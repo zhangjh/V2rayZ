@@ -772,7 +772,7 @@ public class NativeApi
         try
         {
             _logManager.ClearLogs();
-            return JsonSerializer.Serialize(new { success = true }, JsonOptions);
+            return JsonSerializer.Serialize(new { success = true, data = true }, JsonOptions);
         }
         catch (Exception ex)
         {

@@ -315,10 +315,10 @@ public partial class MainWindow : Window
 
     private void InitializeSystemTray()
     {
-        // Create system tray icon
+        // Create system tray icon (initially disconnected/gray)
         _notifyIcon = new NotifyIcon
         {
-            Icon = LoadIcon(),
+            Icon = LoadIcon(false), // Start with disconnected (gray) icon
             Visible = true,
             Text = "V2rayZ - Disconnected"
         };
@@ -346,12 +346,14 @@ public partial class MainWindow : Window
     {
         var contextMenu = new ContextMenuStrip();
 
-        // Status item (disabled, shows current status)
+        // Status item (shows current status, enabled to allow color display)
         var statusItem = new ToolStripMenuItem("● 已断开")
         {
-            Enabled = false,
-            Font = new Font(contextMenu.Font, System.Drawing.FontStyle.Bold)
+            Enabled = true, // Enable to allow custom colors to show
+            Font = new Font(contextMenu.Font, System.Drawing.FontStyle.Bold),
+            ForeColor = Color.Gray // Initial color for disconnected state
         };
+        // Prevent clicking by not adding a click handler
         contextMenu.Items.Add(statusItem);
         contextMenu.Items.Add(new ToolStripSeparator());
 
@@ -509,8 +511,9 @@ public partial class MainWindow : Window
             _notifyIcon.Text = $"V2rayZ - {statusText}" + 
                 (status == Models.ConnectionStatus.Connected ? $" - {modeText}" : "");
 
-            // Update icon (you can add different icons for different states)
-            // For now, we'll keep the same icon
+            // Update icon based on connection status
+            var isConnected = status == Models.ConnectionStatus.Connected;
+            _notifyIcon.Icon = LoadIcon(isConnected);
         });
     }
 
@@ -528,7 +531,7 @@ public partial class MainWindow : Window
             var mode = _viewModel.Config.ProxyMode;
             var isConnected = status == Models.ConnectionStatus.Connected;
 
-            // Update status item
+            // Update status item with color
             ToolStripMenuItem statusItem = tag.StatusItem;
             statusItem.Text = status switch
             {
@@ -538,8 +541,18 @@ public partial class MainWindow : Window
                 Models.ConnectionStatus.Error => "● 错误",
                 _ => "● 未知"
             };
+            
+            // Set status item color based on connection state
+            statusItem.ForeColor = status switch
+            {
+                Models.ConnectionStatus.Connected => Color.Green,
+                Models.ConnectionStatus.Connecting => Color.Orange,
+                Models.ConnectionStatus.Disconnected => Color.Gray,
+                Models.ConnectionStatus.Error => Color.Red,
+                _ => Color.Black
+            };
 
-            // Update toggle proxy item
+            // Update toggle proxy item (no color change)
             ToolStripMenuItem toggleItem = tag.ToggleProxyItem;
             toggleItem.Text = isConnected ? "禁用代理" : "启用代理";
 
@@ -564,6 +577,7 @@ public partial class MainWindow : Window
         serverSelectionItem.DropDownItems.Clear();
 
         var config = _configManager?.LoadConfig();
+        var isConnected = _viewModel?.Connection.Status == Models.ConnectionStatus.Connected;
         
         if (config?.Servers == null || config.Servers.Count == 0)
         {
@@ -579,9 +593,10 @@ public partial class MainWindow : Window
             // Add server items
             foreach (var server in config.Servers)
             {
+                var isSelected = server.Id == config.SelectedServerId;
                 var serverItem = new ToolStripMenuItem($"{server.Name} ({server.Protocol})")
                 {
-                    Checked = server.Id == config.SelectedServerId,
+                    Checked = isSelected,
                     Tag = server.Id
                 };
                 serverItem.Click += OnServerSelectionClick;
@@ -645,14 +660,28 @@ public partial class MainWindow : Window
         SendEventToJavaScript("navigateToPage", "\"server\"");
     }
 
-    private Icon LoadIcon()
+    private Icon LoadIcon(bool isConnected = false)
     {
         try
         {
-            var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "app.ico");
+            // Use different icons based on connection status
+            var iconFileName = isConnected ? "app.ico" : "app-gray.ico";
+            var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", iconFileName);
+            
             if (File.Exists(iconPath))
             {
                 return new Icon(iconPath);
+            }
+            
+            // Fallback to main icon if gray icon doesn't exist
+            if (!isConnected)
+            {
+                var mainIconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "app.ico");
+                if (File.Exists(mainIconPath))
+                {
+                    // Create a grayscale version programmatically if gray icon doesn't exist
+                    return CreateGrayscaleIcon(mainIconPath);
+                }
             }
         }
         catch
@@ -662,6 +691,41 @@ public partial class MainWindow : Window
 
         // Return default icon if custom icon not found
         return SystemIcons.Application;
+    }
+
+    private Icon CreateGrayscaleIcon(string originalIconPath)
+    {
+        try
+        {
+            using var originalIcon = new Icon(originalIconPath);
+            using var bitmap = originalIcon.ToBitmap();
+            using var grayBitmap = new Bitmap(bitmap.Width, bitmap.Height);
+            
+            // Convert to grayscale using a more efficient method
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                for (int y = 0; y < bitmap.Height; y++)
+                {
+                    var pixel = bitmap.GetPixel(x, y);
+                    // Use standard grayscale conversion formula
+                    var gray = (int)(pixel.R * 0.299 + pixel.G * 0.587 + pixel.B * 0.114);
+                    var grayColor = Color.FromArgb(pixel.A, gray, gray, gray);
+                    grayBitmap.SetPixel(x, y, grayColor);
+                }
+            }
+            
+            // Convert bitmap to icon
+            var iconHandle = grayBitmap.GetHicon();
+            var grayIcon = System.Drawing.Icon.FromHandle(iconHandle);
+            
+            return grayIcon;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to create grayscale icon: {ex.Message}");
+            // If grayscale conversion fails, return original icon
+            return new Icon(originalIconPath);
+        }
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)

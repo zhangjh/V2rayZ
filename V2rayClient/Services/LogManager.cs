@@ -67,7 +67,7 @@ public class LogManager : ILogManager
     }
 
     /// <summary>
-    /// Clear all log entries
+    /// Clear all log entries (both in-memory and log files)
     /// </summary>
     public void ClearLogs()
     {
@@ -78,7 +78,19 @@ public class LogManager : ILogManager
             _logs.Clear();
         }
 
-        AddLog(LogLevel.Info, "Logs cleared", "system");
+        // Also clear physical log files
+        try
+        {
+            LoggerConfiguration.ClearLogs();
+        }
+        catch (Exception ex)
+        {
+            // Log the error but don't fail the operation
+            System.Diagnostics.Debug.WriteLine($"Failed to clear log files: {ex.Message}");
+        }
+
+        // Don't add a log entry after clearing - this defeats the purpose
+        // The UI will show empty logs as expected
     }
 
     /// <summary>
