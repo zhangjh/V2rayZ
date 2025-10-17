@@ -746,6 +746,28 @@ public class NativeApi
 
     #endregion
 
+    #region Update Management
+
+    /// <summary>
+    /// Check for application updates
+    /// </summary>
+    public string CheckForUpdates()
+    {
+        try
+        {
+            // This will be handled by the main window
+            // Send event to trigger update check
+            _sendEvent("checkForUpdates", "{}");
+            return JsonSerializer.Serialize(new { success = true, message = "Update check initiated" }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    #endregion
+
     #region Logging
 
     /// <summary>

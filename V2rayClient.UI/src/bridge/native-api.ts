@@ -335,6 +335,27 @@ export async function getVersionInfo(): Promise<ApiResponse<{
 }
 
 /**
+ * Update Management APIs
+ */
+export async function checkForUpdates(): Promise<ApiResponse<void>> {
+  if (!isWebView2()) {
+    return { success: false, error: 'Not running in WebView2 environment' }
+  }
+  
+  try {
+    const nativeApi = (window as any).nativeApi
+    if (nativeApi && nativeApi.checkForUpdates) {
+      const result = await nativeApi.checkForUpdates()
+      return parseResponse(result)
+    } else {
+      return { success: false, error: 'checkForUpdates method not available' }
+    }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
+/**
  * Debug function to get config file information
  */
 

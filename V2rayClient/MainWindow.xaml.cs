@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private IStatisticsManager? _statsManager;
     private IRoutingRuleManager? _routingManager;
     private ILogManager? _logManager;
+    private UpdateService? _updateService;
 
     public MainWindow()
     {
@@ -36,6 +37,9 @@ public partial class MainWindow : Window
         InitializeServices();
         InitializeSystemTray();
         InitializeAsync();
+        
+        // 启动时检查更新（延迟5秒）
+        _ = Task.Delay(5000).ContinueWith(_ => CheckForUpdatesAsync());
         
         // Handle window state changes
         StateChanged += OnWindowStateChanged;
@@ -68,6 +72,7 @@ public partial class MainWindow : Window
         _logManager = new LogManager();
         _v2rayManager = new V2rayManager(_logManager, _routingManager);
         _statsManager = new StatisticsManager();
+        _updateService = new UpdateService();
 
         // Create view model
         _viewModel = new AppViewModel(
@@ -253,7 +258,8 @@ public partial class MainWindow : Window
                     deleteCustomRule: (ruleId) => chrome.webview.hostObjects.nativeApi.DeleteCustomRule(ruleId),
                     getLogs: (count) => chrome.webview.hostObjects.nativeApi.GetLogs(count),
                     clearLogs: () => chrome.webview.hostObjects.nativeApi.ClearLogs(),
-                    getVersionInfo: () => chrome.webview.hostObjects.nativeApi.GetVersionInfo()
+                    getVersionInfo: () => chrome.webview.hostObjects.nativeApi.GetVersionInfo(),
+                    checkForUpdates: () => chrome.webview.hostObjects.nativeApi.CheckForUpdates()
                 };
 
                 // Event listener system
@@ -296,6 +302,14 @@ public partial class MainWindow : Window
         {
             try
             {
+                // Handle special events
+                if (eventName == "checkForUpdates")
+                {
+                    // Trigger update check from main window
+                    _ = Task.Run(() => CheckForUpdatesAsync(true));
+                    return;
+                }
+
                 var script = $@"
                     window.dispatchEvent(new CustomEvent('native-event', {{
                         detail: {{
@@ -398,6 +412,11 @@ public partial class MainWindow : Window
         var settingsItem = new ToolStripMenuItem("打开设置");
         settingsItem.Click += (s, e) => ShowSettingsPage();
         contextMenu.Items.Add(settingsItem);
+
+        // Check for updates
+        var checkUpdateItem = new ToolStripMenuItem("检查更新");
+        checkUpdateItem.Click += (s, e) => CheckForUpdatesAsync(true);
+        contextMenu.Items.Add(checkUpdateItem);
 
         contextMenu.Items.Add(new ToolStripSeparator());
 
@@ -921,6 +940,7 @@ public partial class MainWindow : Window
             _v2rayManager?.Dispose();
             _statsManager?.Dispose();
             _logManager?.Dispose();
+            _updateService?.Dispose();
             
             // Clear references
             _nativeApi = null;
@@ -964,5 +984,93 @@ public partial class MainWindow : Window
         
         System.Diagnostics.Debug.WriteLine("=== MainWindow OnClosed cleanup completed ===");
         base.OnClosed(e);
+    }
+
+    /// <summary>
+    /// 检查更新
+    /// </summary>
+    /// <param name="showNoUpdateMessage">是否显示无更新消息</param>
+    private async Task CheckForUpdatesAsync(bool showNoUpdateMessage = false)
+    {
+        if (_updateService == null) return;
+
+        try
+        {
+            // 检查是否跳过了某个版本
+            var skippedVersion = GetSkippedVersion();
+            
+            var updateInfo = await _updateService.CheckForUpdateAsync(false);
+            
+            if (updateInfo == null)
+            {
+                if (showNoUpdateMessage)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show("当前已是最新版本！", "检查更新", 
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+                }
+                return;
+            }
+
+            // 如果用户跳过了这个版本，不显示更新提示
+            if (!string.IsNullOrEmpty(skippedVersion) && skippedVersion == updateInfo.Version)
+            {
+                if (showNoUpdateMessage)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show($"发现新版本 {updateInfo.Version}，但您已选择跳过此版本。", "检查更新", 
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+                }
+                return;
+            }
+
+            // 显示更新窗口
+            Dispatcher.Invoke(() =>
+            {
+                var updateWindow = new UpdateWindow(_updateService, updateInfo)
+                {
+                    Owner = this
+                };
+                updateWindow.ShowDialog();
+            });
+        }
+        catch (Exception ex)
+        {
+            if (showNoUpdateMessage)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show($"检查更新失败: {ex.Message}", "错误", 
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取跳过的版本
+    /// </summary>
+    private string? GetSkippedVersion()
+    {
+        try
+        {
+            var configDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "V2rayZ");
+            var skippedVersionFile = Path.Combine(configDir, "skipped_version.txt");
+            
+            if (File.Exists(skippedVersionFile))
+            {
+                return File.ReadAllText(skippedVersionFile).Trim();
+            }
+        }
+        catch
+        {
+            // 忽略错误
+        }
+        
+        return null;
     }
 }

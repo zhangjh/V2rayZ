@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { ExternalLink, Loader2 } from 'lucide-react'
-import { getVersionInfo } from '@/bridge/api-wrapper'
+import { getVersionInfo, checkForUpdates } from '@/bridge/api-wrapper'
 
 interface VersionInfo {
   appVersion: string
@@ -18,6 +18,7 @@ interface VersionInfo {
 export function AboutSettings() {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
 
   useEffect(() => {
     loadVersionInfo()
@@ -36,8 +37,17 @@ export function AboutSettings() {
     }
   }
 
-  const handleCheckUpdate = () => {
-    toast.info('检查更新功能即将推出')
+  const handleCheckUpdate = async () => {
+    try {
+      setCheckingUpdate(true)
+      await checkForUpdates()
+      toast.success('正在检查更新...')
+    } catch (error) {
+      console.error('Failed to check for updates:', error)
+      toast.error('检查更新失败')
+    } finally {
+      setCheckingUpdate(false)
+    }
   }
 
   const handleOpenGitHub = () => {
@@ -87,8 +97,13 @@ export function AboutSettings() {
           <Separator />
 
           <div className="space-y-2">
-            <Button onClick={handleCheckUpdate} className="w-full sm:w-auto">
-              检查更新
+            <Button 
+              onClick={handleCheckUpdate} 
+              disabled={checkingUpdate}
+              className="w-full sm:w-auto"
+            >
+              {checkingUpdate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {checkingUpdate ? '检查中...' : '检查更新'}
             </Button>
           </div>
 

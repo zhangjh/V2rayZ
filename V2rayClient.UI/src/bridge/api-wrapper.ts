@@ -253,6 +253,19 @@ export async function getVersionInfo() {
 }
 
 /**
+ * Update Management APIs with error handling
+ */
+export async function checkForUpdates(): Promise<boolean> {
+  const result = await wrapApiCall(
+    () => nativeApi.checkForUpdates(),
+    '检查更新',
+    ErrorCategory.System
+  );
+  
+  return result !== null;
+}
+
+/**
  * Re-export event listener functions
  */
 export { addEventListener, removeEventListener } from './native-api';

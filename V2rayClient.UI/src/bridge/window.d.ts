@@ -32,6 +32,9 @@ interface NativeApi {
 
   // Version Information
   getVersionInfo(): Promise<string>
+
+  // Update Management
+  checkForUpdates(): Promise<string>
 }
 
 declare global {
