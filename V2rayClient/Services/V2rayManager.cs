@@ -532,6 +532,18 @@ public class V2rayManager : IV2rayManager
                 };
             }
         }
+
+        // Configure WebSocket if enabled
+        if (server.Network == NetworkType.Ws)
+        {
+            outbound.StreamSettings.WsSettings = new WsStreamSettings
+            {
+                Path = server.WsSettings?.Path ?? "/",
+                Headers = !string.IsNullOrEmpty(server.WsSettings?.Host) 
+                    ? new Dictionary<string, string> { { "Host", server.WsSettings.Host } }
+                    : null
+            };
+        }
     }
 
     private async Task<string> WriteConfigFileAsync(V2rayConfig config)

@@ -69,4 +69,9 @@ public class ServerConfig
     /// TLS settings (when Security is Tls)
     /// </summary>
     public TlsSettings? TlsSettings { get; set; }
+
+    /// <summary>
+    /// WebSocket settings (when Network is Ws)
+    /// </summary>
+    public WsSettings? WsSettings { get; set; }
 }

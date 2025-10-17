@@ -44,6 +44,7 @@ export interface ServerConfig {
   network: 'Tcp' | 'Ws' | 'H2'
   security: 'None' | 'Tls'
   tlsSettings?: TlsSettings
+  wsSettings?: WsSettings
   
   // VLESS specific fields (optional)
   uuid?: string
@@ -56,6 +57,11 @@ export interface ServerConfig {
 export interface TlsSettings {
   serverName?: string
   allowInsecure?: boolean
+}
+
+export interface WsSettings {
+  path?: string
+  host?: string
 }
 
 export interface DomainRule {

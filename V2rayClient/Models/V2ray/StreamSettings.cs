@@ -24,6 +24,12 @@ public class StreamSettings
     /// </summary>
     [JsonPropertyName("tlsSettings")]
     public TlsStreamSettings? TlsSettings { get; set; }
+
+    /// <summary>
+    /// WebSocket settings
+    /// </summary>
+    [JsonPropertyName("wsSettings")]
+    public WsStreamSettings? WsSettings { get; set; }
 }
 
 /// <summary>
@@ -48,4 +54,22 @@ public class TlsStreamSettings
     /// </summary>
     [JsonPropertyName("alpn")]
     public List<string>? Alpn { get; set; }
+}
+
+/// <summary>
+/// WebSocket settings for stream
+/// </summary>
+public class WsStreamSettings
+{
+    /// <summary>
+    /// WebSocket path
+    /// </summary>
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = "/";
+
+    /// <summary>
+    /// WebSocket headers
+    /// </summary>
+    [JsonPropertyName("headers")]
+    public Dictionary<string, string>? Headers { get; set; }
 }

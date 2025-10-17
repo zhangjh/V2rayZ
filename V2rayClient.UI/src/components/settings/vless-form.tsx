@@ -35,6 +35,9 @@ const vlessFormSchema = z.object({
   security: z.enum(['None', 'Tls']),
   tlsServerName: z.string().optional(),
   tlsAllowInsecure: z.boolean(),
+  // WebSocket specific settings
+  wsPath: z.string().optional(),
+  wsHost: z.string().optional(),
 })
 
 type VlessFormValues = z.infer<typeof vlessFormSchema>
@@ -58,6 +61,8 @@ export function VlessForm({ serverConfig, onSubmit, onTestConnection, isTestingC
       security: 'Tls',
       tlsServerName: '',
       tlsAllowInsecure: false,
+      wsPath: '',
+      wsHost: '',
     },
   })
 
@@ -73,6 +78,8 @@ export function VlessForm({ serverConfig, onSubmit, onTestConnection, isTestingC
         security: serverConfig.security || 'Tls',
         tlsServerName: serverConfig.tlsSettings?.serverName || '',
         tlsAllowInsecure: serverConfig.tlsSettings?.allowInsecure || false,
+        wsPath: serverConfig.wsSettings?.path || '',
+        wsHost: serverConfig.wsSettings?.host || '',
       }
       console.log('[VlessForm] Resetting form with:', formData)
       form.reset(formData)
@@ -92,12 +99,17 @@ export function VlessForm({ serverConfig, onSubmit, onTestConnection, isTestingC
         serverName: values.tlsServerName || null,
         allowInsecure: values.tlsAllowInsecure,
       } : null,
+      wsSettings: values.network === 'Ws' ? {
+        path: values.wsPath || '/',
+        host: values.wsHost || null,
+      } : null,
     }
 
     await onSubmit(serverConfig)
   }
 
   const isTlsEnabled = form.watch('security') === 'Tls'
+  const isWebSocketEnabled = form.watch('network') === 'Ws'
 
   return (
     <Form {...form}>
@@ -281,6 +293,44 @@ export function VlessForm({ serverConfig, onSubmit, onTestConnection, isTestingC
                       跳过 TLS 证书验证（不推荐，仅用于测试）
                     </FormDescription>
                   </div>
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+
+        {isWebSocketEnabled && (
+          <>
+            <FormField
+              control={form.control}
+              name="wsPath"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WebSocket 路径</FormLabel>
+                  <FormControl>
+                    <Input placeholder="" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    WebSocket 连接路径
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="wsHost"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WebSocket 主机头（可选）</FormLabel>
+                  <FormControl>
+                    <Input placeholder="example.com" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    WebSocket 伪装域名，留空则使用服务器地址
+                  </FormDescription>
+                  <FormMessage />
                 </FormItem>
               )}
             />
