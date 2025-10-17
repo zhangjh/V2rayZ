@@ -1,0 +1,117 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.log
+*.vspscc
+*.vssscc
+.vs/
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.opendb
+*.VC.db
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+publish/
+installer-output/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# React build output
+dist/
+dist-ssr/
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# WebView2
+**/WebView2/
+
+# wwwroot (React build output - keep .gitkeep)
+V2rayClient/wwwroot/*
+!V2rayClient/wwwroot/.gitkeep
+
+# Resources (v2ray binaries and GeoData files)
+V2rayClient/Resources/v2ray.exe
+V2rayClient/Resources/geoip.dat
+V2rayClient/Resources/geosite.dat
+V2rayClient/Resources/*.zip
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Development and testing files (not for production)
+.kiro/
+V2rayClient.Tests/
+**/TASK_*.md
+build-debug.ps1
+run-with-logs.ps1
+test-installer.ps1
+test-release.ps1
+verify-trojan-json.ps1
+download-resources.ps1
+BUILD.md
+DEPLOYMENT_GUIDE.md
+INSTALLER.md
+RELEASE_CHECKLIST.md
+PROJECT_STATUS.md
+SETUP.md
+QUICKSTART.md
+**/IMPLEMENTATION_SUMMARY.md
+**/IMPLEMENTATION_NOTES.md
+**/ErrorHandling.Usage.md
+cleanup-for-release.ps1
