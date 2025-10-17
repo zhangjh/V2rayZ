@@ -175,7 +175,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       if (response.success && response.data) {
         console.log('[Store] Config loaded successfully:', response.data)
-        set({ config: response.data })
+        
+        // Migrate old config format to new format if needed
+        let config = response.data
+        if (config.server && !config.servers) {
+          // Old format: migrate single server to servers array
+          const migratedServer = {
+            ...config.server,
+            id: crypto.randomUUID(),
+            name: `${config.server.protocol} 服务器`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+          
+          config = {
+            ...config,
+            servers: [migratedServer],
+            selectedServerId: migratedServer.id,
+          }
+          delete config.server
+          
+          // Save migrated config
+          await get().saveConfig(config)
+        }
+        
+        set({ config })
       } else {
         console.error('[Store] Failed to load config:', response.error)
         set({ error: response.error || 'Failed to load config' })

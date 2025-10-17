@@ -3,6 +3,7 @@ import { ProxyModeSelector } from '@/components/home/proxy-mode-selector'
 import { RealTimeLogs } from '@/components/home/real-time-logs'
 
 export function HomePage() {
+
   return (
     <div className="space-y-6">
       <div>

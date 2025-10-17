@@ -1,70 +1,139 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useAppStore } from '@/store/app-store'
-import { VlessForm } from '@/components/settings/vless-form'
-import { TrojanForm } from '@/components/settings/trojan-form'
+import { ServerList } from '@/components/settings/server-list'
+import { ServerConfigDialog } from '@/components/settings/server-config-dialog'
+import type { ServerConfigWithId } from '@/bridge/types'
 
 export function ServerPage() {
   const config = useAppStore((state) => state.config)
   const saveConfig = useAppStore((state) => state.saveConfig)
-  const connectionStatus = useAppStore((state) => state.connectionStatus)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingServer, setEditingServer] = useState<ServerConfigWithId | undefined>()
   const [isTestingConnection, setIsTestingConnection] = useState(false)
-  const [selectedProtocol, setSelectedProtocol] = useState<'Vless' | 'Trojan'>('Vless')
 
-  // Load protocol from config
-  useEffect(() => {
-    if (config?.server?.protocol) {
-      setSelectedProtocol(config.server.protocol)
-    }
-  }, [config])
+  const servers = config?.servers || []
+  const selectedServerId = config?.selectedServerId
 
+  const handleAddServer = () => {
+    setEditingServer(undefined)
+    setIsDialogOpen(true)
+  }
 
+  const handleEditServer = (server: ServerConfigWithId) => {
+    setEditingServer(server)
+    setIsDialogOpen(true)
+  }
 
-  const handleSaveConfig = async (serverConfig: any) => {
+  const handleDeleteServer = async (serverId: string) => {
     try {
-      console.log('========== SAVE CONFIG START ==========')
-      console.log('Server config:', serverConfig)
+      const updatedServers = servers.filter(s => s.id !== serverId)
+      
+      // If deleting the selected server, clear selection
+      const newSelectedServerId = selectedServerId === serverId ? undefined : selectedServerId
 
-      // Create default config if not exists
-      const baseConfig = config || {
-        proxyMode: 'Smart',
-        customRules: [],
-        autoStart: false,
-        autoConnect: false,
-        minimizeToTray: true,
-        socksPort: 65534,
-        httpPort: 65533,
-      }
-
-      // Update the config with new server settings
       const updatedConfig = {
-        ...baseConfig,
-        server: serverConfig,
+        ...config,
+        servers: updatedServers,
+        selectedServerId: newSelectedServerId,
+        proxyMode: config?.proxyMode || 'Smart',
+        customRules: config?.customRules || [],
+        autoStart: config?.autoStart || false,
+        autoConnect: config?.autoConnect || false,
+        minimizeToTray: config?.minimizeToTray || true,
+        socksPort: config?.socksPort || 65534,
+        httpPort: config?.httpPort || 65533,
       }
-
-      console.log('Final config to save:', updatedConfig)
 
       await saveConfig(updatedConfig)
+      toast.success('服务器已删除')
+    } catch (error) {
+      toast.error('删除失败', {
+        description: error instanceof Error ? error.message : '删除服务器时发生错误',
+      })
+    }
+  }
 
-      console.log('========== SAVE CONFIG END ==========')
+  const handleSelectServer = async (serverId: string) => {
+    try {
+      const updatedConfig = {
+        ...config,
+        selectedServerId: serverId,
+        servers: config?.servers || [],
+        proxyMode: config?.proxyMode || 'Smart',
+        customRules: config?.customRules || [],
+        autoStart: config?.autoStart || false,
+        autoConnect: config?.autoConnect || false,
+        minimizeToTray: config?.minimizeToTray || true,
+        socksPort: config?.socksPort || 65534,
+        httpPort: config?.httpPort || 65533,
+      }
 
-      const protocolName = serverConfig.protocol === 'Vless' ? 'VLESS' : 'Trojan'
-      toast.success('配置已保存', {
-        description: `${protocolName} 服务器配置已成功保存。如果代理正在运行，请重新连接以应用新配置。`,
+      await saveConfig(updatedConfig)
+      toast.success('服务器已选择')
+    } catch (error) {
+      toast.error('选择失败', {
+        description: error instanceof Error ? error.message : '选择服务器时发生错误',
+      })
+    }
+  }
+
+  const handleSaveServer = async (serverData: Omit<ServerConfigWithId, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      console.log('[ServerPage] Saving server:', serverData)
+      console.log('[ServerPage] Current servers:', servers)
+      console.log('[ServerPage] Current config:', config)
+      
+      const now = new Date().toISOString()
+      let updatedServers: ServerConfigWithId[]
+
+      if (editingServer) {
+        // Update existing server
+        updatedServers = servers.map(s => 
+          s.id === editingServer.id 
+            ? { ...serverData, id: editingServer.id, createdAt: editingServer.createdAt, updatedAt: now }
+            : s
+        )
+        console.log('[ServerPage] Updated existing server')
+      } else {
+        // Add new server
+        const newServer: ServerConfigWithId = {
+          ...serverData,
+          id: crypto.randomUUID(),
+          createdAt: now,
+          updatedAt: now,
+        }
+        updatedServers = [...servers, newServer]
+        console.log('[ServerPage] Added new server:', newServer)
+      }
+
+      const updatedConfig = {
+        ...config,
+        servers: updatedServers,
+        selectedServerId: config?.selectedServerId,
+        proxyMode: config?.proxyMode || 'Smart',
+        customRules: config?.customRules || [],
+        autoStart: config?.autoStart || false,
+        autoConnect: config?.autoConnect || false,
+        minimizeToTray: config?.minimizeToTray || true,
+        socksPort: config?.socksPort || 65534,
+        httpPort: config?.httpPort || 65533,
+      }
+
+      console.log('[ServerPage] Final config to save:', updatedConfig)
+      await saveConfig(updatedConfig)
+      console.log('[ServerPage] Config saved successfully')
+
+      const action = editingServer ? '更新' : '添加'
+      toast.success(`服务器配置已${action}`, {
+        description: `${serverData.name} 配置已成功保存`,
       })
     } catch (error) {
-      console.error('========== SAVE CONFIG ERROR ==========', error)
+      console.error('[ServerPage] Save error:', error)
       toast.error('保存失败', {
-        description: error instanceof Error ? error.message : '保存配置时发生错误',
+        description: error instanceof Error ? error.message : '保存服务器配置时发生错误',
       })
+      throw error
     }
   }
 
@@ -88,72 +157,28 @@ export function ServerPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">服务器配置</h2>
-        <p className="text-muted-foreground mt-1">配置代理服务器连接信息，支持 VLESS 和 Trojan 协议</p>
+        <p className="text-muted-foreground mt-1">
+          管理您的代理服务器配置，支持 VLESS 和 Trojan 协议
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>协议类型选择</CardTitle>
-          <CardDescription>
-            选择您的代理服务器协议类型
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">协议类型</label>
-            <Select
-              value={selectedProtocol}
-              onValueChange={(value) => setSelectedProtocol(value as 'Vless' | 'Trojan')}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Vless">VLESS</SelectItem>
-                <SelectItem value="Trojan">Trojan</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              切换协议类型将显示对应的配置表单
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <ServerList
+        servers={servers}
+        selectedServerId={selectedServerId}
+        onAddServer={handleAddServer}
+        onEditServer={handleEditServer}
+        onDeleteServer={handleDeleteServer}
+        onSelectServer={handleSelectServer}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>服务器配置</CardTitle>
-          <CardDescription>
-            填写您的代理服务器连接信息。修改配置后需要重新连接才能生效。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {connectionStatus?.v2ray.running && (
-            <div className="mb-6 p-4 border border-yellow-500/50 bg-yellow-500/10 rounded-lg">
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                ⚠️ 代理正在运行中。修改配置后，请停止并重新启动代理以应用新配置。
-              </p>
-            </div>
-          )}
-
-          {selectedProtocol === 'Vless' && (
-            <VlessForm
-              serverConfig={config?.server?.protocol === 'Vless' ? config.server : undefined}
-              onSubmit={handleSaveConfig}
-              onTestConnection={handleTestConnection}
-              isTestingConnection={isTestingConnection}
-            />
-          )}
-          {selectedProtocol === 'Trojan' && (
-            <TrojanForm
-              serverConfig={config?.server?.protocol === 'Trojan' ? config.server : undefined}
-              onSubmit={handleSaveConfig}
-              onTestConnection={handleTestConnection}
-              isTestingConnection={isTestingConnection}
-            />
-          )}
-        </CardContent>
-      </Card>
+      <ServerConfigDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        server={editingServer}
+        onSave={handleSaveServer}
+        onTestConnection={handleTestConnection}
+        isTestingConnection={isTestingConnection}
+      />
     </div>
   )
 }

@@ -65,8 +65,17 @@ export interface DomainRule {
   enabled: boolean
 }
 
+export interface ServerConfigWithId extends ServerConfig {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface UserConfig {
-  server: ServerConfig
+  servers: ServerConfigWithId[]
+  selectedServerId?: string
+  server?: ServerConfig // Legacy field for backward compatibility
   proxyMode: 'Global' | 'Smart' | 'Direct'
   customRules: DomainRule[]
   autoStart: boolean

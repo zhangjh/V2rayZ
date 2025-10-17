@@ -8,10 +8,20 @@ namespace V2rayClient.Models;
 public class UserConfig
 {
     /// <summary>
-    /// Server configuration
+    /// List of server configurations
     /// </summary>
-    [Required(ErrorMessage = "服务器配置不能为空")]
-    public ServerConfig Server { get; set; } = new();
+    public List<ServerConfigWithId> Servers { get; set; } = new();
+
+    /// <summary>
+    /// ID of the currently selected server
+    /// </summary>
+    public string? SelectedServerId { get; set; }
+
+    /// <summary>
+    /// Server configuration (legacy, for backward compatibility)
+    /// </summary>
+    [Obsolete("Use Servers and SelectedServerId instead")]
+    public ServerConfig? Server { get; set; }
 
     /// <summary>
     /// Current proxy mode
@@ -49,4 +59,16 @@ public class UserConfig
     /// </summary>
     [Range(1024, 65535, ErrorMessage = "HTTP 端口必须在 1024-65535 之间")]
     public int HttpPort { get; set; } = 65533;
+
+    /// <summary>
+    /// Get the currently selected server configuration
+    /// </summary>
+    /// <returns>Selected server or null if none selected</returns>
+    public ServerConfigWithId? GetSelectedServer()
+    {
+        if (string.IsNullOrEmpty(SelectedServerId))
+            return null;
+
+        return Servers.FirstOrDefault(s => s.Id == SelectedServerId);
+    }
 }

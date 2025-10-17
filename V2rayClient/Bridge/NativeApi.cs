@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using V2rayClient.Models;
 using V2rayClient.Services;
 
@@ -281,8 +282,49 @@ public class NativeApi
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine("[NativeApi] ========== GET CONFIG START ==========");
             var config = _configManager.LoadConfig();
-            return JsonSerializer.Serialize(new { success = true, data = config }, JsonOptions);
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Loaded config - Servers count: {config.Servers?.Count ?? 0}");
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Selected server ID: {config.SelectedServerId}");
+            
+            var result = JsonSerializer.Serialize(new { success = true, data = config }, JsonOptions);
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Returning config JSON length: {result.Length}");
+            System.Diagnostics.Debug.WriteLine("[NativeApi] ========== GET CONFIG END ==========");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Get config failed: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Get configuration file information for debugging
+    /// </summary>
+    public string GetConfigFileInfo()
+    {
+        try
+        {
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var appFolder = Path.Combine(appDataPath, "V2rayClient");
+            var configPath = Path.Combine(appFolder, "config.json");
+            
+            var info = new
+            {
+                success = true,
+                data = new
+                {
+                    configPath = configPath,
+                    directoryExists = Directory.Exists(appFolder),
+                    fileExists = File.Exists(configPath),
+                    fileSize = File.Exists(configPath) ? new FileInfo(configPath).Length : 0,
+                    fileContent = File.Exists(configPath) ? File.ReadAllText(configPath) : null,
+                    lastModified = File.Exists(configPath) ? File.GetLastWriteTime(configPath).ToString() : null
+                }
+            };
+            
+            return JsonSerializer.Serialize(info, JsonOptions);
         }
         catch (Exception ex)
         {
@@ -312,10 +354,18 @@ public class NativeApi
                 return JsonSerializer.Serialize(new { success = false, error = "Failed to deserialize configuration" }, JsonOptions);
             }
 
-            System.Diagnostics.Debug.WriteLine($"[NativeApi] Protocol: {config.Server?.Protocol}");
-            System.Diagnostics.Debug.WriteLine($"[NativeApi] Address: {config.Server?.Address}");
-            System.Diagnostics.Debug.WriteLine($"[NativeApi] Port: {config.Server?.Port}");
+            // Log new format info
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Servers count: {config.Servers?.Count ?? 0}");
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Selected server ID: {config.SelectedServerId}");
             System.Diagnostics.Debug.WriteLine($"[NativeApi] ProxyMode: {config.ProxyMode}");
+            
+            // Log legacy format info if present
+            if (config.Server != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[NativeApi] Legacy server - Protocol: {config.Server.Protocol}");
+                System.Diagnostics.Debug.WriteLine($"[NativeApi] Legacy server - Address: {config.Server.Address}");
+                System.Diagnostics.Debug.WriteLine($"[NativeApi] Legacy server - Port: {config.Server.Port}");
+            }
             
             // Validate and save configuration
             _configManager.SaveConfig(config);

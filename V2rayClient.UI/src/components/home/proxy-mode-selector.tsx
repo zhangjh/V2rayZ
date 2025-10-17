@@ -18,21 +18,22 @@ export function ProxyModeSelector() {
   const isConnected = connectionStatus?.v2ray?.running && connectionStatus?.proxy?.enabled
   const hasError = connectionStatus?.v2ray?.error
 
-  // Check if server is configured
+  // Check if server is configured and selected
   const isServerConfigured = (() => {
-    if (!config?.server) return false
+    if (!config?.selectedServerId) return false
     
-    const server = config.server
+    const selectedServer = config.servers?.find(s => s.id === config.selectedServerId)
+    if (!selectedServer) return false
     
     // Basic checks
-    if (!server.address || server.address.trim() === '') return false
-    if (!server.port || server.port <= 0) return false
+    if (!selectedServer.address || selectedServer.address.trim() === '') return false
+    if (!selectedServer.port || selectedServer.port <= 0) return false
     
     // Protocol-specific checks
-    if (server.protocol === 'Vless') {
-      return !!(server.uuid && server.uuid.trim() !== '')
-    } else if (server.protocol === 'Trojan') {
-      return !!(server.password && server.password.trim() !== '')
+    if (selectedServer.protocol === 'Vless') {
+      return !!(selectedServer.uuid && selectedServer.uuid.trim() !== '')
+    } else if (selectedServer.protocol === 'Trojan') {
+      return !!(selectedServer.password && selectedServer.password.trim() !== '')
     }
     
     return false
@@ -99,14 +100,7 @@ export function ProxyModeSelector() {
           </div>
         </RadioGroup>
 
-        <div className="pt-2 border-t">
-          {!isServerConfigured && (
-            <div className="p-3 mb-3 border border-yellow-500/50 bg-yellow-500/10 rounded-lg">
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                ⚠️ 请先在"服务器"页面配置代理服务器信息
-              </p>
-            </div>
-          )}
+        <div className="pt-2 border-t"> 
           
           <Button
             onClick={handleToggleProxy}
