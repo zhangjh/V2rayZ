@@ -238,7 +238,6 @@ public partial class MainWindow : Window
             (function() {
                 // Create a promise-based wrapper for the native API
                 window.nativeApi = {
-                    testBridge: () => chrome.webview.hostObjects.nativeApi.TestBridge(),
                     startProxy: () => chrome.webview.hostObjects.nativeApi.StartProxy(),
                     stopProxy: () => chrome.webview.hostObjects.nativeApi.StopProxy(),
                     getConfig: () => chrome.webview.hostObjects.nativeApi.GetConfig(),

@@ -17,11 +17,7 @@ public class UserConfig
     /// </summary>
     public string? SelectedServerId { get; set; }
 
-    /// <summary>
-    /// Server configuration (legacy, for backward compatibility)
-    /// </summary>
-    [Obsolete("Use Servers and SelectedServerId instead")]
-    public ServerConfig? Server { get; set; }
+
 
     /// <summary>
     /// Current proxy mode

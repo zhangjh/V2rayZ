@@ -32,9 +32,6 @@ interface NativeApi {
 
   // Version Information
   getVersionInfo(): Promise<string>
-
-  // Debug Functions
-  getConfigFileInfo(): Promise<string>
 }
 
 declare global {

@@ -177,28 +177,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (response.success && response.data) {
         console.log('[Store] Config loaded successfully:', response.data)
         
-        // Migrate old config format to new format if needed
-        let config = response.data
-        if (config.server && !config.servers) {
-          // Old format: migrate single server to servers array
-          const migratedServer = {
-            ...config.server,
-            id: crypto.randomUUID(),
-            name: `${config.server.protocol} 服务器`,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-          
-          config = {
-            ...config,
-            servers: [migratedServer],
-            selectedServerId: migratedServer.id,
-          }
-          delete config.server
-          
-          // Save migrated config
-          await get().saveConfig(config)
-        }
+        const config = response.data
         
         set({ config })
       } else {
@@ -350,8 +329,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const response = await nativeApi.addCustomRule(rule)
       if (response.success) {
-        // Clear localStorage cache to force reload from backend
-        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
       } else {
@@ -369,8 +346,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const response = await nativeApi.addCustomRulesBatch(rules)
       if (response.success) {
-        // Clear localStorage cache to force reload from backend
-        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
       } else {
@@ -395,8 +370,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       if (response.success) {
         console.log('[Store] Rule updated successfully, reloading config...')
-        // Clear localStorage cache to force reload from backend
-        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
         console.log('[Store] Config reloaded after rule update')
@@ -420,8 +393,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const response = await nativeApi.deleteCustomRule(ruleId)
       if (response.success) {
-        // Clear localStorage cache to force reload from backend
-        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
       } else {

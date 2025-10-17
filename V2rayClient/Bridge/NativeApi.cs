@@ -61,39 +61,7 @@ public class NativeApi
 
     #region Proxy Control
 
-    /// <summary>
-    /// Test method to verify bridge is working
-    /// </summary>
-    public string TestBridge()
-    {
-        System.Diagnostics.Debug.WriteLine("[NativeApi] ========== TestBridge START ==========");
-        
-        try
-        {
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 1: Method called");
-            
-            // Skip LogManager for now to isolate the issue
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 2: About to create result object");
-            
-            var resultObj = new { success = true, message = "Bridge is working!" };
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 3: Result object created");
-            
-            var result = JsonSerializer.Serialize(resultObj, JsonOptions);
-            System.Diagnostics.Debug.WriteLine($"[NativeApi] Step 4: JSON serialized: {result}");
-            
-            System.Diagnostics.Debug.WriteLine("[NativeApi] ========== TestBridge SUCCESS ==========");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[NativeApi] TestBridge EXCEPTION: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"[NativeApi] Exception Type: {ex.GetType().Name}");
-            System.Diagnostics.Debug.WriteLine($"[NativeApi] Stack Trace: {ex.StackTrace}");
-            
-            // Return a simple string without JSON serialization
-            return "{\"success\":false,\"error\":\"Exception occurred\"}";
-        }
-    }
+
 
     /// <summary>
     /// Start the proxy connection
@@ -299,36 +267,47 @@ public class NativeApi
         }
     }
 
+
+
     /// <summary>
-    /// Get configuration file information for debugging
+    /// Test ConfigurationManager.LoadConfig() directly for debugging
     /// </summary>
-    public string GetConfigFileInfo()
+    public string TestLoadConfig()
     {
         try
         {
-            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var appFolder = Path.Combine(appDataPath, "V2rayZ");
-            var configPath = Path.Combine(appFolder, "config.json");
+            System.Diagnostics.Debug.WriteLine("[NativeApi] ========== TEST LOAD CONFIG START ==========");
             
-            var info = new
+            // Call LoadConfig directly and capture detailed info
+            var config = _configManager.LoadConfig();
+            
+            var result = new
             {
                 success = true,
                 data = new
                 {
-                    configPath = configPath,
-                    directoryExists = Directory.Exists(appFolder),
-                    fileExists = File.Exists(configPath),
-                    fileSize = File.Exists(configPath) ? new FileInfo(configPath).Length : 0,
-                    fileContent = File.Exists(configPath) ? File.ReadAllText(configPath) : null,
-                    lastModified = File.Exists(configPath) ? File.GetLastWriteTime(configPath).ToString() : null
+                    serversCount = config.Servers?.Count ?? 0,
+                    selectedServerId = config.SelectedServerId,
+                    proxyMode = config.ProxyMode.ToString(),
+                    servers = config.Servers?.Select(s => new {
+                        id = s.Id,
+                        name = s.Name,
+                        protocol = s.Protocol.ToString(),
+                        address = s.Address,
+                        port = s.Port
+                    }).ToArray()
                 }
             };
             
-            return JsonSerializer.Serialize(info, JsonOptions);
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] LoadConfig result - Servers: {result.data.serversCount}");
+            System.Diagnostics.Debug.WriteLine("[NativeApi] ========== TEST LOAD CONFIG END ==========");
+            
+            return JsonSerializer.Serialize(result, JsonOptions);
         }
         catch (Exception ex)
         {
-            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Test LoadConfig failed: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message, stackTrace = ex.StackTrace }, JsonOptions);
         }
     }
 
@@ -354,18 +333,10 @@ public class NativeApi
                 return JsonSerializer.Serialize(new { success = false, error = "Failed to deserialize configuration" }, JsonOptions);
             }
 
-            // Log new format info
+            // Log configuration info
             System.Diagnostics.Debug.WriteLine($"[NativeApi] Servers count: {config.Servers?.Count ?? 0}");
             System.Diagnostics.Debug.WriteLine($"[NativeApi] Selected server ID: {config.SelectedServerId}");
             System.Diagnostics.Debug.WriteLine($"[NativeApi] ProxyMode: {config.ProxyMode}");
-            
-            // Log legacy format info if present
-            if (config.Server != null)
-            {
-                System.Diagnostics.Debug.WriteLine($"[NativeApi] Legacy server - Protocol: {config.Server.Protocol}");
-                System.Diagnostics.Debug.WriteLine($"[NativeApi] Legacy server - Address: {config.Server.Address}");
-                System.Diagnostics.Debug.WriteLine($"[NativeApi] Legacy server - Port: {config.Server.Port}");
-            }
             
             // Validate and save configuration
             _configManager.SaveConfig(config);

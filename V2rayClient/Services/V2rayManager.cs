@@ -308,30 +308,7 @@ public class V2rayManager : IV2rayManager
         var selectedServer = userConfig.GetSelectedServer();
         if (selectedServer == null)
         {
-            // Fallback to legacy server config for backward compatibility
-            if (userConfig.Server != null)
-            {
-                selectedServer = new ServerConfigWithId
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Name = "Legacy Server",
-                    Protocol = userConfig.Server.Protocol,
-                    Address = userConfig.Server.Address,
-                    Port = userConfig.Server.Port,
-                    Uuid = userConfig.Server.Uuid,
-                    Encryption = userConfig.Server.Encryption,
-                    Password = userConfig.Server.Password,
-                    Network = userConfig.Server.Network,
-                    Security = userConfig.Server.Security,
-                    TlsSettings = userConfig.Server.TlsSettings,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-            }
-            else
-            {
-                throw new InvalidOperationException("没有选择服务器配置。请先在服务器页面选择一个服务器。");
-            }
+            throw new InvalidOperationException("没有选择服务器配置。请先在服务器页面选择一个服务器。");
         }
 
         var config = new V2rayConfig

@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Text.Json;
 using V2rayClient.Models;
+using Serilog;
 
 namespace V2rayClient.Services;
 
@@ -44,16 +45,12 @@ public class ConfigurationManager : IConfigurationManager
     /// </summary>
     public UserConfig LoadConfig()
     {
-        Console.WriteLine($"[ConfigManager] ========== LOAD CONFIG START ==========");
-        Console.WriteLine($"[ConfigManager] Config file path: {_configFilePath}");
-        Console.WriteLine($"[ConfigManager] File exists: {File.Exists(_configFilePath)}");
+        Log.Debug("[ConfigManager] Loading configuration from {ConfigFilePath}", _configFilePath);
         
         // If we have a cached config, return it
         if (_currentConfig != null)
         {
-            Console.WriteLine($"[ConfigManager] Returning cached configuration");
-            Console.WriteLine($"[ConfigManager] Cached servers count: {_currentConfig.Servers?.Count ?? 0}");
-            Console.WriteLine($"[ConfigManager] ========== LOAD CONFIG END (CACHED) ==========");
+            Log.Debug("[ConfigManager] Found cached configuration with {ServersCount} servers", _currentConfig.Servers?.Count ?? 0);
             return _currentConfig;
         }
         
@@ -62,126 +59,50 @@ public class ConfigurationManager : IConfigurationManager
             if (File.Exists(_configFilePath))
             {
                 var json = File.ReadAllText(_configFilePath);
-                Console.WriteLine($"[ConfigManager] File content length: {json.Length}");
-                Console.WriteLine($"[ConfigManager] File content preview: {json.Substring(0, Math.Min(200, json.Length))}...");
+                Log.Debug("[ConfigManager] Configuration file loaded, size: {ContentLength} bytes", json.Length);
                 
                 var config = JsonSerializer.Deserialize<UserConfig>(json, _jsonOptions);
 
                 if (config != null)
                 {
-                    Console.WriteLine($"[ConfigManager] Deserialized config - Servers count: {config.Servers?.Count ?? 0}");
-                    Console.WriteLine($"[ConfigManager] Selected server ID: {config.SelectedServerId}");
-                    Console.WriteLine($"[ConfigManager] Legacy server present: {config.Server != null}");
+                    Log.Information("[ConfigManager] Configuration loaded successfully - {ServersCount} servers, selected: {SelectedServerId}", 
+                        config.Servers?.Count ?? 0, config.SelectedServerId ?? "none");
                     
-                    bool needsMigration = false;
-
-                    // Migration from old single-server format to new multi-server format
-                    using (var jsonDoc = JsonDocument.Parse(json))
-                    {
-                        if (jsonDoc.RootElement.TryGetProperty("server", out var serverElement) && 
-                            !jsonDoc.RootElement.TryGetProperty("servers", out _))
-                        {
-                            needsMigration = true;
-                            Console.WriteLine("[ConfigManager] Detected old single-server configuration format. Migrating to multi-server format.");
-
-                            // Migrate old server config to new format
-                            if (config.Server != null)
-                            {
-                                var migratedServer = new ServerConfigWithId
-                                {
-                                    Id = Guid.NewGuid().ToString(),
-                                    Name = $"{config.Server.Protocol} 服务器",
-                                    Protocol = config.Server.Protocol,
-                                    Address = config.Server.Address,
-                                    Port = config.Server.Port,
-                                    Uuid = config.Server.Uuid,
-                                    Encryption = config.Server.Encryption,
-                                    Password = config.Server.Password,
-                                    Network = config.Server.Network,
-                                    Security = config.Server.Security,
-                                    TlsSettings = config.Server.TlsSettings,
-                                    CreatedAt = DateTime.UtcNow,
-                                    UpdatedAt = DateTime.UtcNow
-                                };
-
-                                config.Servers = new List<ServerConfigWithId> { migratedServer };
-                                config.SelectedServerId = migratedServer.Id;
-                                config.Server = null; // Clear old server config
-                                Console.WriteLine($"[ConfigManager] Migrated server: {migratedServer.Name} (ID: {migratedServer.Id})");
-                            }
-                        }
-                        // Check for old configs without Protocol field in existing server
-                        else if (jsonDoc.RootElement.TryGetProperty("server", out serverElement))
-                        {
-                            if (!serverElement.TryGetProperty("protocol", out _))
-                            {
-                                needsMigration = true;
-                                if (config.Server != null)
-                                {
-                                    config.Server.Protocol = ProtocolType.Vless;
-                                    Console.WriteLine("[ConfigManager] Detected old configuration format. Setting Protocol field to Vless.");
-                                }
-                            }
-                        }
-                    }
-
-                    // Perform basic validation during load (less strict than save validation)
+                    // Validate configuration
                     try
                     {
                         ValidateConfigForLoad(config);
-                        Console.WriteLine("[ConfigManager] Configuration validation passed");
+                        Log.Debug("[ConfigManager] Configuration validation passed");
                     }
                     catch (Exception validationEx)
                     {
-                        Console.WriteLine($"[ConfigManager] Warning: Configuration validation failed during load: {validationEx.Message}");
-                        Console.WriteLine("[ConfigManager] Using configuration anyway, validation will be enforced on save.");
+                        Log.Warning("[ConfigManager] Warning: Configuration validation failed during load: {ValidationError}", validationEx.Message);
+                        Log.Information("[ConfigManager] Using configuration anyway, validation will be enforced on save.");
                     }
                     
                     _currentConfig = config;
-
-                    // Save migrated configuration back to file
-                    if (needsMigration)
-                    {
-                        try
-                        {
-                            var migratedJson = JsonSerializer.Serialize(config, _jsonOptions);
-                            File.WriteAllText(_configFilePath, migratedJson);
-                            Console.WriteLine("[ConfigManager] Configuration migration completed and saved.");
-                        }
-                        catch (Exception migrationEx)
-                        {
-                            Console.WriteLine($"[ConfigManager] Warning: Failed to save migrated configuration: {migrationEx.Message}");
-                            // Continue with the migrated config in memory even if save fails
-                        }
-                    }
-
-                    Console.WriteLine($"[ConfigManager] ========== LOAD CONFIG SUCCESS ==========");
-                    Console.WriteLine($"[ConfigManager] Final servers count: {config.Servers?.Count ?? 0}");
-                    Console.WriteLine($"[ConfigManager] Final selected server ID: {config.SelectedServerId}");
                     return config;
                 }
                 else
                 {
-                    Console.WriteLine("[ConfigManager] Failed to deserialize configuration - config is null");
+                    Log.Error("[ConfigManager] Failed to deserialize configuration - config is null");
                 }
             }
             else
             {
-                Console.WriteLine("[ConfigManager] Configuration file does not exist");
+                Log.Information("[ConfigManager] Configuration file does not exist, creating default configuration");
             }
         }
         catch (Exception ex)
         {
             // Log error and return default config
-            Console.WriteLine($"[ConfigManager] Error loading config: {ex.Message}");
-            Console.WriteLine($"[ConfigManager] Exception type: {ex.GetType().Name}");
-            Console.WriteLine($"[ConfigManager] Stack trace: {ex.StackTrace}");
+            Log.Error(ex, "[ConfigManager] Error loading config: {ErrorMessage}", ex.Message);
+            Log.Error("[ConfigManager] Exception type: {ExceptionType}", ex.GetType().Name);
         }
 
         // Return default configuration if file doesn't exist or error occurred
-        Console.WriteLine("[ConfigManager] Returning default configuration");
+        Log.Information("[ConfigManager] Using default configuration");
         _currentConfig = CreateDefaultConfig();
-        Console.WriteLine($"[ConfigManager] ========== LOAD CONFIG END (DEFAULT) ==========");
         return _currentConfig;
     }
 
@@ -192,45 +113,45 @@ public class ConfigurationManager : IConfigurationManager
     {
         try
         {
-            Console.WriteLine($"[ConfigManager] ========== SAVE CONFIG START ==========");
-            Console.WriteLine($"[ConfigManager] Config path: {_configFilePath}");
-            Console.WriteLine($"[ConfigManager] Servers count: {config.Servers?.Count ?? 0}");
-            Console.WriteLine($"[ConfigManager] Selected server ID: {config.SelectedServerId}");
+            Log.Information("[ConfigManager] ========== SAVE CONFIG START ==========");
+            Log.Information("[ConfigManager] Config path: {ConfigPath}", _configFilePath);
+            Log.Information("[ConfigManager] Servers count: {ServersCount}", config.Servers?.Count ?? 0);
+            Log.Information("[ConfigManager] Selected server ID: {SelectedServerId}", config.SelectedServerId);
             
             // Validate configuration before saving
-            Console.WriteLine($"[ConfigManager] Validating configuration...");
+            Log.Information("[ConfigManager] Validating configuration...");
             ValidateConfig(config);
-            Console.WriteLine($"[ConfigManager] Configuration validation passed");
+            Log.Information("[ConfigManager] Configuration validation passed");
 
             var json = JsonSerializer.Serialize(config, _jsonOptions);
-            Console.WriteLine($"[ConfigManager] Serialized JSON length: {json.Length}");
+            Log.Information("[ConfigManager] Serialized JSON length: {JsonLength}", json.Length);
             
             // Try to save to file first
             try
             {
                 File.WriteAllText(_configFilePath, json);
-                Console.WriteLine($"[ConfigManager] Configuration written to file successfully");
+                Log.Information("[ConfigManager] Configuration written to file successfully");
             }
             catch (Exception fileEx)
             {
-                Console.WriteLine($"[ConfigManager] Failed to write to file: {fileEx.Message}");
-                Console.WriteLine($"[ConfigManager] Configuration will be stored in memory only");
+                Log.Warning(fileEx, "[ConfigManager] Failed to write to file: {FileError}", fileEx.Message);
+                Log.Information("[ConfigManager] Configuration will be stored in memory only");
                 // Don't throw here, just log the error and continue with in-memory storage
             }
             
-            Console.WriteLine($"Configuration processed for: {_configFilePath}");
+            Log.Information("Configuration processed for: {ConfigFilePath}", _configFilePath);
             
             var selectedServer = config.GetSelectedServer();
             if (selectedServer != null)
             {
-                Console.WriteLine($"Selected Server: {selectedServer.Name} ({selectedServer.Protocol}) - {selectedServer.Address}:{selectedServer.Port}");
+                Log.Information("Selected Server: {ServerName} ({Protocol}) - {Address}:{Port}", selectedServer.Name, selectedServer.Protocol, selectedServer.Address, selectedServer.Port);
             }
             else
             {
-                Console.WriteLine("No server selected");
+                Log.Information("No server selected");
             }
             
-            Console.WriteLine($"[ConfigManager] ========== SAVE CONFIG SUCCESS ==========");
+            Log.Information("[ConfigManager] ========== SAVE CONFIG SUCCESS ==========");
 
             var oldConfig = _currentConfig;
             _currentConfig = config;
@@ -321,22 +242,17 @@ public class ConfigurationManager : IConfigurationManager
     /// </summary>
     private void ValidateConfigForLoad(UserConfig config)
     {
-        // For new format, check servers list
-        if (config.Servers != null && config.Servers.Count > 0)
+        // Only validate that the basic structure is present
+        // Servers list can be empty for new installations
+        if (config.Servers == null)
         {
-            // New format is valid
-            return;
-        }
-
-        // For old format, check legacy server config
-        if (config.Server == null)
-        {
-            throw new ValidationException("Server configuration is missing");
+            config.Servers = new List<ServerConfigWithId>();
         }
         
-        // Don't validate protocol-specific fields during load
-        // This allows loading configurations that might have validation issues
-        // but still contain the basic structure
+        if (config.CustomRules == null)
+        {
+            config.CustomRules = new List<DomainRule>();
+        }
     }
 
     /// <summary>
@@ -353,18 +269,13 @@ public class ConfigurationManager : IConfigurationManager
             throw new ValidationException($"Configuration validation failed: {errors}");
         }
 
-        // Validate servers in new format
+        // Validate servers
         if (config.Servers != null && config.Servers.Count > 0)
         {
             foreach (var server in config.Servers)
             {
                 ValidateServerConfig(server);
             }
-        }
-        // Validate legacy server config if present
-        else if (config.Server != null)
-        {
-            ValidateServerConfig(config.Server);
         }
         // Allow empty servers list - this is valid for new installations
 
@@ -393,7 +304,7 @@ public class ConfigurationManager : IConfigurationManager
         if (!Validator.TryValidateObject(server, serverContext, serverResults, true))
         {
             var errors = string.Join(", ", serverResults.Select(r => r.ErrorMessage));
-            Console.WriteLine($"[ConfigManager] Server validation failed: {errors}");
+            Log.Error("[ConfigManager] Server validation failed: {ValidationErrors}", errors);
             throw new ValidationException($"Server configuration validation failed: {errors}");
         }
 
