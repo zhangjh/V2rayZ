@@ -49,14 +49,47 @@ public class UpdateInfo
     {
         try
         {
-            var current = new Version(currentVersion);
-            var latest = new Version(Version.TrimStart('v'));
+            // 标准化版本号格式，确保至少有两个部分
+            var normalizedCurrent = NormalizeVersion(currentVersion);
+            var normalizedLatest = NormalizeVersion(Version.TrimStart('v'));
+            
+            var current = new Version(normalizedCurrent);
+            var latest = new Version(normalizedLatest);
             return latest > current;
         }
         catch
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// 标准化版本号格式
+    /// </summary>
+    /// <param name="version">原始版本号</param>
+    /// <returns>标准化后的版本号</returns>
+    private static string NormalizeVersion(string version)
+    {
+        if (string.IsNullOrEmpty(version))
+            return "0.0.0.0";
+
+        var parts = version.Split('.');
+        
+        // 确保至少有4个部分 (Major.Minor.Build.Revision)
+        var normalizedParts = new string[4];
+        for (int i = 0; i < 4; i++)
+        {
+            if (i < parts.Length && int.TryParse(parts[i], out _))
+            {
+                normalizedParts[i] = parts[i];
+            }
+            else
+            {
+                normalizedParts[i] = "0";
+            }
+        }
+        
+        return string.Join(".", normalizedParts);
     }
 }
 

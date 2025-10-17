@@ -17,9 +17,9 @@
     <!-- Assembly Information -->
     <AssemblyName>V2rayZ</AssemblyName>
     <RootNamespace>V2rayClient</RootNamespace>
-    <Version>1.0.0</Version>
-    <FileVersion>1.0.0.0</FileVersion>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Version>1.1</Version>
+    <FileVersion>1.1.0.0</FileVersion>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
     
     <!-- Product Information -->
     <Company>V2rayZ Project</Company>
@@ -60,6 +60,10 @@
     <None Update="Resources\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\app.ico" />
   </ItemGroup>
 
 </Project>

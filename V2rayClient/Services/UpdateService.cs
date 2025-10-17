@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using Octokit;
 using Serilog;
@@ -74,10 +75,11 @@ public class UpdateService
                 IsPrerelease = latestRelease.Prerelease
             };
 
-            // 查找Windows安装包
+            // 查找Windows安装包或压缩包
             var asset = latestRelease.Assets
                 .FirstOrDefault(a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
-                                   a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase));
+                                   a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase) ||
+                                   a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
 
             if (asset != null)
             {
@@ -86,12 +88,12 @@ public class UpdateService
             }
             else
             {
-                _logger.Warning("未找到Windows安装包");
+                _logger.Warning("未找到Windows更新包");
                 OnProgressChanged(new UpdateProgress
                 {
                     Status = UpdateStatus.Error,
-                    Message = "未找到Windows安装包",
-                    ErrorMessage = "发布版本中没有找到.exe或.msi文件"
+                    Message = "未找到Windows更新包",
+                    ErrorMessage = "发布版本中没有找到.exe、.msi或.zip文件"
                 });
                 return null;
             }
@@ -223,13 +225,153 @@ public class UpdateService
             OnProgressChanged(new UpdateProgress
             {
                 Status = UpdateStatus.Installing,
-                Message = "正在启动安装程序..."
+                Message = "正在安装更新..."
             });
 
             if (!File.Exists(installerPath))
             {
                 throw new FileNotFoundException("安装包文件不存在", installerPath);
             }
+
+            var fileExtension = Path.GetExtension(installerPath).ToLowerInvariant();
+            
+            if (fileExtension == ".zip")
+            {
+                return await InstallFromZipAsync(installerPath);
+            }
+            else if (fileExtension == ".exe" || fileExtension == ".msi")
+            {
+                return await InstallFromInstallerAsync(installerPath);
+            }
+            else
+            {
+                throw new NotSupportedException($"不支持的安装包格式: {fileExtension}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "安装更新时发生错误");
+            OnProgressChanged(new UpdateProgress
+            {
+                Status = UpdateStatus.Error,
+                Message = "安装失败",
+                ErrorMessage = ex.Message
+            });
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 从ZIP文件安装更新
+    /// </summary>
+    private async Task<bool> InstallFromZipAsync(string zipPath)
+    {
+        try
+        {
+            OnProgressChanged(new UpdateProgress
+            {
+                Status = UpdateStatus.Installing,
+                Message = "正在提取更新文件..."
+            });
+
+            var extractPath = Path.Combine(_tempDir, "extracted");
+            if (Directory.Exists(extractPath))
+            {
+                Directory.Delete(extractPath, true);
+            }
+            Directory.CreateDirectory(extractPath);
+
+            // 提取ZIP文件
+            System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractPath);
+            
+            OnProgressChanged(new UpdateProgress
+            {
+                Status = UpdateStatus.Installing,
+                Message = "正在创建更新脚本..."
+            });
+
+            // 创建更新脚本
+            var currentExePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+            if (string.IsNullOrEmpty(currentExePath))
+            {
+                throw new InvalidOperationException("无法获取当前应用程序路径");
+            }
+
+            var currentDir = Path.GetDirectoryName(currentExePath);
+            var updateScriptPath = Path.Combine(_tempDir, "update.bat");
+            
+            var updateScript = $@"@echo off
+echo 正在更新V2rayZ...
+timeout /t 3 /nobreak > nul
+
+echo 停止当前进程...
+taskkill /f /im V2rayZ.exe > nul 2>&1
+
+echo 备份当前版本...
+if exist ""{currentDir}\V2rayZ.exe.backup"" del ""{currentDir}\V2rayZ.exe.backup""
+if exist ""{currentDir}\V2rayZ.exe"" ren ""{currentDir}\V2rayZ.exe"" V2rayZ.exe.backup
+
+echo 复制新版本文件...
+xcopy ""{extractPath}\*"" ""{currentDir}\"" /E /Y /Q
+
+echo 启动新版本...
+start """" ""{currentDir}\V2rayZ.exe""
+
+echo 清理临时文件...
+timeout /t 2 /nobreak > nul
+rd /s /q ""{_tempDir}""
+
+echo 更新完成！
+del ""%~f0""
+";
+
+            File.WriteAllText(updateScriptPath, updateScript, System.Text.Encoding.Default);
+
+            OnProgressChanged(new UpdateProgress
+            {
+                Status = UpdateStatus.Installing,
+                Message = "正在启动更新程序..."
+            });
+
+            // 启动更新脚本
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = updateScriptPath,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            Process.Start(startInfo);
+
+            _logger.Information("更新脚本已启动，准备退出当前应用");
+            
+            // 延迟一下让更新脚本启动
+            await Task.Delay(1000);
+
+            // 退出当前应用程序
+            System.Windows.Application.Current.Shutdown();
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "从ZIP安装更新时发生错误");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 从安装程序安装更新
+    /// </summary>
+    private async Task<bool> InstallFromInstallerAsync(string installerPath)
+    {
+        try
+        {
+            OnProgressChanged(new UpdateProgress
+            {
+                Status = UpdateStatus.Installing,
+                Message = "正在启动安装程序..."
+            });
 
             // 启动安装程序
             var startInfo = new ProcessStartInfo
@@ -253,14 +395,8 @@ public class UpdateService
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "安装更新时发生错误");
-            OnProgressChanged(new UpdateProgress
-            {
-                Status = UpdateStatus.Error,
-                Message = "安装失败",
-                ErrorMessage = ex.Message
-            });
-            return false;
+            _logger.Error(ex, "从安装程序安装更新时发生错误");
+            throw;
         }
     }
 

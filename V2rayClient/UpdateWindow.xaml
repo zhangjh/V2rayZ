@@ -68,7 +68,7 @@
 
         <!-- 标题 -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
-            <Image Source="Resources/app.ico" Width="32" Height="32" Margin="0,0,12,0"/>
+            <Image Source="pack://application:,,,/Resources/app.ico" Width="32" Height="32" Margin="0,0,12,0"/>
             <StackPanel>
                 <TextBlock x:Name="TitleTextBlock" 
                           Text="发现新版本" 

@@ -52,13 +52,6 @@ public partial class MainWindow : Window
             {
                 webView.CoreWebView2?.OpenDevToolsWindow();
             }
-            // Force exit with Ctrl+Alt+Q
-            else if (e.Key == System.Windows.Input.Key.Q && 
-                     System.Windows.Input.Keyboard.Modifiers == (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Alt))
-            {
-                System.Diagnostics.Debug.WriteLine("Force exit requested by user");
-                ExitApplication();
-            }
         };
     }
 
@@ -98,48 +91,21 @@ public partial class MainWindow : Window
             webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
 
-            // Enable console message logging
-            webView.CoreWebView2.WebMessageReceived += (s, e) =>
-            {
-                System.Diagnostics.Debug.WriteLine($"WebView Message: {e.WebMessageAsJson}");
-            };
-
-            // Log navigation events
-            webView.CoreWebView2.NavigationStarting += (s, e) =>
-            {
-                System.Diagnostics.Debug.WriteLine($"Navigation Starting: {e.Uri}");
-            };
-
             webView.CoreWebView2.NavigationCompleted += (s, e) =>
             {
-                System.Diagnostics.Debug.WriteLine($"Navigation Completed: Success={e.IsSuccess}");
-                // Temporarily disabled error dialog to prevent false positives
-                // The app may work fine even if some resources fail to load
-                /*
-                if (!e.IsSuccess)
+                // 只对严重的导航错误显示对话框，忽略正常的中断和重定向
+                if (!e.IsSuccess && 
+                    e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled &&
+                    e.WebErrorStatus != CoreWebView2WebErrorStatus.ConnectionAborted &&
+                    e.WebErrorStatus != CoreWebView2WebErrorStatus.Timeout)
                 {
-                    MessageBox.Show($"Navigation failed!\nError: {e.WebErrorStatus}\n\nTry pressing F12 to open DevTools for more details.", 
-                        "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"导航失败!\n错误: {e.WebErrorStatus}", 
+                        "导航错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
-                */
-            };
-
-            // Capture console messages
-            webView.CoreWebView2.WebResourceResponseReceived += (s, e) =>
-            {
-                System.Diagnostics.Debug.WriteLine($"Resource Loaded: {e.Request.Uri} - Status: {e.Response.StatusCode}");
-            };
-
-            // Log resource loading for debugging
-            webView.CoreWebView2.WebResourceRequested += (s, e) =>
-            {
-                System.Diagnostics.Debug.WriteLine($"Resource Requested: {e.Request.Uri}");
             };
 
             // Set up virtual host mapping for local files
             var wwwrootFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot");
-            System.Diagnostics.Debug.WriteLine($"wwwroot folder: {wwwrootFolder}");
-            System.Diagnostics.Debug.WriteLine($"Folder exists: {Directory.Exists(wwwrootFolder)}");
 
             if (Directory.Exists(wwwrootFolder))
             {
@@ -150,63 +116,16 @@ public partial class MainWindow : Window
                     CoreWebView2HostResourceAccessKind.Allow
                 );
 
-                System.Diagnostics.Debug.WriteLine("Virtual host mapping set up successfully");
-
                 // Set up JavaScript bridge
                 SetupJavaScriptBridge();
 
-                // Add DOM content loaded handler
-                webView.CoreWebView2.DOMContentLoaded += (s, e) =>
-                {
-                    System.Diagnostics.Debug.WriteLine("DOM Content Loaded successfully");
-                };
-
                 // Navigate to the virtual host
-                var url = "https://app.local/index.html";
-                System.Diagnostics.Debug.WriteLine($"Navigating to: {url}");
-                webView.CoreWebView2.Navigate(url);
+                webView.CoreWebView2.Navigate("https://app.local/index.html");
             }
             else
             {
-                // Show placeholder if React app is not built yet
-                MessageBox.Show($"wwwroot folder not found at:\n{wwwrootFolder}\n\nPlease build the frontend first.", 
-                    "Folder Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
-                
-                webView.NavigateToString(@"
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>V2rayZ</title>
-                        <style>
-                            body {
-                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                height: 100vh;
-                                margin: 0;
-                                background: #f5f5f5;
-                            }
-                            .container {
-                                text-align: center;
-                                padding: 40px;
-                                background: white;
-                                border-radius: 8px;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                            }
-                            h1 { color: #333; margin-bottom: 16px; }
-                            p { color: #666; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class='container'>
-                            <h1>V2rayZ</h1>
-                            <p>React UI is not built yet. Please build the frontend project.</p>
-                            <p><code>cd V2rayClient.UI && npm run build</code></p>
-                        </div>
-                    </body>
-                    </html>
-                ");
+                MessageBox.Show($"前端资源未找到:\n{wwwrootFolder}\n\n请先构建前端项目。", 
+                    "资源未找到", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         catch (Exception ex)
@@ -291,7 +210,7 @@ public partial class MainWindow : Window
                     }
                 };
 
-                console.log('Native API bridge initialized');
+
             })();
         ");
     }
@@ -320,9 +239,9 @@ public partial class MainWindow : Window
                 ";
                 await webView.CoreWebView2.ExecuteScriptAsync(script);
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to send event to JavaScript: {ex.Message}");
+                // 忽略JavaScript事件发送错误
             }
         });
     }
@@ -739,9 +658,8 @@ public partial class MainWindow : Window
             
             return grayIcon;
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Failed to create grayscale icon: {ex.Message}");
             // If grayscale conversion fails, return original icon
             return new Icon(originalIconPath);
         }
@@ -785,79 +703,50 @@ public partial class MainWindow : Window
     {
         _isClosing = true;
         
-        System.Diagnostics.Debug.WriteLine("=== Starting application exit cleanup ===");
-        
         try
         {
-            // 1. Stop V2ray process first
+            // Stop V2ray process first
             if (_v2rayManager != null)
             {
                 var status = _v2rayManager.GetStatus();
                 if (status.Running)
                 {
-                    System.Diagnostics.Debug.WriteLine("Stopping V2ray process...");
                     var stopTask = _v2rayManager.StopAsync();
-                    if (!stopTask.Wait(TimeSpan.FromSeconds(10)))
-                    {
-                        System.Diagnostics.Debug.WriteLine("V2ray stop timeout, forcing termination");
-                    }
+                    stopTask.Wait(TimeSpan.FromSeconds(10));
                 }
             }
             
-            // 2. Disable system proxy
+            // Disable system proxy
             if (_proxyManager != null)
             {
                 var proxyStatus = _proxyManager.GetProxyStatus();
                 if (proxyStatus.Enabled)
                 {
-                    System.Diagnostics.Debug.WriteLine("Disabling system proxy...");
                     _proxyManager.DisableProxy();
                 }
             }
             
-            // 3. Stop statistics monitoring
-            if (_statsManager != null)
-            {
-                System.Diagnostics.Debug.WriteLine("Stopping statistics monitoring...");
-                _statsManager.StopMonitoring();
-            }
+            // Stop statistics monitoring
+            _statsManager?.StopMonitoring();
             
-            // 4. Clean up WebView2
+            // Clean up WebView2
             if (webView?.CoreWebView2 != null)
             {
-                System.Diagnostics.Debug.WriteLine("Cleaning up WebView2...");
                 try
                 {
-                    // Remove host objects
                     webView.CoreWebView2.RemoveHostObjectFromScript("nativeApi");
-                    
-                    // Unsubscribe from events
-                    webView.CoreWebView2.NavigationStarting -= null;
-                    webView.CoreWebView2.NavigationCompleted -= null;
-                    webView.CoreWebView2.WebResourceResponseReceived -= null;
-                    
-                    // Navigate to about:blank to release resources
                     webView.CoreWebView2.Navigate("about:blank");
                 }
-                catch (Exception webViewEx)
+                catch
                 {
-                    System.Diagnostics.Debug.WriteLine($"WebView2 cleanup error: {webViewEx.Message}");
+                    // 忽略WebView2清理错误
                 }
             }
             
-            // 5. Kill any remaining V2ray processes
+            // Kill any remaining V2ray processes
             KillRemainingV2rayProcesses();
             
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error during cleanup: {ex.Message}");
-            // Continue with exit even if cleanup fails
-        }
-        
-        // 6. Unsubscribe from events
-        try
-        {
+            // Unsubscribe from events
             if (_viewModel != null)
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
@@ -866,15 +755,8 @@ public partial class MainWindow : Window
             {
                 _configManager.ConfigChanged -= OnConfigManagerConfigChanged;
             }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error unsubscribing from events: {ex.Message}");
-        }
-        
-        // 7. Dispose system tray icon
-        try
-        {
+            
+            // Dispose system tray icon
             if (_notifyIcon != null)
             {
                 _notifyIcon.Visible = false;
@@ -882,12 +764,10 @@ public partial class MainWindow : Window
                 _notifyIcon = null;
             }
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Error disposing tray icon: {ex.Message}");
+            // 忽略清理过程中的错误，继续退出
         }
-        
-        System.Diagnostics.Debug.WriteLine("=== Application exit cleanup completed ===");
         
         // Force application shutdown
         System.Windows.Application.Current.Shutdown();
@@ -897,20 +777,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine("Checking for remaining V2ray processes...");
-            
             var processes = System.Diagnostics.Process.GetProcessesByName("v2ray");
             foreach (var process in processes)
             {
                 try
                 {
-                    System.Diagnostics.Debug.WriteLine($"Killing V2ray process PID: {process.Id}");
-                    process.Kill(true); // Kill entire process tree
-                    process.WaitForExit(3000); // Wait up to 3 seconds
+                    process.Kill(true);
+                    process.WaitForExit(3000);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to kill V2ray process {process.Id}: {ex.Message}");
+                    // 忽略进程终止错误
                 }
                 finally
                 {
@@ -918,21 +795,16 @@ public partial class MainWindow : Window
                 }
             }
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Error killing V2ray processes: {ex.Message}");
+            // 忽略进程查找错误
         }
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine("=== MainWindow OnClosed cleanup ===");
-        
         try
         {
-            // Dispose services in proper order
-            System.Diagnostics.Debug.WriteLine("Disposing services...");
-            
             // Stop monitoring first
             _statsManager?.StopMonitoring();
             
@@ -946,29 +818,9 @@ public partial class MainWindow : Window
             _nativeApi = null;
             _viewModel = null;
             
-            System.Diagnostics.Debug.WriteLine("Services disposed successfully");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error during window cleanup: {ex.Message}");
-        }
-        
-        try
-        {
             // Dispose WebView2
-            if (webView != null)
-            {
-                System.Diagnostics.Debug.WriteLine("Disposing WebView2...");
-                webView.Dispose();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error disposing WebView2: {ex.Message}");
-        }
-        
-        try
-        {
+            webView?.Dispose();
+            
             // Final tray icon cleanup
             if (_notifyIcon != null)
             {
@@ -977,12 +829,11 @@ public partial class MainWindow : Window
                 _notifyIcon = null;
             }
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Error disposing tray icon in OnClosed: {ex.Message}");
+            // 忽略清理过程中的错误
         }
         
-        System.Diagnostics.Debug.WriteLine("=== MainWindow OnClosed cleanup completed ===");
         base.OnClosed(e);
     }
 
