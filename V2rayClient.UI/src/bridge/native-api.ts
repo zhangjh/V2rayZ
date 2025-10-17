@@ -88,19 +88,19 @@ export async function getConfig(): Promise<ApiResponse<UserConfig>> {
     httpPort: 65533,
   }
 
-  // Always try localStorage first as it's more reliable
-  try {
-    const saved = localStorage.getItem('v2ray-config')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      console.log('[native-api] Loaded config from localStorage:', parsed)
-      return { success: true, data: parsed }
-    }
-  } catch (error) {
-    console.warn('[native-api] Failed to load from localStorage:', error)
-  }
-
   if (!isWebView2()) {
+    // In development, try localStorage first
+    try {
+      const saved = localStorage.getItem('v2ray-config')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        console.log('[native-api] Loaded config from localStorage:', parsed)
+        return { success: true, data: parsed }
+      }
+    } catch (error) {
+      console.warn('[native-api] Failed to load from localStorage:', error)
+    }
+    
     console.log('[native-api] Not in WebView2, returning default config')
     return { success: true, data: defaultConfig }
   }
@@ -125,7 +125,20 @@ export async function getConfig(): Promise<ApiResponse<UserConfig>> {
     return parsed
   } catch (error) {
     console.error('[native-api] Get config error:', error)
-    // Return default config as fallback
+    
+    // Fallback to localStorage if native API fails
+    try {
+      const saved = localStorage.getItem('v2ray-config')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        console.log('[native-api] Fallback to localStorage config:', parsed)
+        return { success: true, data: parsed }
+      }
+    } catch (localError) {
+      console.warn('[native-api] Failed to load from localStorage fallback:', localError)
+    }
+    
+    // Return default config as final fallback
     return { success: true, data: defaultConfig }
   }
 }

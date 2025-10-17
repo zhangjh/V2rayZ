@@ -325,6 +325,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const response = await nativeApi.addCustomRule(rule)
       if (response.success) {
+        // Clear localStorage cache to force reload from backend
+        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
       } else {
@@ -342,6 +344,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const response = await nativeApi.addCustomRulesBatch(rules)
       if (response.success) {
+        // Clear localStorage cache to force reload from backend
+        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
       } else {
@@ -366,6 +370,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       if (response.success) {
         console.log('[Store] Rule updated successfully, reloading config...')
+        // Clear localStorage cache to force reload from backend
+        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
         console.log('[Store] Config reloaded after rule update')
@@ -389,6 +395,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const response = await nativeApi.deleteCustomRule(ruleId)
       if (response.success) {
+        // Clear localStorage cache to force reload from backend
+        localStorage.removeItem('v2ray-config')
         // Reload config to get updated rules
         await get().loadConfig()
       } else {
