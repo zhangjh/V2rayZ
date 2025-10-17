@@ -348,7 +348,7 @@ public partial class MainWindow : Window
         var contextMenu = new ContextMenuStrip();
 
         // Status item (disabled, shows current status)
-        var statusItem = new ToolStripMenuItem("● Disconnected")
+        var statusItem = new ToolStripMenuItem("● 已断开")
         {
             Enabled = false,
             Font = new Font(contextMenu.Font, System.Drawing.FontStyle.Bold)
@@ -357,31 +357,31 @@ public partial class MainWindow : Window
         contextMenu.Items.Add(new ToolStripSeparator());
 
         // Enable/Disable proxy toggle
-        var toggleProxyItem = new ToolStripMenuItem("Enable Proxy");
+        var toggleProxyItem = new ToolStripMenuItem("启用代理");
         toggleProxyItem.Click += OnToggleProxyClick;
         contextMenu.Items.Add(toggleProxyItem);
         contextMenu.Items.Add(new ToolStripSeparator());
 
         // Server selection submenu
-        var serverSelectionItem = new ToolStripMenuItem("Select Server");
+        var serverSelectionItem = new ToolStripMenuItem("选择服务器");
         contextMenu.Items.Add(serverSelectionItem);
         
         // Initialize server selection submenu immediately
         UpdateServerSelectionMenu(serverSelectionItem);
 
         // Proxy mode submenu
-        var proxyModeItem = new ToolStripMenuItem("Proxy Mode");
+        var proxyModeItem = new ToolStripMenuItem("代理模式");
         
-        var globalModeItem = new ToolStripMenuItem("Global Proxy");
+        var globalModeItem = new ToolStripMenuItem("全局代理");
         globalModeItem.Click += (s, e) => OnProxyModeClick("Global");
         proxyModeItem.DropDownItems.Add(globalModeItem);
 
-        var smartModeItem = new ToolStripMenuItem("Smart Routing");
+        var smartModeItem = new ToolStripMenuItem("智能分流");
         smartModeItem.Click += (s, e) => OnProxyModeClick("Smart");
         smartModeItem.Checked = true; // Default mode
         proxyModeItem.DropDownItems.Add(smartModeItem);
 
-        var directModeItem = new ToolStripMenuItem("Direct Connection");
+        var directModeItem = new ToolStripMenuItem("直连模式");
         directModeItem.Click += (s, e) => OnProxyModeClick("Direct");
         proxyModeItem.DropDownItems.Add(directModeItem);
 
@@ -389,19 +389,19 @@ public partial class MainWindow : Window
         contextMenu.Items.Add(new ToolStripSeparator());
 
         // Open main window
-        var openItem = new ToolStripMenuItem("Open Main Window");
+        var openItem = new ToolStripMenuItem("打开主窗口");
         openItem.Click += (s, e) => ShowMainWindow();
         contextMenu.Items.Add(openItem);
 
         // Settings (opens main window to settings page)
-        var settingsItem = new ToolStripMenuItem("Settings");
+        var settingsItem = new ToolStripMenuItem("打开设置");
         settingsItem.Click += (s, e) => ShowSettingsPage();
         contextMenu.Items.Add(settingsItem);
 
         contextMenu.Items.Add(new ToolStripSeparator());
 
         // Exit
-        var exitItem = new ToolStripMenuItem("Exit");
+        var exitItem = new ToolStripMenuItem("退出");
         exitItem.Click += (s, e) => ExitApplication();
         contextMenu.Items.Add(exitItem);
 
@@ -437,7 +437,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to toggle proxy: {ex.Message}", "Error", 
+            MessageBox.Show($"切换代理失败: {ex.Message}", "错误", 
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -453,7 +453,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to change proxy mode: {ex.Message}", "Error", 
+            MessageBox.Show($"更改代理模式失败: {ex.Message}", "错误", 
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -492,18 +492,18 @@ public partial class MainWindow : Window
             // Update tooltip text
             var statusText = status switch
             {
-                Models.ConnectionStatus.Connected => "Connected",
-                Models.ConnectionStatus.Connecting => "Connecting",
-                Models.ConnectionStatus.Disconnected => "Disconnected",
-                Models.ConnectionStatus.Error => "Error",
-                _ => "Unknown"
+                Models.ConnectionStatus.Connected => "已连接",
+                Models.ConnectionStatus.Connecting => "连接中",
+                Models.ConnectionStatus.Disconnected => "已断开",
+                Models.ConnectionStatus.Error => "错误",
+                _ => "未知"
             };
 
             var modeText = mode switch
             {
-                Models.ProxyMode.Global => "Global Proxy",
-                Models.ProxyMode.Smart => "Smart Routing",
-                Models.ProxyMode.Direct => "Direct Connection",
+                Models.ProxyMode.Global => "全局代理",
+                Models.ProxyMode.Smart => "智能分流",
+                Models.ProxyMode.Direct => "直连模式",
                 _ => ""
             };
 
@@ -533,16 +533,16 @@ public partial class MainWindow : Window
             ToolStripMenuItem statusItem = tag.StatusItem;
             statusItem.Text = status switch
             {
-                Models.ConnectionStatus.Connected => "● Connected",
-                Models.ConnectionStatus.Connecting => "● Connecting...",
-                Models.ConnectionStatus.Disconnected => "● Disconnected",
-                Models.ConnectionStatus.Error => "● Error",
-                _ => "● Unknown"
+                Models.ConnectionStatus.Connected => "● 已连接",
+                Models.ConnectionStatus.Connecting => "● 连接中...",
+                Models.ConnectionStatus.Disconnected => "● 已断开",
+                Models.ConnectionStatus.Error => "● 错误",
+                _ => "● 未知"
             };
 
             // Update toggle proxy item
             ToolStripMenuItem toggleItem = tag.ToggleProxyItem;
-            toggleItem.Text = isConnected ? "Disable Proxy" : "Enable Proxy";
+            toggleItem.Text = isConnected ? "禁用代理" : "启用代理";
 
             // Update server selection submenu
             ToolStripMenuItem serverSelectionItem = tag.ServerSelectionItem;
@@ -569,7 +569,7 @@ public partial class MainWindow : Window
         if (config?.Servers == null || config.Servers.Count == 0)
         {
             // No servers configured - show placeholder
-            var noServersItem = new ToolStripMenuItem("No servers configured")
+            var noServersItem = new ToolStripMenuItem("未配置服务器")
             {
                 Enabled = false
             };
@@ -594,7 +594,7 @@ public partial class MainWindow : Window
         }
 
         // Always add manage servers option at the bottom
-        var manageServersItem = new ToolStripMenuItem("Manage Servers...");
+        var manageServersItem = new ToolStripMenuItem("管理服务器...");
         manageServersItem.Click += (s, e) => ShowServersPage();
         serverSelectionItem.DropDownItems.Add(manageServersItem);
     }
@@ -617,13 +617,13 @@ public partial class MainWindow : Window
             
             if (!root.TryGetProperty("success", out var successElement) || !successElement.GetBoolean())
             {
-                var error = "Unknown error";
+                var error = "未知错误";
                 if (root.TryGetProperty("error", out var errorElement))
                 {
-                    error = errorElement.GetString() ?? "Unknown error";
+                    error = errorElement.GetString() ?? "未知错误";
                 }
                 
-                MessageBox.Show($"Failed to switch server: {error}", "Error", 
+                MessageBox.Show($"切换服务器失败: {error}", "错误", 
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -633,7 +633,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to select server: {ex.Message}", "Error", 
+            MessageBox.Show($"选择服务器失败: {ex.Message}", "错误", 
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
