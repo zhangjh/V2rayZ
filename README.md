@@ -1,13 +1,13 @@
 # V2rayZ
 
 一个现代化的 Windows v2ray 客户端，支持 VLESS 和 Trojan 协议。
+为了解决当前Windows下没有好用的V2ray客户端的问题，去除掉市面上常见的客户端复杂的功能，仅保留核心的代理开关、自定义规则配置等，其他用户什么DNS、GFW List之类的不需要用户感知的一概屏蔽由系统自己集成。
 
 ## ✨ 功能特性
 
 - ✅ 支持 VLESS 和 Trojan 协议
 - ✅ 多种代理模式（全局、智能、直连）
 - ✅ 自定义域名路由规则
-- ✅ 实时流量统计
 - ✅ 系统托盘集成
 - ✅ 开机自启动和自动连接
 - ✅ 现代化的用户界面
@@ -20,7 +20,7 @@
 ## 📥 安装
 
 1. 从 [Releases](../../releases) 页面下载最新的安装程序
-2. 运行 `V2rayZ-Setup-x.x.x.exe`
+2. 运行 `V2rayZ.exe`
 3. 按照安装向导完成安装
 
 ## 🚀 快速开始
@@ -57,14 +57,6 @@
 # 2. 构建安装程序（需要 Inno Setup）
 .\build-installer.ps1
 ```
-
-详细说明请查看 [BUILD_GUIDE.md](BUILD_GUIDE.md)
-
-## 📚 文档
-
-- [BUILD_GUIDE.md](BUILD_GUIDE.md) - 构建指南
-- [check-config.ps1](check-config.ps1) - 配置验证
-- [diagnose-connection.ps1](diagnose-connection.ps1) - 连接诊断
 
 ## 🔧 技术栈
 
