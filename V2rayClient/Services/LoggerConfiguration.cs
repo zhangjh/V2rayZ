@@ -15,7 +15,7 @@ public static class LoggerConfiguration
     public static ILogger CreateLogger(LogEventLevel minimumLevel = LogEventLevel.Information)
     {
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var logDirectory = Path.Combine(appDataPath, "V2rayClient", "logs");
+        var logDirectory = Path.Combine(appDataPath, "V2rayZ", "logs");
         
         // 确保日志目录存在
         Directory.CreateDirectory(logDirectory);
@@ -44,7 +44,7 @@ public static class LoggerConfiguration
     public static string GetLogDirectory()
     {
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appDataPath, "V2rayClient", "logs");
+        return Path.Combine(appDataPath, "V2rayZ", "logs");
     }
     
     /// <summary>

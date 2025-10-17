@@ -307,7 +307,7 @@ public class NativeApi
         try
         {
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var appFolder = Path.Combine(appDataPath, "V2rayClient");
+            var appFolder = Path.Combine(appDataPath, "V2rayZ");
             var configPath = Path.Combine(appFolder, "config.json");
             
             var info = new

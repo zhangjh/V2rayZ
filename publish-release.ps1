@@ -1,4 +1,4 @@
-# V2ray Client Release Build Script
+# V2rayZ Release Build Script
 # This script builds the complete application for release
 
 param(
@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "V2ray Client Release Build" -ForegroundColor Cyan
+Write-Host "V2rayZ Release Build" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -95,7 +95,7 @@ Write-Host "  ✓ Application published successfully" -ForegroundColor Green
 Write-Host ""
 Write-Host "[5/5] Verifying build..." -ForegroundColor Yellow
 
-$exePath = Join-Path $OutputDir "V2rayClient.exe"
+$exePath = Join-Path $OutputDir "V2rayZ.exe"
 $wwwrootPath = Join-Path $OutputDir "wwwroot"
 $resourcesPath = Join-Path $OutputDir "Resources"
 

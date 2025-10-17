@@ -34,7 +34,7 @@ If you prefer to download manually:
 ## Resource Extraction
 
 On first run, the application will automatically:
-1. Copy these files from the Resources directory to `%APPDATA%\V2rayClient\resources\`
+1. Copy these files from the Resources directory to `%APPDATA%\V2rayZ\resources\`
 2. Use the files from AppData for runtime operations
 3. Update the files if newer versions are detected
 

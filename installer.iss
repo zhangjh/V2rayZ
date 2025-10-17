@@ -5,7 +5,7 @@
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "V2rayZ Project"
 #define MyAppURL "https://github.com/v2rayclient/v2ray-windows-client"
-#define MyAppExeName "V2rayClient.exe"
+#define MyAppExeName "V2rayZ.exe"
 #define MyAppId "{{8F7A3B2C-9D4E-4F1A-B8C6-2E5D7A9F3C1B}"
 
 [Setup]
@@ -23,7 +23,7 @@ AllowNoIcons=yes
 LicenseFile=LICENSE.txt
 InfoBeforeFile=INSTALLER_INFO.txt
 OutputDir=installer-output
-OutputBaseFilename=V2rayClient-Setup-{#MyAppVersion}
+OutputBaseFilename=V2rayZ-Setup-{#MyAppVersion}
 SetupIconFile=V2rayClient\Resources\app.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -139,7 +139,7 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    AppDataPath := ExpandConstant('{userappdata}\V2rayClient');
+    AppDataPath := ExpandConstant('{userappdata}\V2rayZ');
     
     if DirExists(AppDataPath) then
     begin
@@ -162,9 +162,9 @@ begin
   Result := '';
   
   // Check if the application is running
-  if CheckForMutexes('V2rayClientMutex') then
+  if CheckForMutexes('V2rayZMutex') then
   begin
-    Result := 'V2ray Client is currently running.' + #13#10 + #13#10 +
+    Result := 'V2rayZ is currently running.' + #13#10 + #13#10 +
               'Please close the application before continuing with the installation.';
   end;
 end;

@@ -18,9 +18,9 @@ public class ConfigurationManager : IConfigurationManager
 
     public ConfigurationManager()
     {
-        // Get config file path in %APPDATA%\V2rayClient\config.json
+        // Get config file path in %APPDATA%\V2rayZ\config.json
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var appFolder = Path.Combine(appDataPath, "V2rayClient");
+        var appFolder = Path.Combine(appDataPath, "V2rayZ");
         
         // Ensure directory exists
         if (!Directory.Exists(appFolder))

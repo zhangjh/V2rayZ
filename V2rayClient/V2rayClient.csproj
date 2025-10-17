@@ -15,7 +15,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     
     <!-- Assembly Information -->
-    <AssemblyName>V2rayClient</AssemblyName>
+    <AssemblyName>V2rayZ</AssemblyName>
     <RootNamespace>V2rayClient</RootNamespace>
     <Version>1.0.0</Version>
     <FileVersion>1.0.0.0</FileVersion>

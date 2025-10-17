@@ -19,7 +19,7 @@ public class ResourceManager : IDisposable
         _logger = logger;
         _appDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "V2rayClient"
+            "V2rayZ"
         );
         _resourcesPath = Path.Combine(_appDataPath, "resources");
     }

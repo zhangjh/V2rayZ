@@ -1,4 +1,4 @@
-# V2ray Client Installer Build Script
+# V2rayZ Installer Build Script
 # This script builds the Windows installer using Inno Setup
 
 param(
@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "V2ray Client Installer Build" -ForegroundColor Cyan
+Write-Host "V2rayZ Installer Build" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -64,7 +64,7 @@ if (-not (Test-Path $PublishDir)) {
 }
 
 $requiredFiles = @(
-    "V2rayClient.exe",
+    "V2rayZ.exe",
     "wwwroot\index.html",
     "Resources\v2ray.exe"
 )

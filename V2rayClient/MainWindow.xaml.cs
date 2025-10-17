@@ -171,7 +171,7 @@ public partial class MainWindow : Window
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>V2ray Client</title>
+                        <title>V2rayZ</title>
                         <style>
                             body {
                                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -195,7 +195,7 @@ public partial class MainWindow : Window
                     </head>
                     <body>
                         <div class='container'>
-                            <h1>V2ray Client</h1>
+                            <h1>V2rayZ</h1>
                             <p>React UI is not built yet. Please build the frontend project.</p>
                             <p><code>cd V2rayClient.UI && npm run build</code></p>
                         </div>
@@ -320,7 +320,7 @@ public partial class MainWindow : Window
         {
             Icon = LoadIcon(),
             Visible = true,
-            Text = "V2ray Client - Disconnected"
+            Text = "V2rayZ - Disconnected"
         };
 
         // Double-click to show window
@@ -483,7 +483,7 @@ public partial class MainWindow : Window
                 _ => ""
             };
 
-            _notifyIcon.Text = $"V2ray Client - {statusText}" + 
+            _notifyIcon.Text = $"V2rayZ - {statusText}" + 
                 (status == Models.ConnectionStatus.Connected ? $" - {modeText}" : "");
 
             // Update icon (you can add different icons for different states)

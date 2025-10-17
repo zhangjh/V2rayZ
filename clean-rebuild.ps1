@@ -110,8 +110,8 @@ Write-Host "✓ Complete rebuild finished!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Output directory: .\publish" -ForegroundColor White
-Write-Host "Executable: .\publish\V2rayClient.exe" -ForegroundColor White
+Write-Host "Executable: .\publish\V2rayZ.exe" -ForegroundColor White
 Write-Host ""
 Write-Host "You can now run the application:" -ForegroundColor Yellow
-Write-Host "  .\publish\V2rayClient.exe" -ForegroundColor Cyan
+Write-Host "  .\publish\V2rayZ.exe" -ForegroundColor Cyan
 Write-Host ""

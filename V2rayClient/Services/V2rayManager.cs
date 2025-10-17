@@ -538,7 +538,7 @@ public class V2rayManager : IV2rayManager
     {
         var appDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "V2rayClient"
+            "V2rayZ"
         );
 
         Directory.CreateDirectory(appDataPath);
