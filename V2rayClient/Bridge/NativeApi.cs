@@ -717,7 +717,6 @@ public class NativeApi
             {
                 appVersion = VersionInfo.Version,
                 appName = VersionInfo.ApplicationName,
-                buildDate = VersionInfo.BuildDate,
                 v2rayVersion = App.ResourceManager?.GetV2rayVersion() ?? "Unknown",
                 copyright = VersionInfo.Copyright,
                 repositoryUrl = VersionInfo.RepositoryUrl

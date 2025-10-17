@@ -52,14 +52,6 @@ export function AdvancedSettings() {
     }
   }
 
-  const handleViewLogs = () => {
-    toast.info('日志查看功能即将推出')
-  }
-
-  const handleClearLogs = () => {
-    toast.info('日志清除功能即将推出')
-  }
-
   if (!config) {
     return null
   }
@@ -141,13 +133,13 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      set https_proxy=http://127.0.0.1:{httpPort}
+                      set https_proxy=http://127.0.0.1:{socksPort}
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`set https_proxy=http://127.0.0.1:${httpPort}`)
+                        navigator.clipboard.writeText(`set https_proxy=http://127.0.0.1:${socksPort}`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -177,13 +169,13 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      $env:https_proxy="http://127.0.0.1:{httpPort}"
+                      $env:https_proxy="http://127.0.0.1:{socksPort}"
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`$env:https_proxy="http://127.0.0.1:${httpPort}"`)
+                        navigator.clipboard.writeText(`$env:https_proxy="http://127.0.0.1:${socksPort}"`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -213,13 +205,13 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      export https_proxy=http://127.0.0.1:{httpPort}
+                      export https_proxy=http://127.0.0.1:{socksPort}
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`export https_proxy=http://127.0.0.1:${httpPort}`)
+                        navigator.clipboard.writeText(`export https_proxy=http://127.0.0.1:${socksPort}`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -249,7 +241,7 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      git config --global https.proxy http://127.0.0.1:{httpPort}
+                      git config --global https.proxy http://127.0.0.1:{socksPort}
                     </code>
                     <Button 
                       variant="outline" 
@@ -285,13 +277,13 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      npm config set https-proxy http://127.0.0.1:{httpPort}
+                      npm config set https-proxy http://127.0.0.1:{socksPort}
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`npm config set https-proxy http://127.0.0.1:${httpPort}`)
+                        navigator.clipboard.writeText(`npm config set https-proxy http://127.0.0.1:${socksPort}`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -316,22 +308,6 @@ export function AdvancedSettings() {
           </div>
         </div>
 
-        <div className="space-y-4 pt-4 border-t">
-          <div>
-            <h4 className="text-sm font-medium mb-2">日志</h4>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleViewLogs}>
-                查看日志
-              </Button>
-              <Button variant="outline" onClick={handleClearLogs}>
-                清除日志
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              日志功能即将推出
-            </p>
-          </div>
-        </div>
       </CardContent>
     </Card>
   )

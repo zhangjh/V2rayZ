@@ -169,8 +169,39 @@ public class ResourceManager : IDisposable
                 return "Unknown";
             }
 
-            var versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(V2rayExePath);
-            return versionInfo.FileVersion ?? "Unknown";
+            // Execute v2ray with version command to get version information
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo.FileName = V2rayExePath;
+            process.StartInfo.Arguments = "version";
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.CreateNoWindow = true;
+            process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(5000); // Wait up to 5 seconds
+
+            if (process.ExitCode == 0 && !string.IsNullOrEmpty(output))
+            {
+                // Parse version from output like "V2Ray 5.20.0 (V2Fly, a community-driven edition of V2Ray.)"
+                var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length > 0)
+                {
+                    var versionLine = lines[0].Trim();
+                    // Extract version number from the first line
+                    var parts = versionLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2 && parts[0] == "V2Ray")
+                    {
+                        return $"V2Ray {parts[1]}";
+                    }
+                    // Fallback: return the first line as-is
+                    return versionLine;
+                }
+            }
+
+            return "Unknown";
         }
         catch (Exception ex)
         {

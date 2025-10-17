@@ -44,7 +44,7 @@ export function AboutSettings() {
     if (versionInfo?.repositoryUrl) {
       window.open(versionInfo.repositoryUrl, '_blank')
     } else {
-      toast.info('GitHub 链接: https://github.com/v2rayz/v2rayz')
+      toast.info('GitHub 链接: https://github.com/zhangjh/V2rayZ')
     }
   }
 
@@ -75,11 +75,6 @@ export function AboutSettings() {
             <p className="text-lg font-semibold">
               {versionInfo?.appName || 'V2rayZ'} v{versionInfo?.appVersion || '1.0.0'}
             </p>
-            {versionInfo?.buildDate && (
-              <p className="text-xs text-muted-foreground mt-1">
-                构建日期: {versionInfo.buildDate}
-              </p>
-            )}
           </div>
 
           <Separator />

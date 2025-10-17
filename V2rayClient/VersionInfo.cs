@@ -38,29 +38,14 @@ public static class VersionInfo
     /// <summary>
     /// GitHub repository URL
     /// </summary>
-    public const string RepositoryUrl = "https://github.com/v2rayz/v2rayz";
-
-    /// <summary>
-    /// Build date (set during build process)
-    /// </summary>
-    public static readonly string BuildDate = GetBuildDate();
-
-    /// <summary>
-    /// Gets the build date from the assembly
-    /// </summary>
-    private static string GetBuildDate()
-    {
-        var assembly = typeof(VersionInfo).Assembly;
-        var buildDate = System.IO.File.GetLastWriteTime(assembly.Location);
-        return buildDate.ToString("yyyy-MM-dd HH:mm:ss");
-    }
+    public const string RepositoryUrl = "https://github.com/zhangjh/V2rayZ";
 
     /// <summary>
     /// Gets the full version string with build date
     /// </summary>
     public static string GetFullVersionString()
     {
-        return $"{ApplicationName} v{Version} (Build: {BuildDate})";
+        return $"{ApplicationName} v{Version} ";
     }
 
     /// <summary>
