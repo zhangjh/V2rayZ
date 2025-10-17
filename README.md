@@ -3,7 +3,8 @@
 一个现代化的 Windows v2ray 客户端，支持 VLESS 和 Trojan 协议。
 
 开发初衷：
-![alt text](image.png)
+
+<img width="722" height="150" alt="image" src="https://github.com/user-attachments/assets/3c8512af-04ed-4fad-ac4f-141101a0b453" />
 
 为了解决当前Windows下没有好用的V2ray客户端的问题（也可能是我没发现，我之前在用V2rayN），去除掉市面上常见的客户端复杂的功能，仅保留核心的代理开关、自定义规则配置等，其他用户什么DNS、GFW List之类的不需要用户感知的一概屏蔽由系统自己集成。
 
