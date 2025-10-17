@@ -86,9 +86,19 @@ export function useNativeEventListeners() {
     console.log('Stats updated:', data)
   }
 
+  const handleNavigateToPage = (page: string) => {
+    console.log('Navigate to page:', page)
+    // Import useAppStore dynamically to avoid circular dependency
+    import('@/store/app-store').then(({ useAppStore }) => {
+      const setCurrentView = useAppStore.getState().setCurrentView
+      setCurrentView(page)
+    })
+  }
+
   useNativeEvent('processStarted', handleProcessStarted)
   useNativeEvent('processStopped', handleProcessStopped)
   useNativeEvent('processError', handleProcessError)
   useNativeEvent('configChanged', handleConfigChanged)
   useNativeEvent('statsUpdated', handleStatsUpdated)
+  useNativeEvent('navigateToPage', handleNavigateToPage)
 }

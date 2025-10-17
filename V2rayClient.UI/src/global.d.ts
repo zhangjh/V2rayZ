@@ -10,6 +10,7 @@ declare global {
             getConfig: () => Promise<string>
             saveConfig: (configJson: string) => Promise<string>
             updateProxyMode: (mode: string) => Promise<string>
+            switchServer: (serverId: string) => Promise<string>
             getConnectionStatus: () => Promise<string>
             getStatistics: () => Promise<string>
             resetStatistics: () => Promise<string>

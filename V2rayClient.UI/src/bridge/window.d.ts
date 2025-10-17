@@ -13,6 +13,7 @@ interface NativeApi {
   getConfig(): Promise<string>
   saveConfig(configJson: string): Promise<string>
   updateProxyMode(mode: 'Global' | 'Smart' | 'Direct'): Promise<string>
+  switchServer(serverId: string): Promise<string>
 
   // Status and Statistics
   getConnectionStatus(): Promise<string>

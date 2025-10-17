@@ -244,6 +244,7 @@ public partial class MainWindow : Window
                     getConfig: () => chrome.webview.hostObjects.nativeApi.GetConfig(),
                     saveConfig: (configJson) => chrome.webview.hostObjects.nativeApi.SaveConfig(configJson),
                     updateProxyMode: (mode) => chrome.webview.hostObjects.nativeApi.UpdateProxyMode(mode),
+                    switchServer: (serverId) => chrome.webview.hostObjects.nativeApi.SwitchServer(serverId),
                     getConnectionStatus: () => chrome.webview.hostObjects.nativeApi.GetConnectionStatus(),
                     getStatistics: () => chrome.webview.hostObjects.nativeApi.GetStatistics(),
                     resetStatistics: () => chrome.webview.hostObjects.nativeApi.ResetStatistics(),
@@ -334,6 +335,12 @@ public partial class MainWindow : Window
         {
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
+        
+        // Subscribe to configuration changes to update tray menu
+        if (_configManager != null)
+        {
+            _configManager.ConfigChanged += OnConfigManagerConfigChanged;
+        }
     }
 
     private void CreateTrayContextMenu()
@@ -354,6 +361,13 @@ public partial class MainWindow : Window
         toggleProxyItem.Click += OnToggleProxyClick;
         contextMenu.Items.Add(toggleProxyItem);
         contextMenu.Items.Add(new ToolStripSeparator());
+
+        // Server selection submenu
+        var serverSelectionItem = new ToolStripMenuItem("Select Server");
+        contextMenu.Items.Add(serverSelectionItem);
+        
+        // Initialize server selection submenu immediately
+        UpdateServerSelectionMenu(serverSelectionItem);
 
         // Proxy mode submenu
         var proxyModeItem = new ToolStripMenuItem("Proxy Mode");
@@ -381,7 +395,7 @@ public partial class MainWindow : Window
 
         // Settings (opens main window to settings page)
         var settingsItem = new ToolStripMenuItem("Settings");
-        settingsItem.Click += (s, e) => ShowMainWindow();
+        settingsItem.Click += (s, e) => ShowSettingsPage();
         contextMenu.Items.Add(settingsItem);
 
         contextMenu.Items.Add(new ToolStripSeparator());
@@ -398,6 +412,7 @@ public partial class MainWindow : Window
         {
             StatusItem = statusItem,
             ToggleProxyItem = toggleProxyItem,
+            ServerSelectionItem = serverSelectionItem,
             GlobalModeItem = globalModeItem,
             SmartModeItem = smartModeItem,
             DirectModeItem = directModeItem
@@ -454,6 +469,18 @@ public partial class MainWindow : Window
         {
             UpdateTrayMenu();
         }
+    }
+
+    private void OnConfigManagerConfigChanged(object? sender, Services.ConfigChangedEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine("[MainWindow] Configuration changed event received, updating tray menu");
+        
+        // Update tray menu when configuration changes
+        Dispatcher.Invoke(() =>
+        {
+            UpdateTrayMenu();
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Tray menu updated after configuration change");
+        });
     }
 
     private void UpdateTrayIcon()
@@ -520,6 +547,10 @@ public partial class MainWindow : Window
             ToolStripMenuItem toggleItem = tag.ToggleProxyItem;
             toggleItem.Text = isConnected ? "Disable Proxy" : "Enable Proxy";
 
+            // Update server selection submenu
+            ToolStripMenuItem serverSelectionItem = tag.ServerSelectionItem;
+            UpdateServerSelectionMenu(serverSelectionItem);
+
             // Update proxy mode checkmarks
             ToolStripMenuItem globalItem = tag.GlobalModeItem;
             ToolStripMenuItem smartItem = tag.SmartModeItem;
@@ -529,6 +560,107 @@ public partial class MainWindow : Window
             smartItem.Checked = mode == Models.ProxyMode.Smart;
             directItem.Checked = mode == Models.ProxyMode.Direct;
         });
+    }
+
+    private void UpdateServerSelectionMenu(ToolStripMenuItem serverSelectionItem)
+    {
+        System.Diagnostics.Debug.WriteLine("[MainWindow] Updating server selection menu");
+        
+        // Clear existing server items
+        serverSelectionItem.DropDownItems.Clear();
+
+        var config = _configManager?.LoadConfig();
+        System.Diagnostics.Debug.WriteLine($"[MainWindow] Loaded config - Servers count: {config?.Servers?.Count ?? 0}");
+        
+        if (config?.Servers == null || config.Servers.Count == 0)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainWindow] No servers configured, showing placeholder");
+            // No servers configured - show placeholder
+            var noServersItem = new ToolStripMenuItem("No servers configured")
+            {
+                Enabled = false
+            };
+            serverSelectionItem.DropDownItems.Add(noServersItem);
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Adding {config.Servers.Count} servers to menu");
+            // Add server items
+            foreach (var server in config.Servers)
+            {
+                var serverItem = new ToolStripMenuItem($"{server.Name} ({server.Protocol})")
+                {
+                    Checked = server.Id == config.SelectedServerId,
+                    Tag = server.Id
+                };
+                serverItem.Click += OnServerSelectionClick;
+                serverSelectionItem.DropDownItems.Add(serverItem);
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Added server: {server.Name} (Selected: {server.Id == config.SelectedServerId})");
+            }
+            
+            // Add separator before manage option
+            serverSelectionItem.DropDownItems.Add(new ToolStripSeparator());
+        }
+
+        // Always add manage servers option at the bottom
+        var manageServersItem = new ToolStripMenuItem("Manage Servers...");
+        manageServersItem.Click += (s, e) => ShowServersPage();
+        serverSelectionItem.DropDownItems.Add(manageServersItem);
+        
+        System.Diagnostics.Debug.WriteLine("[MainWindow] Server selection menu update completed");
+    }
+
+    private void OnServerSelectionClick(object? sender, EventArgs e)
+    {
+        if (sender is not ToolStripMenuItem menuItem || menuItem.Tag is not string serverId)
+            return;
+
+        if (_nativeApi == null) return;
+
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Switching to server: {serverId}");
+            
+            // Use NativeApi to switch server (handles all the logic)
+            var result = _nativeApi.SwitchServer(serverId);
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Switch server result: {result}");
+            
+            // Parse JSON response properly
+            using var document = JsonDocument.Parse(result);
+            var root = document.RootElement;
+            
+            if (!root.TryGetProperty("success", out var successElement) || !successElement.GetBoolean())
+            {
+                var error = "Unknown error";
+                if (root.TryGetProperty("error", out var errorElement))
+                {
+                    error = errorElement.GetString() ?? "Unknown error";
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Switch server failed: {error}");
+                MessageBox.Show($"Failed to switch server: {error}", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Server switched successfully, updating tray menu");
+            // Update tray menu to reflect changes
+            UpdateTrayMenu();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Exception in OnServerSelectionClick: {ex.Message}");
+            MessageBox.Show($"Failed to select server: {ex.Message}", "Error", 
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ShowServersPage()
+    {
+        ShowMainWindow();
+        
+        // Send event to frontend to navigate to servers page
+        SendEventToJavaScript("navigateToPage", "\"server\"");
     }
 
     private Icon LoadIcon()
@@ -574,6 +706,14 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+    }
+
+    private void ShowSettingsPage()
+    {
+        ShowMainWindow();
+        
+        // Send event to frontend to navigate to settings page
+        SendEventToJavaScript("navigateToPage", "\"settings\"");
     }
 
     public void ExitApplication()
@@ -650,7 +790,24 @@ public partial class MainWindow : Window
             // Continue with exit even if cleanup fails
         }
         
-        // 6. Dispose system tray icon
+        // 6. Unsubscribe from events
+        try
+        {
+            if (_viewModel != null)
+            {
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            }
+            if (_configManager != null)
+            {
+                _configManager.ConfigChanged -= OnConfigManagerConfigChanged;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error unsubscribing from events: {ex.Message}");
+        }
+        
+        // 7. Dispose system tray icon
         try
         {
             if (_notifyIcon != null)

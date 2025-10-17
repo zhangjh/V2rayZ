@@ -193,6 +193,19 @@ export async function updateProxyMode(mode: ProxyMode): Promise<ApiResponse<void
   }
 }
 
+export async function switchServer(serverId: string): Promise<ApiResponse<void>> {
+  if (!isWebView2()) {
+    return { success: false, error: 'Not running in WebView2 environment' }
+  }
+  
+  try {
+    const result = await window.nativeApi.switchServer(serverId)
+    return parseResponse(result)
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
 /**
  * Status and Statistics APIs
  */

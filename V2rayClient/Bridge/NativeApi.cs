@@ -421,6 +421,49 @@ public class NativeApi
         }
     }
 
+    /// <summary>
+    /// Switch to a different server
+    /// </summary>
+    public string SwitchServer(string serverId)
+    {
+        try
+        {
+            var config = _configManager.LoadConfig();
+            
+            // Find the server
+            var server = config.Servers?.FirstOrDefault(s => s.Id == serverId);
+            if (server == null)
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "Server not found" }, JsonOptions);
+            }
+
+            var oldServerId = config.SelectedServerId;
+            config.SelectedServerId = serverId;
+            _configManager.SaveConfig(config);
+            
+            _logManager.AddLog(Models.LogLevel.Info, $"已切换到服务器: {server.Name}", "config");
+
+            // Restart proxy if running
+            var status = _v2rayManager.GetStatus();
+            if (status.Running)
+            {
+                // Stop current connection
+                _v2rayManager.StopAsync().Wait(TimeSpan.FromSeconds(5));
+                
+                // Start with new server configuration
+                var v2rayConfig = _v2rayManager.GenerateConfig(config);
+                _v2rayManager.StartAsync(v2rayConfig).Wait(TimeSpan.FromSeconds(10));
+            }
+
+            return JsonSerializer.Serialize(new { success = true }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logManager.AddLog(Models.LogLevel.Error, $"切换服务器失败: {ex.Message}", "config");
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
     #endregion
 
     #region Status and Statistics

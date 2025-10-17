@@ -40,6 +40,7 @@ interface AppState {
   loadConfig: () => Promise<void>
   saveConfig: (config: UserConfig) => Promise<void>
   updateProxyMode: (mode: ProxyMode) => Promise<void>
+  switchServer: (serverId: string) => Promise<void>
   
   // Status Actions
   refreshConnectionStatus: () => Promise<void>
@@ -268,6 +269,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       set({ error: String(error) })
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  switchServer: async (serverId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const response = await nativeApi.switchServer(serverId)
+      if (response.success) {
+        // Update local config
+        const currentConfig = get().config
+        if (currentConfig) {
+          set({ config: { ...currentConfig, selectedServerId: serverId } })
+        }
+        // Refresh connection status
+        await get().refreshConnectionStatus()
+      } else {
+        set({ error: response.error || 'Failed to switch server' })
+        throw new Error(response.error || 'Failed to switch server')
+      }
+    } catch (error) {
+      set({ error: String(error) })
+      throw error
     } finally {
       set({ isLoading: false })
     }

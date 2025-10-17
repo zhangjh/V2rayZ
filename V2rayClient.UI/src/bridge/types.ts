@@ -100,6 +100,7 @@ export interface NativeEventData {
   configChanged: { key?: string; oldValue?: any; newValue?: any }
   statsUpdated: TrafficStats
   logReceived: LogEntry
+  navigateToPage: string
 }
 
 export type NativeEventListener<K extends keyof NativeEventData> = (
