@@ -80,6 +80,11 @@ export function useNativeEventListeners() {
 
   const handleConfigChanged = (data: NativeEventData['configChanged']) => {
     console.log('Config changed:', data)
+    // Reload configuration when it changes
+    import('@/store/app-store').then(({ useAppStore }) => {
+      const loadConfig = useAppStore.getState().loadConfig
+      loadConfig()
+    })
   }
 
   const handleStatsUpdated = (data: NativeEventData['statsUpdated']) => {

@@ -473,13 +473,10 @@ public partial class MainWindow : Window
 
     private void OnConfigManagerConfigChanged(object? sender, Services.ConfigChangedEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine("[MainWindow] Configuration changed event received, updating tray menu");
-        
         // Update tray menu when configuration changes
         Dispatcher.Invoke(() =>
         {
             UpdateTrayMenu();
-            System.Diagnostics.Debug.WriteLine("[MainWindow] Tray menu updated after configuration change");
         });
     }
 
@@ -564,17 +561,13 @@ public partial class MainWindow : Window
 
     private void UpdateServerSelectionMenu(ToolStripMenuItem serverSelectionItem)
     {
-        System.Diagnostics.Debug.WriteLine("[MainWindow] Updating server selection menu");
-        
         // Clear existing server items
         serverSelectionItem.DropDownItems.Clear();
 
         var config = _configManager?.LoadConfig();
-        System.Diagnostics.Debug.WriteLine($"[MainWindow] Loaded config - Servers count: {config?.Servers?.Count ?? 0}");
         
         if (config?.Servers == null || config.Servers.Count == 0)
         {
-            System.Diagnostics.Debug.WriteLine("[MainWindow] No servers configured, showing placeholder");
             // No servers configured - show placeholder
             var noServersItem = new ToolStripMenuItem("No servers configured")
             {
@@ -584,7 +577,6 @@ public partial class MainWindow : Window
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine($"[MainWindow] Adding {config.Servers.Count} servers to menu");
             // Add server items
             foreach (var server in config.Servers)
             {
@@ -595,7 +587,6 @@ public partial class MainWindow : Window
                 };
                 serverItem.Click += OnServerSelectionClick;
                 serverSelectionItem.DropDownItems.Add(serverItem);
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] Added server: {server.Name} (Selected: {server.Id == config.SelectedServerId})");
             }
             
             // Add separator before manage option
@@ -606,8 +597,6 @@ public partial class MainWindow : Window
         var manageServersItem = new ToolStripMenuItem("Manage Servers...");
         manageServersItem.Click += (s, e) => ShowServersPage();
         serverSelectionItem.DropDownItems.Add(manageServersItem);
-        
-        System.Diagnostics.Debug.WriteLine("[MainWindow] Server selection menu update completed");
     }
 
     private void OnServerSelectionClick(object? sender, EventArgs e)
@@ -619,11 +608,8 @@ public partial class MainWindow : Window
 
         try
         {
-            System.Diagnostics.Debug.WriteLine($"[MainWindow] Switching to server: {serverId}");
-            
             // Use NativeApi to switch server (handles all the logic)
             var result = _nativeApi.SwitchServer(serverId);
-            System.Diagnostics.Debug.WriteLine($"[MainWindow] Switch server result: {result}");
             
             // Parse JSON response properly
             using var document = JsonDocument.Parse(result);
@@ -637,19 +623,16 @@ public partial class MainWindow : Window
                     error = errorElement.GetString() ?? "Unknown error";
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] Switch server failed: {error}");
                 MessageBox.Show($"Failed to switch server: {error}", "Error", 
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            System.Diagnostics.Debug.WriteLine("[MainWindow] Server switched successfully, updating tray menu");
             // Update tray menu to reflect changes
             UpdateTrayMenu();
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[MainWindow] Exception in OnServerSelectionClick: {ex.Message}");
             MessageBox.Show($"Failed to select server: {ex.Message}", "Error", 
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
