@@ -107,18 +107,28 @@ public partial class MainWindow : Window
 
             webView.CoreWebView2.NavigationCompleted += (s, e) =>
             {
-                System.Diagnostics.Debug.WriteLine($"Navigation Completed: Success={e.IsSuccess}, HttpStatusCode={e.HttpStatusCode}");
+                System.Diagnostics.Debug.WriteLine($"Navigation Completed: Success={e.IsSuccess}");
+                // Temporarily disabled error dialog to prevent false positives
+                // The app may work fine even if some resources fail to load
+                /*
                 if (!e.IsSuccess)
                 {
-                    MessageBox.Show($"Navigation failed!\nHTTP Status: {e.HttpStatusCode}\nError: {e.WebErrorStatus}\n\nTry pressing F12 to open DevTools for more details.", 
+                    MessageBox.Show($"Navigation failed!\nError: {e.WebErrorStatus}\n\nTry pressing F12 to open DevTools for more details.", 
                         "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
+                */
             };
 
             // Capture console messages
             webView.CoreWebView2.WebResourceResponseReceived += (s, e) =>
             {
                 System.Diagnostics.Debug.WriteLine($"Resource Loaded: {e.Request.Uri} - Status: {e.Response.StatusCode}");
+            };
+
+            // Log resource loading for debugging
+            webView.CoreWebView2.WebResourceRequested += (s, e) =>
+            {
+                System.Diagnostics.Debug.WriteLine($"Resource Requested: {e.Request.Uri}");
             };
 
             // Set up virtual host mapping for local files
@@ -139,6 +149,12 @@ public partial class MainWindow : Window
 
                 // Set up JavaScript bridge
                 SetupJavaScriptBridge();
+
+                // Add DOM content loaded handler
+                webView.CoreWebView2.DOMContentLoaded += (s, e) =>
+                {
+                    System.Diagnostics.Debug.WriteLine("DOM Content Loaded successfully");
+                };
 
                 // Navigate to the virtual host
                 var url = "https://app.local/index.html";
