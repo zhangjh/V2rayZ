@@ -15,7 +15,7 @@ V2rayZ的名称来源于两个方面：
 软件截图：
 
 主页面：
-<img width="1250" height="875" alt="image" src="https://github.com/user-attachments/assets/c1c64855-2798-437d-ac0f-93c5e9d0d9a3" />
+<img width="1233" height="829" alt="image" src="https://github.com/user-attachments/assets/01567b24-1126-4395-ad55-a7b5420974d4" />
 
 自定义规则页面：
 <img width="1233" height="829" alt="image" src="https://github.com/user-attachments/assets/e057cf80-3d2a-4063-bd8c-3cad00ed6520" />
