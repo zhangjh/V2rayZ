@@ -21,6 +21,7 @@ public class NativeApi
     private readonly IStatisticsManager _statsManager;
     private readonly IRoutingRuleManager _routingManager;
     private readonly ILogManager _logManager;
+    private readonly IProtocolParser _protocolParser;
     private readonly Action<string, string> _sendEvent;
     
     // JSON serialization options for consistent camelCase naming
@@ -40,6 +41,7 @@ public class NativeApi
         IStatisticsManager statsManager,
         IRoutingRuleManager routingManager,
         ILogManager logManager,
+        IProtocolParser protocolParser,
         Action<string, string> sendEvent)
     {
         _v2rayManager = v2rayManager;
@@ -48,6 +50,7 @@ public class NativeApi
         _statsManager = statsManager;
         _routingManager = routingManager;
         _logManager = logManager;
+        _protocolParser = protocolParser;
         _sendEvent = sendEvent;
 
         // Subscribe to events
@@ -432,6 +435,129 @@ public class NativeApi
         {
             _logManager.AddLog(Models.LogLevel.Error, $"切换服务器失败: {ex.Message}", "config");
             return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Parse protocol URL and return server configuration
+    /// </summary>
+    public string ParseProtocolUrl(string url)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 解析协议URL: {url}");
+            
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "URL不能为空" }, JsonOptions);
+            }
+
+            if (!_protocolParser.IsSupported(url))
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "不支持的协议类型" }, JsonOptions);
+            }
+
+            var serverConfig = _protocolParser.ParseUrl(url);
+            
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 协议解析成功: {serverConfig.Protocol}://{serverConfig.Address}:{serverConfig.Port}");
+            
+            return JsonSerializer.Serialize(new { success = true, data = serverConfig }, JsonOptions);
+        }
+        catch (ArgumentException ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 协议解析参数错误: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+        catch (NotSupportedException ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 不支持的协议: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 协议解析失败: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = $"解析失败: {ex.Message}" }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Add server from protocol URL
+    /// </summary>
+    public string AddServerFromUrl(string url, string name)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 从URL添加服务器: {url}, 名称: {name}");
+            
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "URL不能为空" }, JsonOptions);
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "服务器名称不能为空" }, JsonOptions);
+            }
+
+            if (!_protocolParser.IsSupported(url))
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "不支持的协议类型" }, JsonOptions);
+            }
+
+            var serverConfig = _protocolParser.ParseUrl(url);
+            
+            // 创建带ID的服务器配置
+            var serverWithId = new ServerConfigWithId
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = name,
+                Protocol = serverConfig.Protocol,
+                Address = serverConfig.Address,
+                Port = serverConfig.Port,
+                Uuid = serverConfig.Uuid,
+                Encryption = serverConfig.Encryption,
+                Password = serverConfig.Password,
+                Network = serverConfig.Network,
+                Security = serverConfig.Security,
+                TlsSettings = serverConfig.TlsSettings,
+                WsSettings = serverConfig.WsSettings,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            // 加载配置并添加服务器
+            var config = _configManager.LoadConfig();
+            config.Servers ??= new List<ServerConfigWithId>();
+            config.Servers.Add(serverWithId);
+            
+            // 如果这是第一个服务器，自动选择它
+            if (config.Servers.Count == 1)
+            {
+                config.SelectedServerId = serverWithId.Id;
+            }
+            
+            _configManager.SaveConfig(config);
+            
+            _logManager.AddLog(Models.LogLevel.Info, $"已添加服务器: {name} ({serverConfig.Protocol})", "config");
+            
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 服务器添加成功: {serverWithId.Id}");
+            
+            return JsonSerializer.Serialize(new { success = true, data = serverWithId }, JsonOptions);
+        }
+        catch (ArgumentException ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 添加服务器参数错误: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+        catch (NotSupportedException ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 不支持的协议: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] 添加服务器失败: {ex.Message}");
+            return JsonSerializer.Serialize(new { success = false, error = $"添加服务器失败: {ex.Message}" }, JsonOptions);
         }
     }
 

@@ -30,13 +30,28 @@ export interface TrafficStats {
 }
 
 export interface ServerConfig {
+  protocol: 'Vless' | 'Trojan';
   address: string;
   port: number;
-  uuid: string;
-  encryption: string;
+  uuid?: string; // For VLESS
+  encryption?: string; // For VLESS
+  password?: string; // For Trojan
   network: 'Tcp' | 'Ws' | 'H2';
   security: 'None' | 'Tls';
   tlsSettings?: TlsSettings;
+  wsSettings?: WsSettings;
+}
+
+export interface ServerConfigWithId extends ServerConfig {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WsSettings {
+  path?: string;
+  host?: string;
 }
 
 export interface TlsSettings {
@@ -52,7 +67,8 @@ export interface DomainRule {
 }
 
 export interface UserConfig {
-  server: ServerConfig;
+  servers: ServerConfigWithId[];
+  selectedServerId?: string;
   proxyMode: 'Global' | 'Smart' | 'Direct';
   customRules: DomainRule[];
   autoStart: boolean;
@@ -79,6 +95,11 @@ export interface NativeApi {
   getConfig(): Promise<string>;
   saveConfig(config: UserConfig): Promise<string>;
   updateProxyMode(mode: 'Global' | 'Smart' | 'Direct'): Promise<string>;
+  switchServer(serverId: string): Promise<string>;
+
+  // Protocol URL Parsing
+  parseProtocolUrl(url: string): Promise<string>;
+  addServerFromUrl(url: string, name: string): Promise<string>;
 
   // Status and Statistics
   getConnectionStatus(): Promise<string>;
@@ -89,6 +110,15 @@ export interface NativeApi {
   addCustomRule(rule: DomainRule): Promise<string>;
   updateCustomRule(rule: DomainRule): Promise<string>;
   deleteCustomRule(ruleId: string): Promise<string>;
+  addCustomRulesBatch(rules: DomainRule[]): Promise<string>;
+
+  // Logging
+  getLogs(count: number): Promise<string>;
+  clearLogs(): Promise<string>;
+
+  // Version and Updates
+  getVersionInfo(): Promise<string>;
+  checkForUpdates(): Promise<string>;
 }
 
 export interface NativeEventListener<K extends keyof NativeEventData> {

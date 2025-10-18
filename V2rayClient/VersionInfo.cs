@@ -8,12 +8,12 @@ public static class VersionInfo
     /// <summary>
     /// Application version (Major.Minor.Patch)
     /// </summary>
-    public const string Version = "1.1";
+    public const string Version = "1.2";
 
     /// <summary>
     /// Application version with build number (Major.Minor.Patch.Build)
     /// </summary>
-    public const string FullVersion = "1.1.0.0";
+    public const string FullVersion = "1.2.0.0";
 
     /// <summary>
     /// Application name

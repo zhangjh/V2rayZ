@@ -12,6 +12,8 @@ import type {
   NativeEventData,
   NativeEventListener,
   LogEntry,
+  ServerConfig,
+  ServerConfigWithId,
 } from './types'
 
 /**
@@ -329,6 +331,35 @@ export async function getVersionInfo(): Promise<ApiResponse<{
   try {
     const result = await window.nativeApi.getVersionInfo()
     return parseResponse(result)
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
+/**
+ * Protocol URL Parsing APIs
+ */
+export async function parseProtocolUrl(url: string): Promise<ApiResponse<ServerConfig>> {
+  if (!isWebView2()) {
+    return { success: false, error: 'Not running in WebView2 environment' }
+  }
+  
+  try {
+    const result = await window.nativeApi.parseProtocolUrl(url)
+    return parseResponse<ServerConfig>(result)
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
+export async function addServerFromUrl(url: string, name: string): Promise<ApiResponse<ServerConfigWithId>> {
+  if (!isWebView2()) {
+    return { success: false, error: 'Not running in WebView2 environment' }
+  }
+  
+  try {
+    const result = await window.nativeApi.addServerFromUrl(url, name)
+    return parseResponse<ServerConfigWithId>(result)
   } catch (error) {
     return { success: false, error: String(error) }
   }

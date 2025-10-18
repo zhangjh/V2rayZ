@@ -33,6 +33,10 @@ interface NativeApi {
   // Version Information
   getVersionInfo(): Promise<string>
 
+  // Protocol URL Parsing
+  parseProtocolUrl(url: string): Promise<string>
+  addServerFromUrl(url: string, name: string): Promise<string>
+
   // Update Management
   checkForUpdates(): Promise<string>
 }

@@ -18,7 +18,12 @@ declare global {
             addCustomRulesBatch: (rulesJson: string) => Promise<string>
             updateCustomRule: (ruleJson: string) => Promise<string>
             deleteCustomRule: (ruleId: string) => Promise<string>
+            getLogs: (count: number) => Promise<string>
+            clearLogs: () => Promise<string>
             getVersionInfo: () => Promise<string>
+            checkForUpdates: () => Promise<string>
+            parseProtocolUrl: (url: string) => Promise<string>
+            addServerFromUrl: (url: string, name: string) => Promise<string>
         }
         addNativeEventListener: (eventName: string, callback: (data: any) => void) => void
         removeNativeEventListener: (eventName: string, callback: (data: any) => void) => void

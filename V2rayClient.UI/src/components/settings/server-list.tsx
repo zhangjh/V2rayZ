@@ -1,4 +1,5 @@
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +14,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Plus, Edit, Trash2, Server } from 'lucide-react'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Plus, Edit, Trash2, Server, ChevronDown, Link } from 'lucide-react'
+import { ImportUrlDialog } from './import-url-dialog'
 import type { ServerConfigWithId } from '@/bridge/types'
 
 interface ServerListProps {
@@ -23,6 +31,7 @@ interface ServerListProps {
     onEditServer: (server: ServerConfigWithId) => void
     onDeleteServer: (serverId: string) => void
     onSelectServer: (serverId: string) => void
+    onImportSuccess?: () => void
 }
 
 export function ServerList({
@@ -32,7 +41,9 @@ export function ServerList({
     onEditServer,
     onDeleteServer,
     onSelectServer,
+    onImportSuccess,
 }: ServerListProps) {
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
     const handleDelete = (serverId: string) => {
         onDeleteServer(serverId)
     }
@@ -54,10 +65,25 @@ export function ServerList({
                         管理您的代理服务器配置
                     </p>
                 </div>
-                <Button onClick={onAddServer} className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    添加服务器
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            添加服务器
+                            <ChevronDown className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={onAddServer}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            手动添加
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)}>
+                            <Link className="h-4 w-4 mr-2" />
+                            从URL导入
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             {servers.length === 0 ? (
@@ -68,10 +94,20 @@ export function ServerList({
                         <p className="text-sm text-muted-foreground mb-4 text-center">
                             您还没有添加任何服务器配置。点击上方按钮添加您的第一个服务器。
                         </p>
-                        <Button onClick={onAddServer} className="flex items-center gap-2">
-                            <Plus className="h-4 w-4" />
-                            添加服务器
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button onClick={onAddServer} className="flex items-center gap-2">
+                                <Plus className="h-4 w-4" />
+                                手动添加
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setIsImportDialogOpen(true)}
+                                className="flex items-center gap-2"
+                            >
+                                <Link className="h-4 w-4" />
+                                从URL导入
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             ) : (
@@ -129,9 +165,12 @@ export function ServerList({
                                                     </AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
-                                                    <AlertDialogCancel>取消</AlertDialogCancel>
+                                                    <AlertDialogCancel onClick={(e) => e.stopPropagation()}>取消</AlertDialogCancel>
                                                     <AlertDialogAction
-                                                        onClick={() => handleDelete(server.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleDelete(server.id)
+                                                        }}
                                                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                                     >
                                                         删除
@@ -165,6 +204,12 @@ export function ServerList({
                     ))}
                 </div>
             )}
+
+            <ImportUrlDialog
+                open={isImportDialogOpen}
+                onOpenChange={setIsImportDialogOpen}
+                onImportSuccess={onImportSuccess}
+            />
         </div>
     )
 }

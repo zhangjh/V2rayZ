@@ -47,6 +47,9 @@ interface AppState {
   refreshStatistics: () => Promise<void>
   resetStatistics: () => Promise<void>
   
+  // Server Management Actions
+  deleteServer: (serverId: string) => Promise<void>
+  
   // Custom Rules Actions
   addCustomRule: (rule: DomainRule) => Promise<void>
   addCustomRulesBatch: (rules: DomainRule[]) => Promise<void>
@@ -318,6 +321,45 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       set({ error: String(error) })
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  // Server Management Actions
+  deleteServer: async (serverId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const currentConfig = get().config
+      if (!currentConfig) {
+        throw new Error('配置未加载')
+      }
+
+      const updatedServers = currentConfig.servers.filter(s => s.id !== serverId)
+      
+      // If deleting the selected server, clear selection
+      const newSelectedServerId = currentConfig.selectedServerId === serverId ? undefined : currentConfig.selectedServerId
+
+      const updatedConfig = {
+        ...currentConfig,
+        servers: updatedServers,
+        selectedServerId: newSelectedServerId,
+      }
+      
+      // 先更新本地状态
+      set({ config: updatedConfig })
+      
+      // 然后保存到后端
+      const response = await nativeApi.saveConfig(updatedConfig)
+      
+      if (!response.success) {
+        // 如果保存失败，恢复原来的配置
+        set({ config: currentConfig, error: response.error || 'Failed to delete server' })
+        throw new Error(response.error || 'Failed to delete server')
+      }
+    } catch (error) {
+      set({ error: String(error) })
+      throw error
     } finally {
       set({ isLoading: false })
     }

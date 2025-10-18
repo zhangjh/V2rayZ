@@ -8,6 +8,7 @@ import type { ServerConfigWithId } from '@/bridge/types'
 export function ServerPage() {
   const config = useAppStore((state) => state.config)
   const saveConfig = useAppStore((state) => state.saveConfig)
+  const deleteServer = useAppStore((state) => state.deleteServer)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingServer, setEditingServer] = useState<ServerConfigWithId | undefined>()
   const [isTestingConnection, setIsTestingConnection] = useState(false)
@@ -27,25 +28,7 @@ export function ServerPage() {
 
   const handleDeleteServer = async (serverId: string) => {
     try {
-      const updatedServers = servers.filter(s => s.id !== serverId)
-      
-      // If deleting the selected server, clear selection
-      const newSelectedServerId = selectedServerId === serverId ? undefined : selectedServerId
-
-      const updatedConfig = {
-        ...config,
-        servers: updatedServers,
-        selectedServerId: newSelectedServerId,
-        proxyMode: config?.proxyMode || 'Smart',
-        customRules: config?.customRules || [],
-        autoStart: config?.autoStart || false,
-        autoConnect: config?.autoConnect || false,
-        minimizeToTray: config?.minimizeToTray || true,
-        socksPort: config?.socksPort || 65534,
-        httpPort: config?.httpPort || 65533,
-      }
-
-      await saveConfig(updatedConfig)
+      await deleteServer(serverId)
       toast.success('服务器已删除')
     } catch (error) {
       toast.error('删除失败', {
@@ -80,10 +63,6 @@ export function ServerPage() {
 
   const handleSaveServer = async (serverData: Omit<ServerConfigWithId, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      console.log('[ServerPage] Saving server:', serverData)
-      console.log('[ServerPage] Current servers:', servers)
-      console.log('[ServerPage] Current config:', config)
-      
       const now = new Date().toISOString()
       let updatedServers: ServerConfigWithId[]
 
@@ -94,7 +73,6 @@ export function ServerPage() {
             ? { ...serverData, id: editingServer.id, createdAt: editingServer.createdAt, updatedAt: now }
             : s
         )
-        console.log('[ServerPage] Updated existing server')
       } else {
         // Add new server
         const newServer: ServerConfigWithId = {
@@ -104,7 +82,6 @@ export function ServerPage() {
           updatedAt: now,
         }
         updatedServers = [...servers, newServer]
-        console.log('[ServerPage] Added new server:', newServer)
       }
 
       const updatedConfig = {
@@ -120,16 +97,13 @@ export function ServerPage() {
         httpPort: config?.httpPort || 65533,
       }
 
-      console.log('[ServerPage] Final config to save:', updatedConfig)
       await saveConfig(updatedConfig)
-      console.log('[ServerPage] Config saved successfully')
 
       const action = editingServer ? '更新' : '添加'
       toast.success(`服务器配置已${action}`, {
         description: `${serverData.name} 配置已成功保存`,
       })
     } catch (error) {
-      console.error('[ServerPage] Save error:', error)
       toast.error('保存失败', {
         description: error instanceof Error ? error.message : '保存服务器配置时发生错误',
       })
@@ -153,6 +127,12 @@ export function ServerPage() {
     }
   }
 
+  const handleImportSuccess = () => {
+    // 导入成功后刷新配置
+    // 这里可以触发重新加载配置，但由于使用了状态管理，配置会自动更新
+    toast.success('服务器导入成功')
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -169,6 +149,7 @@ export function ServerPage() {
         onEditServer={handleEditServer}
         onDeleteServer={handleDeleteServer}
         onSelectServer={handleSelectServer}
+        onImportSuccess={handleImportSuccess}
       />
 
       <ServerConfigDialog

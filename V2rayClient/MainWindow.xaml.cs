@@ -143,6 +143,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Create protocol parser
+        var protocolParser = new ProtocolParser();
+
         // Create NativeApi instance with event callback
         _nativeApi = new NativeApi(
             _v2rayManager,
@@ -151,6 +154,7 @@ public partial class MainWindow : Window
             _statsManager,
             _routingManager,
             _logManager,
+            protocolParser,
             SendEventToJavaScript
         );
 
@@ -178,7 +182,9 @@ public partial class MainWindow : Window
                     getLogs: (count) => chrome.webview.hostObjects.nativeApi.GetLogs(count),
                     clearLogs: () => chrome.webview.hostObjects.nativeApi.ClearLogs(),
                     getVersionInfo: () => chrome.webview.hostObjects.nativeApi.GetVersionInfo(),
-                    checkForUpdates: () => chrome.webview.hostObjects.nativeApi.CheckForUpdates()
+                    checkForUpdates: () => chrome.webview.hostObjects.nativeApi.CheckForUpdates(),
+                    parseProtocolUrl: (url) => chrome.webview.hostObjects.nativeApi.ParseProtocolUrl(url),
+                    addServerFromUrl: (url, name) => chrome.webview.hostObjects.nativeApi.AddServerFromUrl(url, name)
                 };
 
                 // Event listener system

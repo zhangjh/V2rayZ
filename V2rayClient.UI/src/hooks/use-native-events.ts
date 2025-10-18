@@ -80,10 +80,18 @@ export function useNativeEventListeners() {
 
   const handleConfigChanged = (data: NativeEventData['configChanged']) => {
     console.log('Config changed:', data)
-    // Reload configuration when it changes
+    // 只有在非用户主动操作时才重新加载配置
+    // 这里可以根据需要添加更复杂的逻辑来判断是否需要重新加载
     import('@/store/app-store').then(({ useAppStore }) => {
-      const loadConfig = useAppStore.getState().loadConfig
-      loadConfig()
+      const state = useAppStore.getState()
+      // 如果当前没有在加载状态，说明不是用户主动操作，可以重新加载
+      if (!state.isLoading) {
+        console.log('Config changed by external source, reloading...')
+        const loadConfig = state.loadConfig
+        loadConfig()
+      } else {
+        console.log('Config changed during user operation, skipping reload')
+      }
     })
   }
 

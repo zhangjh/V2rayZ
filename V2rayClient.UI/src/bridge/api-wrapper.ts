@@ -253,6 +253,32 @@ export async function getVersionInfo() {
 }
 
 /**
+ * Protocol URL Parsing APIs with error handling
+ */
+export async function parseProtocolUrl(url: string) {
+  return wrapApiCall(
+    () => nativeApi.parseProtocolUrl(url),
+    '解析协议URL',
+    ErrorCategory.Config
+  );
+}
+
+export async function addServerFromUrl(url: string, name: string): Promise<boolean> {
+  const result = await wrapApiCall(
+    () => nativeApi.addServerFromUrl(url, name),
+    '从URL添加服务器',
+    ErrorCategory.Config
+  );
+  
+  if (result !== null) {
+    ErrorHandler.showSuccess('服务器已添加');
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Update Management APIs with error handling
  */
 export async function checkForUpdates(): Promise<boolean> {
