@@ -12,6 +12,15 @@ V2rayZ的名称来源于两个方面：
 1. 跟随当前V2ray客户端的起名大流，V2ray + 单字母
 2. Z代表作者的姓氏缩写（Zhang）
 
+软件截图：
+
+主页面：
+<img width="1233" height="829" alt="image" src="https://github.com/user-attachments/assets/01567b24-1126-4395-ad55-a7b5420974d4" />
+
+自定义规则页面：
+<img width="1233" height="829" alt="image" src="https://github.com/user-attachments/assets/e057cf80-3d2a-4063-bd8c-3cad00ed6520" />
+
+
 ## ✨ 功能特性
 
 - ✅ 支持 VLESS 和 Trojan 协议
