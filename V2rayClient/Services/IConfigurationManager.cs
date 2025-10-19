@@ -35,6 +35,12 @@ public interface IConfigurationManager
     void Set(string key, object value);
 
     /// <summary>
+    /// Sync auto-start setting with actual registry state
+    /// </summary>
+    /// <param name="startupManager">Startup manager to check registry state</param>
+    void SyncAutoStartSetting(IStartupManager startupManager);
+
+    /// <summary>
     /// Event raised when configuration changes
     /// </summary>
     event EventHandler<ConfigChangedEventArgs>? ConfigChanged;

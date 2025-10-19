@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private IStatisticsManager? _statsManager;
     private IRoutingRuleManager? _routingManager;
     private ILogManager? _logManager;
+    private IStartupManager? _startupManager;
     private UpdateService? _updateService;
 
     public MainWindow()
@@ -37,6 +38,19 @@ public partial class MainWindow : Window
         InitializeServices();
         InitializeSystemTray();
         InitializeAsync();
+        
+        // 检查是否为最小化启动
+        if (System.Windows.Application.Current.Properties.Contains("MinimizedStart"))
+        {
+            WindowState = WindowState.Minimized;
+            Hide();
+        }
+        
+        // 同步开机启动设置（延迟1秒）
+        _ = Task.Delay(1000).ContinueWith(_ => SyncAutoStartSetting());
+        
+        // 处理自动连接（延迟3秒等待初始化完成）
+        _ = Task.Delay(3000).ContinueWith(_ => HandleAutoConnectAsync());
         
         // 启动时检查更新（延迟5秒）
         _ = Task.Delay(5000).ContinueWith(_ => CheckForUpdatesAsync());
@@ -65,6 +79,7 @@ public partial class MainWindow : Window
         _logManager = new LogManager();
         _v2rayManager = new V2rayManager(_logManager, _routingManager);
         _statsManager = new StatisticsManager();
+        _startupManager = new StartupManager(App.Logger, _v2rayManager, _proxyManager);
         _updateService = new UpdateService();
 
         // Create view model
@@ -138,7 +153,7 @@ public partial class MainWindow : Window
     private void SetupJavaScriptBridge()
     {
         if (_v2rayManager == null || _configManager == null || _proxyManager == null || 
-            _statsManager == null || _routingManager == null || _logManager == null)
+            _statsManager == null || _routingManager == null || _logManager == null || _startupManager == null)
         {
             return;
         }
@@ -154,6 +169,7 @@ public partial class MainWindow : Window
             _statsManager,
             _routingManager,
             _logManager,
+            _startupManager,
             protocolParser,
             SendEventToJavaScript
         );
@@ -905,6 +921,41 @@ public partial class MainWindow : Window
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 });
             }
+        }
+    }
+
+    /// <summary>
+    /// 同步开机启动设置
+    /// </summary>
+    private void SyncAutoStartSetting()
+    {
+        if (_startupManager == null || _configManager == null) return;
+
+        try
+        {
+            _configManager.SyncAutoStartSetting(_startupManager);
+        }
+        catch (Exception ex)
+        {
+            App.Logger.Error(ex, "Failed to sync auto-start setting: {Error}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 处理自动连接功能
+    /// </summary>
+    private async Task HandleAutoConnectAsync()
+    {
+        if (_startupManager == null || _configManager == null) return;
+
+        try
+        {
+            var config = _configManager.LoadConfig();
+            await _startupManager.HandleAutoConnectAsync(config);
+        }
+        catch (Exception ex)
+        {
+            App.Logger.Error(ex, "Failed to handle auto-connect: {Error}", ex.Message);
         }
     }
 

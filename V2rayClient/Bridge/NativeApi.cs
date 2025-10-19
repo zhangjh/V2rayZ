@@ -21,6 +21,7 @@ public class NativeApi
     private readonly IStatisticsManager _statsManager;
     private readonly IRoutingRuleManager _routingManager;
     private readonly ILogManager _logManager;
+    private readonly IStartupManager _startupManager;
     private readonly IProtocolParser _protocolParser;
     private readonly Action<string, string> _sendEvent;
     
@@ -41,6 +42,7 @@ public class NativeApi
         IStatisticsManager statsManager,
         IRoutingRuleManager routingManager,
         ILogManager logManager,
+        IStartupManager startupManager,
         IProtocolParser protocolParser,
         Action<string, string> sendEvent)
     {
@@ -50,6 +52,7 @@ public class NativeApi
         _statsManager = statsManager;
         _routingManager = routingManager;
         _logManager = logManager;
+        _startupManager = startupManager;
         _protocolParser = protocolParser;
         _sendEvent = sendEvent;
 
@@ -340,9 +343,31 @@ public class NativeApi
             System.Diagnostics.Debug.WriteLine($"[NativeApi] Servers count: {config.Servers?.Count ?? 0}");
             System.Diagnostics.Debug.WriteLine($"[NativeApi] Selected server ID: {config.SelectedServerId}");
             System.Diagnostics.Debug.WriteLine($"[NativeApi] ProxyMode: {config.ProxyMode}");
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] AutoStart: {config.AutoStart}");
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] AutoConnect: {config.AutoConnect}");
+            
+            // Get old configuration to check for changes
+            var oldConfig = _configManager.LoadConfig();
             
             // Validate and save configuration
             _configManager.SaveConfig(config);
+            
+            // Handle auto-start setting changes
+            if (oldConfig.AutoStart != config.AutoStart)
+            {
+                System.Diagnostics.Debug.WriteLine($"[NativeApi] Auto-start setting changed from {oldConfig.AutoStart} to {config.AutoStart}");
+                var success = _startupManager.SetAutoStart(config.AutoStart);
+                if (success)
+                {
+                    _logManager.AddLog(Models.LogLevel.Info, 
+                        config.AutoStart ? "已启用开机自动启动" : "已禁用开机自动启动", "config");
+                }
+                else
+                {
+                    _logManager.AddLog(Models.LogLevel.Warning, 
+                        "设置开机启动失败，可能需要管理员权限", "config");
+                }
+            }
             
             System.Diagnostics.Debug.WriteLine("[NativeApi] Config saved successfully");
             System.Diagnostics.Debug.WriteLine($"[NativeApi] ========== SAVE CONFIG END ==========");

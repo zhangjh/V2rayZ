@@ -17,9 +17,9 @@
     <!-- Assembly Information -->
     <AssemblyName>V2rayZ</AssemblyName>
     <RootNamespace>V2rayClient</RootNamespace>
-    <Version>1.2</Version>
-    <FileVersion>1.2.0.0</FileVersion>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <Version>1.3</Version>
+    <FileVersion>1.3.0.0</FileVersion>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
     
     <!-- Product Information -->
     <Company>V2rayZ Project</Company>

@@ -351,4 +351,29 @@ public class ConfigurationManager : IConfigurationManager
             HttpPort = 65533
         };
     }
+
+    /// <summary>
+    /// Sync auto-start setting with actual registry state
+    /// </summary>
+    public void SyncAutoStartSetting(IStartupManager startupManager)
+    {
+        if (_currentConfig == null) return;
+
+        try
+        {
+            var actualAutoStart = startupManager.IsAutoStartEnabled();
+            if (_currentConfig.AutoStart != actualAutoStart)
+            {
+                Log.Information("[ConfigManager] Syncing auto-start setting: config={ConfigAutoStart}, registry={RegistryAutoStart}", 
+                    _currentConfig.AutoStart, actualAutoStart);
+                
+                _currentConfig.AutoStart = actualAutoStart;
+                SaveConfig(_currentConfig);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[ConfigManager] Failed to sync auto-start setting: {Error}", ex.Message);
+        }
+    }
 }

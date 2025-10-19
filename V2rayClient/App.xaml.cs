@@ -28,11 +28,22 @@ public partial class App : System.Windows.Application
         
         Logger.Information("Application starting...");
         
+        // Check for minimized startup argument
+        var isMinimizedStart = e.Args.Contains("--minimized");
+        Logger.Information("Minimized start: {IsMinimized}", isMinimizedStart);
+        
         // Initialize resources
         InitializeResources();
         
         // Initialize WebView2 environment
         InitializeWebView2Environment();
+        
+        // Handle minimized startup
+        if (isMinimizedStart)
+        {
+            // Set a flag that MainWindow can check
+            Properties["MinimizedStart"] = true;
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
