@@ -35,7 +35,7 @@ export function DeleteRuleDialog({ open, onOpenChange, rule }: DeleteRuleDialogP
     try {
       await deleteCustomRule(rule.id)
       toast.success('规则已删除', {
-        description: `域名 ${rule.domain} 的规则已成功删除`,
+        description: `包含 ${rule.domains.length} 个域名的规则已成功删除`,
       })
       onOpenChange(false)
     } catch (error) {
@@ -65,7 +65,11 @@ export function DeleteRuleDialog({ open, onOpenChange, rule }: DeleteRuleDialogP
           <div className="space-y-2 rounded-lg border p-4 bg-muted/50">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">域名：</span>
-              <span className="font-mono font-medium">{rule.domain}</span>
+              <span className="font-mono font-medium">
+                {rule.domains.length === 1 
+                  ? rule.domains[0] 
+                  : `${rule.domains.join(', ')}`}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">策略：</span>

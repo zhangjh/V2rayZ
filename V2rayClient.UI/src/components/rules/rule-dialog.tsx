@@ -44,17 +44,23 @@ const validateDomains = (domainsText: string) => {
     .split('\n')
     .map(d => d.trim())
     .filter(d => d.length > 0)
-  
+
   if (domains.length === 0) {
     return '至少需要输入一个域名'
   }
-  
+
+  // 检查重复域名
+  const uniqueDomains = new Set(domains)
+  if (uniqueDomains.size !== domains.length) {
+    return '存在重复的域名，请检查输入'
+  }
+
   for (const domain of domains) {
     if (!domainRegex.test(domain)) {
       return `域名格式不正确：${domain}（例如：example.com 或 *.example.com）`
     }
   }
-  
+
   return true
 }
 
@@ -76,12 +82,11 @@ interface RuleDialogProps {
   onOpenChange: (open: boolean) => void
   mode: 'add' | 'edit'
   rule?: DomainRule
-  rules?: DomainRule[] // For batch edit mode
 }
 
-export function RuleDialog({ open, onOpenChange, mode, rule, rules }: RuleDialogProps) {
+export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) {
   const addCustomRule = useAppStore((state) => state.addCustomRule)
-  const addCustomRulesBatch = useAppStore((state) => state.addCustomRulesBatch)
+
   const updateCustomRule = useAppStore((state) => state.updateCustomRule)
 
   const form = useForm<RuleFormValues>({
@@ -98,17 +103,9 @@ export function RuleDialog({ open, onOpenChange, mode, rule, rules }: RuleDialog
     if (open) {
       if (mode === 'edit' && rule) {
         form.reset({
-          domains: rule.domain,
+          domains: rule.domains.join('\n'),
           strategy: rule.strategy,
           enabled: rule.enabled,
-        })
-      } else if (mode === 'edit' && rules && rules.length > 0) {
-        // Batch edit mode - show all domains from selected rules
-        const domainsText = rules.map(r => r.domain).join('\n')
-        form.reset({
-          domains: domainsText,
-          strategy: rules[0].strategy, // Use first rule's strategy as default
-          enabled: rules[0].enabled,   // Use first rule's enabled state as default
         })
       } else {
         form.reset({
@@ -118,11 +115,11 @@ export function RuleDialog({ open, onOpenChange, mode, rule, rules }: RuleDialog
         })
       }
     }
-  }, [open, mode, rule, rules, form])
+  }, [open, mode, rule, form])
 
   const onSubmit = async (values: RuleFormValues) => {
     console.log('[RuleDialog] onSubmit called', { mode, values })
-    
+
     try {
       // Parse domains from textarea
       const domains = values.domains
@@ -133,49 +130,34 @@ export function RuleDialog({ open, onOpenChange, mode, rule, rules }: RuleDialog
       console.log('[RuleDialog] Parsed domains:', domains)
 
       if (mode === 'add') {
-        if (domains.length === 1) {
-          // Single domain - use existing logic
-          const newRule: DomainRule = {
-            id: `rule_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            domain: domains[0],
-            strategy: values.strategy,
-            enabled: values.enabled,
-          }
-          await addCustomRule(newRule)
-          toast.success('规则已添加', {
-            description: `域名 ${domains[0]} 的规则已成功添加`,
-          })
-        } else {
-          // Multiple domains - use batch add to avoid multiple restarts
-          const newRules: DomainRule[] = domains.map(domain => ({
-            id: `rule_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            domain,
-            strategy: values.strategy,
-            enabled: values.enabled,
-          }))
-          
-          await addCustomRulesBatch(newRules)
-          toast.success('规则已添加', {
-            description: `已成功添加 ${domains.length} 个域名规则`,
-          })
-        }
-      } else if (mode === 'edit' && rule) {
-        // Single rule edit - update with first domain
-        console.log('[RuleDialog] Updating rule:', rule.id, 'with domain:', domains[0])
-        
-        const updatedRule: DomainRule = {
-          ...rule,
-          domain: domains[0],
+        // 创建一条包含多个域名的规则
+        const newRule: DomainRule = {
+          id: `rule_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          domains: domains,
           strategy: values.strategy,
           enabled: values.enabled,
         }
-        
+        await addCustomRule(newRule)
+        toast.success('规则已添加', {
+          description: `已成功添加包含 ${domains.length} 个域名的规则`,
+        })
+      } else if (mode === 'edit' && rule) {
+        // 更新规则的域名列表
+        console.log('[RuleDialog] Updating rule:', rule.id, 'with domains:', domains)
+
+        const updatedRule: DomainRule = {
+          ...rule,
+          domains: domains,
+          strategy: values.strategy,
+          enabled: values.enabled,
+        }
+
         console.log('[RuleDialog] Calling updateCustomRule with:', updatedRule)
         await updateCustomRule(updatedRule)
-        
+
         console.log('[RuleDialog] Rule updated successfully')
         toast.success('规则已更新', {
-          description: `域名 ${domains[0]} 的规则已成功更新`,
+          description: `规则已成功更新，包含 ${domains.length} 个域名`,
         })
       }
       console.log('[RuleDialog] Operation completed, closing dialog')

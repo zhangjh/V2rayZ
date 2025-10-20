@@ -91,7 +91,11 @@ export function RulesPage() {
                         onCheckedChange={() => handleToggleRule(rule)}
                       />
                     </TableCell>
-                    <TableCell className="font-mono">{rule.domain}</TableCell>
+                    <TableCell className="font-mono">
+                      {rule.domains.length === 1 
+                        ? rule.domains[0] 
+                        : `${rule.domains[0]} 等 ${rule.domains.length} 个域名`}
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={rule.strategy === 'Proxy' ? 'default' : 'secondary'}

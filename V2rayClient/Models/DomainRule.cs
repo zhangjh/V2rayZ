@@ -14,13 +14,11 @@ public class DomainRule
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
     /// <summary>
-    /// Domain name or pattern (supports wildcards like *.example.com)
+    /// List of domain names or patterns (supports wildcards like *.example.com)
     /// </summary>
-    [Required(ErrorMessage = "域名不能为空")]
-    [MaxLength(255)]
-    [RegularExpression(@"^(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
-        ErrorMessage = "域名格式无效")]
-    public string Domain { get; set; } = string.Empty;
+    [Required(ErrorMessage = "域名列表不能为空")]
+    [MinLength(1, ErrorMessage = "至少需要一个域名")]
+    public List<string> Domains { get; set; } = new();
 
     /// <summary>
     /// Routing strategy (Proxy or Direct)

@@ -734,7 +734,7 @@ public class NativeApi
                 return JsonSerializer.Serialize(new { success = false, error = "Rule not found" }, JsonOptions);
             }
 
-            existingRule.Domain = rule.Domain;
+            existingRule.Domains = rule.Domains;
             existingRule.Strategy = rule.Strategy;
             existingRule.Enabled = rule.Enabled;
             _configManager.SaveConfig(config);

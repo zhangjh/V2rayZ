@@ -53,12 +53,12 @@ public class RoutingRuleManager : IRoutingRuleManager
         // Group enabled rules by strategy
         var proxyDomains = customRules
             .Where(r => r.Enabled && r.Strategy == RuleStrategy.Proxy)
-            .Select(r => ConvertDomainPattern(r.Domain))
+            .SelectMany(r => r.Domains.Select(ConvertDomainPattern))
             .ToList();
 
         var directDomains = customRules
             .Where(r => r.Enabled && r.Strategy == RuleStrategy.Direct)
-            .Select(r => ConvertDomainPattern(r.Domain))
+            .SelectMany(r => r.Domains.Select(ConvertDomainPattern))
             .ToList();
 
         // Add proxy rule for custom domains

@@ -1,55 +1,54 @@
-namespace V2rayClient;
+﻿namespace V2rayClient;
 
 /// <summary>
-/// Contains version and build information for the application
+/// V2rayZ 版本信息 - 简化版本管理
+/// 只保留一个应用版本号，用于更新检查和显示
 /// </summary>
 public static class VersionInfo
 {
     /// <summary>
-    /// Application version (Major.Minor.Patch)
+    /// V2rayZ 应用版本号 - 唯一的版本号，用于更新检查
+    /// 修改版本时只需要更新这个值
     /// </summary>
-    public const string Version = "1.3";
+    public const string Version = "1.4.0";
 
     /// <summary>
-    /// Application version with build number (Major.Minor.Patch.Build)
-    /// </summary>
-    public const string FullVersion = "1.3.0.0";
-
-    /// <summary>
-    /// Application name
+    /// 应用程序名称
     /// </summary>
     public const string ApplicationName = "V2rayZ";
 
     /// <summary>
-    /// Application description
+    /// 应用程序描述
     /// </summary>
     public const string Description = "A modern Windows client for v2ray with VLESS protocol support";
 
     /// <summary>
-    /// Copyright information
+    /// 版权信息
     /// </summary>
     public const string Copyright = "Copyright © 2025 V2rayZ Project";
 
     /// <summary>
-    /// Company name
+    /// 公司名称
     /// </summary>
     public const string Company = "V2rayZ Project";
 
     /// <summary>
-    /// GitHub repository URL
+    /// GitHub仓库地址
     /// </summary>
     public const string RepositoryUrl = "https://github.com/zhangjh/V2rayZ";
 
+    // ========== 显示用方法 ==========
+    
     /// <summary>
-    /// Gets the full version string with build date
+    /// 获取完整版本字符串
     /// </summary>
     public static string GetFullVersionString()
     {
-        return $"{ApplicationName} v{Version} ";
+        return $"{ApplicationName} v{Version}";
     }
 
     /// <summary>
-    /// Gets the version string for display in UI
+    /// 获取UI显示用的版本字符串
     /// </summary>
     public static string GetDisplayVersion()
     {

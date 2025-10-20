@@ -66,7 +66,7 @@ export interface WsSettings {
 
 export interface DomainRule {
   id?: string
-  domain: string
+  domains: string[]  // 支持多个域名
   strategy: 'Proxy' | 'Direct'
   enabled: boolean
 }
