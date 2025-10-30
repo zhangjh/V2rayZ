@@ -404,12 +404,27 @@ public class NativeApi
             _configManager.SaveConfig(config);
             _logManager.AddLog(Models.LogLevel.Info, $"代理模式已从 {oldMode} 切换到 {mode}", "config");
 
-            // Restart proxy if running
+            // Restart proxy if running (non-blocking)
             var status = _v2rayManager.GetStatus();
             if (status.Running)
             {
                 var v2rayConfig = _v2rayManager.GenerateConfig(config);
-                _v2rayManager.RestartAsync(v2rayConfig).Wait();
+                
+                // Use Task.Run to avoid blocking the UI thread
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _v2rayManager.RestartAsync(v2rayConfig);
+                        _logManager.AddLog(Models.LogLevel.Info, $"代理已使用新模式 {mode} 重启", "config");
+                        System.Diagnostics.Debug.WriteLine("[UpdateProxyMode] V2ray restarted successfully with new mode");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logManager.AddLog(Models.LogLevel.Error, $"重启代理失败: {ex.Message}", "config");
+                        System.Diagnostics.Debug.WriteLine($"[UpdateProxyMode] V2ray restart failed: {ex.Message}");
+                    }
+                });
             }
 
             return JsonSerializer.Serialize(new { success = true }, JsonOptions);
