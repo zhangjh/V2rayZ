@@ -52,6 +52,19 @@ public partial class App : System.Windows.Application
         
         try
         {
+            // Disable system proxy first
+            Logger.Information("Disabling system proxy...");
+            try
+            {
+                var proxyManager = new Services.SystemProxyManager();
+                proxyManager.DisableProxy();
+                Logger.Information("System proxy disabled successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Failed to disable system proxy");
+            }
+            
             // Ensure all V2ray processes are terminated
             Logger.Information("Cleaning up V2ray processes...");
             var v2rayProcesses = System.Diagnostics.Process.GetProcessesByName("v2ray");

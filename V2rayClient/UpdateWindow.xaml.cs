@@ -113,23 +113,34 @@ public partial class UpdateWindow : Window
                 }
             }
 
-            // 开始安装
-            var success = await _updateService.InstallUpdateAsync(_downloadedFilePath);
-            if (!success)
-            {
-                return; // 安装失败，错误已在事件中处理
-            }
-
-            // 如果到这里说明安装程序已启动，应用程序即将退出
+            // 开始安装（此方法会自动退出应用程序）
+            // 注意：InstallUpdateAsync 会在启动更新程序后立即关闭应用
+            // 所以这个方法调用后，应用会直接退出，不会返回
+            await _updateService.InstallUpdateAsync(_downloadedFilePath);
+            
+            // 注意：正常情况下不会执行到这里，因为应用已经退出
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "更新过程中发生错误");
-            MessageBox.Show(this, 
-                $"更新失败: {ex.Message}", 
-                "错误", 
-                MessageBoxButton.OK, 
-                MessageBoxImage.Error);
+            
+            // 如果是用户取消 UAC 提示，显示友好的错误信息
+            if (ex.Message.Contains("用户取消"))
+            {
+                MessageBox.Show(this, 
+                    "更新需要管理员权限才能继续。\n\n如果您取消了 UAC 提示，请重新点击\"安装更新\"按钮。", 
+                    "需要管理员权限", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Warning);
+            }
+            else
+            {
+                MessageBox.Show(this, 
+                    $"更新失败: {ex.Message}", 
+                    "错误", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
+            }
         }
     }
 
