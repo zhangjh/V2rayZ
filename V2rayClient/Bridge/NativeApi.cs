@@ -23,6 +23,7 @@ public class NativeApi
     private readonly ILogManager _logManager;
     private readonly IStartupManager _startupManager;
     private readonly IProtocolParser _protocolParser;
+    private readonly IGeoDataUpdateService _geoDataUpdateService;
     private readonly Action<string, string> _sendEvent;
     
     // JSON serialization options for consistent camelCase naming
@@ -44,6 +45,7 @@ public class NativeApi
         ILogManager logManager,
         IStartupManager startupManager,
         IProtocolParser protocolParser,
+        IGeoDataUpdateService geoDataUpdateService,
         Action<string, string> sendEvent)
     {
         _v2rayManager = v2rayManager;
@@ -54,6 +56,7 @@ public class NativeApi
         _logManager = logManager;
         _startupManager = startupManager;
         _protocolParser = protocolParser;
+        _geoDataUpdateService = geoDataUpdateService;
         _sendEvent = sendEvent;
 
         // Subscribe to events
@@ -961,6 +964,117 @@ public class NativeApi
         {
             _logManager.ClearLogs();
             return JsonSerializer.Serialize(new { success = true, data = true }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    #endregion
+
+    #region GeoData Management
+
+    /// <summary>
+    /// Get GeoData file information
+    /// </summary>
+    public string GetGeoDataInfo()
+    {
+        try
+        {
+            var info = _geoDataUpdateService.GetGeoDataInfo();
+            return JsonSerializer.Serialize(new { success = true, data = info }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Check for GeoData updates
+    /// </summary>
+    public string CheckGeoDataUpdates()
+    {
+        try
+        {
+            _logManager.AddLog(Models.LogLevel.Info, "正在检查 GeoData 更新...", "system");
+            
+            // Run check asynchronously to avoid blocking
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var updateInfo = await _geoDataUpdateService.CheckForUpdatesAsync();
+                    
+                    // Send result to frontend via event
+                    var data = JsonSerializer.Serialize(updateInfo, JsonOptions);
+                    _sendEvent("geoDataUpdateChecked", data);
+                    
+                    var hasUpdates = updateInfo.GeoIpNeedsUpdate || updateInfo.GeoSiteNeedsUpdate;
+                    if (hasUpdates)
+                    {
+                        _logManager.AddLog(Models.LogLevel.Info, "发现 GeoData 更新", "system");
+                    }
+                    else
+                    {
+                        _logManager.AddLog(Models.LogLevel.Info, "GeoData 文件已是最新", "system");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logManager.AddLog(Models.LogLevel.Error, $"检查 GeoData 更新失败: {ex.Message}", "system");
+                    _sendEvent("geoDataUpdateCheckFailed", JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions));
+                }
+            });
+            
+            return JsonSerializer.Serialize(new { success = true, message = "GeoData update check initiated" }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Update GeoData files
+    /// </summary>
+    public string UpdateGeoData(bool updateGeoIp, bool updateGeoSite)
+    {
+        try
+        {
+            _logManager.AddLog(Models.LogLevel.Info, "开始更新 GeoData 文件...", "system");
+            
+            // Run update asynchronously
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var success = await _geoDataUpdateService.UpdateGeoDataAsync(updateGeoIp, updateGeoSite);
+                    
+                    if (success)
+                    {
+                        _logManager.AddLog(Models.LogLevel.Info, "GeoData 文件更新成功", "system");
+                        
+                        // Send event to frontend
+                        var info = _geoDataUpdateService.GetGeoDataInfo();
+                        var data = JsonSerializer.Serialize(info, JsonOptions);
+                        _sendEvent("geoDataUpdated", data);
+                    }
+                    else
+                    {
+                        _logManager.AddLog(Models.LogLevel.Warning, "GeoData 文件更新失败", "system");
+                        _sendEvent("geoDataUpdateFailed", "{}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logManager.AddLog(Models.LogLevel.Error, $"GeoData 更新错误: {ex.Message}", "system");
+                    _sendEvent("geoDataUpdateFailed", JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions));
+                }
+            });
+            
+            return JsonSerializer.Serialize(new { success = true, message = "GeoData update initiated" }, JsonOptions);
         }
         catch (Exception ex)
         {

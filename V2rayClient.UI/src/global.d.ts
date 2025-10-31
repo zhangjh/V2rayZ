@@ -24,6 +24,9 @@ declare global {
             checkForUpdates: () => Promise<string>
             parseProtocolUrl: (url: string) => Promise<string>
             addServerFromUrl: (url: string, name: string) => Promise<string>
+            getGeoDataInfo: () => Promise<string>
+            checkGeoDataUpdates: () => Promise<string>
+            updateGeoData: (updateGeoIp: boolean, updateGeoSite: boolean) => Promise<string>
         }
         addNativeEventListener: (eventName: string, callback: (data: any) => void) => void
         removeNativeEventListener: (eventName: string, callback: (data: any) => void) => void
