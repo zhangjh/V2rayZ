@@ -35,6 +35,11 @@ ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
 
+; Silent install support
+CloseApplications=yes
+CloseApplicationsFilter=*.exe,*.dll
+RestartApplications=no
+
 ; Uninstall
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
@@ -161,10 +166,20 @@ var
 begin
   Result := '';
   
-  // Check if the application is running
-  if CheckForMutexes('V2rayZMutex') then
+  // 在静默模式下，自动关闭正在运行的应用
+  if WizardSilent() then
   begin
-    Result := 'V2rayZ is currently running.' + #13#10 + #13#10 +
-              'Please close the application before continuing with the installation.';
+    // 尝试关闭应用程序
+    Exec('taskkill', '/f /im V2rayZ.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(1000); // 等待进程完全退出
+  end
+  else
+  begin
+    // 在非静默模式下，检查应用是否运行
+    if CheckForMutexes('V2rayZMutex') then
+    begin
+      Result := 'V2rayZ is currently running.' + #13#10 + #13#10 +
+                'Please close the application before continuing with the installation.';
+    end;
   end;
 end;

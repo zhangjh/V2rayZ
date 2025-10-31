@@ -284,6 +284,17 @@ public class UpdateService
             // 提取ZIP文件
             System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractPath);
             
+            // 检查 ZIP 包结构，如果有单个根文件夹，使用该文件夹作为源
+            var extractedItems = Directory.GetFileSystemEntries(extractPath);
+            var actualSourcePath = extractPath;
+            
+            if (extractedItems.Length == 1 && Directory.Exists(extractedItems[0]))
+            {
+                // ZIP 包里只有一个文件夹，使用该文件夹作为源
+                actualSourcePath = extractedItems[0];
+                _logger.Information("检测到 ZIP 包含单个根文件夹: {Folder}", Path.GetFileName(actualSourcePath));
+            }
+            
             OnProgressChanged(new UpdateProgress
             {
                 Status = UpdateStatus.Installing,
@@ -300,32 +311,94 @@ public class UpdateService
             var currentDir = Path.GetDirectoryName(currentExePath);
             var updateScriptPath = Path.Combine(_tempDir, "update.bat");
             
+            // 改进的更新脚本：
+            // 1. 等待当前进程完全退出
+            // 2. 备份当前版本
+            // 3. 覆盖所有文件
+            // 4. 启动新版本
+            // 5. 清理临时文件
             var updateScript = $@"@echo off
-echo 正在更新V2rayZ...
-timeout /t 3 /nobreak > nul
+chcp 65001 > nul
+title V2rayZ 更新程序
+echo ========================================
+echo V2rayZ 自动更新程序
+echo ========================================
+echo.
 
-echo 停止当前进程...
-taskkill /f /im V2rayZ.exe > nul 2>&1
+:wait_process
+echo [1/5] 等待当前进程退出...
+tasklist /FI ""IMAGENAME eq V2rayZ.exe"" 2>NUL | find /I /N ""V2rayZ.exe"">NUL
+if ""%ERRORLEVEL%""==""0"" (
+    timeout /t 1 /nobreak > nul
+    goto wait_process
+)
+echo 进程已退出
+echo.
 
-echo 备份当前版本...
-if exist ""{currentDir}\V2rayZ.exe.backup"" del ""{currentDir}\V2rayZ.exe.backup""
-if exist ""{currentDir}\V2rayZ.exe"" ren ""{currentDir}\V2rayZ.exe"" V2rayZ.exe.backup
+echo [2/5] 备份当前版本...
+if exist ""{currentDir}\V2rayZ.exe.backup"" del /f /q ""{currentDir}\V2rayZ.exe.backup"" 2>nul
+if exist ""{currentDir}\V2rayZ.exe"" (
+    copy /y ""{currentDir}\V2rayZ.exe"" ""{currentDir}\V2rayZ.exe.backup"" > nul 2>&1
+    if errorlevel 1 (
+        echo 警告: 备份失败，但继续更新...
+    ) else (
+        echo 备份完成
+    )
+) else (
+    echo 未找到旧版本文件
+)
+echo.
 
-echo 复制新版本文件...
-xcopy ""{extractPath}\*"" ""{currentDir}\"" /E /Y /Q
+echo [3/5] 复制新版本文件...
+echo 源目录: {actualSourcePath}
+echo 目标目录: {currentDir}
+xcopy ""{actualSourcePath}\*"" ""{currentDir}\"" /E /Y /I /Q /H /R
 
-echo 启动新版本...
+if errorlevel 1 (
+    echo.
+    echo ========================================
+    echo 错误: 文件复制失败！
+    echo ========================================
+    echo.
+    echo 可能的原因:
+    echo 1. 权限不足（需要管理员权限）
+    echo 2. 文件被占用
+    echo 3. 磁盘空间不足
+    echo.
+    
+    if exist ""{currentDir}\V2rayZ.exe.backup"" (
+        echo 正在恢复备份...
+        copy /y ""{currentDir}\V2rayZ.exe.backup"" ""{currentDir}\V2rayZ.exe"" > nul 2>&1
+        echo 已恢复到旧版本
+    )
+    echo.
+    echo 按任意键退出...
+    pause > nul
+    exit /b 1
+)
+echo 文件复制完成
+echo.
+
+echo [4/5] 启动新版本...
 start """" ""{currentDir}\V2rayZ.exe""
+echo 新版本已启动
+echo.
 
-echo 清理临时文件...
+echo [5/5] 清理临时文件...
 timeout /t 2 /nobreak > nul
-rd /s /q ""{_tempDir}""
+rd /s /q ""{_tempDir}"" > nul 2>&1
+echo 清理完成
+echo.
 
+echo ========================================
 echo 更新完成！
-del ""%~f0""
+echo ========================================
+timeout /t 2 /nobreak > nul
+del /f /q ""%~f0"" > nul 2>&1
+exit
 ";
 
-            File.WriteAllText(updateScriptPath, updateScript, System.Text.Encoding.Default);
+            File.WriteAllText(updateScriptPath, updateScript, System.Text.Encoding.UTF8);
 
             OnProgressChanged(new UpdateProgress
             {
@@ -334,19 +407,30 @@ del ""%~f0""
             });
 
             // 启动更新脚本
+            // 检查是否需要管理员权限
+            var needsAdmin = IsDirectoryWritable(currentDir);
+            
             var startInfo = new ProcessStartInfo
             {
                 FileName = updateScriptPath,
                 UseShellExecute = true,
-                WindowStyle = ProcessWindowStyle.Hidden
+                WorkingDirectory = _tempDir,
+                WindowStyle = ProcessWindowStyle.Normal // 显示窗口以便用户看到进度
             };
+
+            // 如果需要管理员权限，请求提升
+            if (!needsAdmin)
+            {
+                startInfo.Verb = "runas";
+                _logger.Information("请求管理员权限执行更新脚本");
+            }
 
             Process.Start(startInfo);
 
             _logger.Information("更新脚本已启动，准备退出当前应用");
             
             // 延迟一下让更新脚本启动
-            await Task.Delay(1000);
+            await Task.Delay(500);
 
             // 退出当前应用程序
             System.Windows.Application.Current.Shutdown();
@@ -373,6 +457,8 @@ del ""%~f0""
                 Message = "正在启动安装程序..."
             });
 
+            var fileExtension = Path.GetExtension(installerPath).ToLowerInvariant();
+            
             // 启动安装程序
             var startInfo = new ProcessStartInfo
             {
@@ -381,12 +467,29 @@ del ""%~f0""
                 Verb = "runas" // 请求管理员权限
             };
 
+            // 如果是Inno Setup安装程序，添加静默安装参数
+            if (fileExtension == ".exe")
+            {
+                // Inno Setup支持的静默安装参数
+                // /VERYSILENT - 完全静默安装
+                // /SUPPRESSMSGBOXES - 抑制消息框
+                // /NORESTART - 不自动重启
+                // /CLOSEAPPLICATIONS - 自动关闭正在运行的应用
+                startInfo.Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS";
+            }
+            else if (fileExtension == ".msi")
+            {
+                // MSI安装程序使用msiexec
+                startInfo.FileName = "msiexec.exe";
+                startInfo.Arguments = $"/i \"{installerPath}\" /quiet /norestart";
+            }
+
             Process.Start(startInfo);
 
-            _logger.Information("安装程序已启动，准备退出当前应用");
+            _logger.Information("安装程序已启动（{Extension}），准备退出当前应用", fileExtension);
             
             // 延迟一下让安装程序启动
-            await Task.Delay(2000);
+            await Task.Delay(1000);
 
             // 退出当前应用程序
             System.Windows.Application.Current.Shutdown();
@@ -416,6 +519,27 @@ del ""%~f0""
         catch (Exception ex)
         {
             _logger.Warning(ex, "清理临时文件时发生错误");
+        }
+    }
+
+    /// <summary>
+    /// 检查目录是否可写
+    /// </summary>
+    private bool IsDirectoryWritable(string? dirPath)
+    {
+        if (string.IsNullOrEmpty(dirPath) || !Directory.Exists(dirPath))
+            return false;
+
+        try
+        {
+            var testFile = Path.Combine(dirPath, $".write_test_{Guid.NewGuid()}.tmp");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
