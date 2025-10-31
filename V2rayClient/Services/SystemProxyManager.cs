@@ -51,11 +51,16 @@ public class SystemProxyManager : ISystemProxyManager
             }
 
             // Set proxy server address and port
-            var proxyServer = $"{proxyAddress}:{proxyPort}";
+            // Explicitly specify HTTP proxy for http and https protocols
+            // This prevents applications from trying to use SOCKS protocol
+            var proxyServer = $"http={proxyAddress}:{proxyPort};https={proxyAddress}:{proxyPort}";
             key.SetValue(ProxyServerValueName, proxyServer, RegistryValueKind.String);
 
             // Enable proxy
             key.SetValue(ProxyEnableValueName, 1, RegistryValueKind.DWord);
+
+            // Set bypass list for local addresses
+            key.SetValue(ProxyOverrideValueName, "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;<local>", RegistryValueKind.String);
 
             Debug.WriteLine($"System proxy enabled: {proxyServer}");
 
