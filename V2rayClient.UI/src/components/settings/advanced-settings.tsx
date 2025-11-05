@@ -269,13 +269,13 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      set https_proxy=http://127.0.0.1:{socksPort}
+                      set https_proxy=http://127.0.0.1:{httpPort}
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`set https_proxy=http://127.0.0.1:${socksPort}`)
+                        navigator.clipboard.writeText(`set https_proxy=http://127.0.0.1:${httpPort}`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -305,13 +305,13 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      $env:https_proxy="http://127.0.0.1:{socksPort}"
+                      $env:https_proxy="http://127.0.0.1:{httpPort}"
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`$env:https_proxy="http://127.0.0.1:${socksPort}"`)
+                        navigator.clipboard.writeText(`$env:https_proxy="http://127.0.0.1:${httpPort}"`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -341,13 +341,13 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      export https_proxy=http://127.0.0.1:{socksPort}
+                      export https_proxy=http://127.0.0.1:{httpPort}
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`export https_proxy=http://127.0.0.1:${socksPort}`)
+                        navigator.clipboard.writeText(`export https_proxy=http://127.0.0.1:${httpPort}`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -377,7 +377,7 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      git config --global https.proxy http://127.0.0.1:{socksPort}
+                      git config --global https.proxy http://127.0.0.1:{httpPort}
                     </code>
                     <Button 
                       variant="outline" 
@@ -413,13 +413,64 @@ export function AdvancedSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
-                      npm config set https-proxy http://127.0.0.1:{socksPort}
+                      npm config set https-proxy http://127.0.0.1:{httpPort}
                     </code>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`npm config set https-proxy http://127.0.0.1:${socksPort}`)
+                        navigator.clipboard.writeText(`npm config set https-proxy http://127.0.0.1:${httpPort}`)
+                        toast.success('已复制到剪贴板')
+                      }}
+                    >
+                      复制
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground">SOCKS5 代理设置（通用）</Label>
+                <div className="mt-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
+                      set ALL_PROXY=socks5://127.0.0.1:{socksPort}
+                    </code>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`set ALL_PROXY=socks5://127.0.0.1:${socksPort}`)
+                        toast.success('已复制到剪贴板')
+                      }}
+                    >
+                      复制
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
+                      $env:ALL_PROXY="socks5://127.0.0.1:{socksPort}"
+                    </code>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`$env:ALL_PROXY="socks5://127.0.0.1:${socksPort}"`)
+                        toast.success('已复制到剪贴板')
+                      }}
+                    >
+                      复制
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
+                      export ALL_PROXY=socks5://127.0.0.1:{socksPort}
+                    </code>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`export ALL_PROXY=socks5://127.0.0.1:${socksPort}`)
                         toast.success('已复制到剪贴板')
                       }}
                     >
@@ -437,7 +488,8 @@ export function AdvancedSettings() {
               <ul className="text-xs text-muted-foreground mt-1 space-y-1">
                 <li>• 终端代理设置仅在当前会话有效</li>
                 <li>• 要永久设置，请将命令添加到 ~/.bashrc 或 ~/.zshrc 文件中</li>
-                <li>• SOCKS 代理端口：{socksPort}（适用于支持 SOCKS5 的应用）</li>
+                <li>• HTTP 代理端口：{httpPort}（推荐，兼容性最好）</li>
+                <li>• SOCKS5 代理端口：{socksPort}（部分工具支持）</li>
                 <li>• 取消代理：删除或注释相关环境变量</li>
               </ul>
             </div>
