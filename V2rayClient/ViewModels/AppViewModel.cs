@@ -39,7 +39,7 @@ public class AppViewModel : INotifyPropertyChanged
         // Subscribe to events
         _v2rayManager.ProcessStarted += OnProcessStarted;
         _v2rayManager.ProcessStopped += OnProcessStopped;
-        _v2rayManager.ProcessError += OnProcessError;
+        _v2rayManager.ProcessFatalError += OnProcessFatalError;
         _statsManager.StatsUpdated += OnStatsUpdated;
     }
 
@@ -90,7 +90,7 @@ public class AppViewModel : INotifyPropertyChanged
         };
     }
 
-    private void OnProcessError(object? sender, V2rayErrorEventArgs e)
+    private void OnProcessFatalError(object? sender, V2rayErrorEventArgs e)
     {
         Connection = new ConnectionState
         {

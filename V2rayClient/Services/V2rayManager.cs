@@ -25,6 +25,7 @@ public class V2rayManager : IV2rayManager
     public event EventHandler<V2rayEventArgs>? ProcessStarted;
     public event EventHandler<V2rayEventArgs>? ProcessStopped;
     public event EventHandler<V2rayErrorEventArgs>? ProcessError;
+    public event EventHandler<V2rayErrorEventArgs>? ProcessFatalError;
 
     public V2rayManager(ILogManager? logManager = null, IRoutingRuleManager? routingManager = null)
     {
@@ -233,6 +234,14 @@ public class V2rayManager : IV2rayManager
                 var friendlyError = ParseSingBoxError(logData);
                 _lastError = friendlyError;
                 
+                // FATAL/PANIC are critical errors that should affect connection state
+                ProcessFatalError?.Invoke(this, new V2rayErrorEventArgs
+                {
+                    ErrorMessage = friendlyError,
+                    Timestamp = DateTime.Now
+                });
+                
+                // Also fire ProcessError for logging
                 ProcessError?.Invoke(this, new V2rayErrorEventArgs
                 {
                     ErrorMessage = friendlyError,
@@ -242,14 +251,22 @@ public class V2rayManager : IV2rayManager
             else if (logData.Contains("ERROR"))
             {
                 logLevel = LogLevel.Error;
-                var friendlyError = ParseSingBoxError(logData);
-                _lastError = friendlyError;
                 
-                ProcessError?.Invoke(this, new V2rayErrorEventArgs
+                // Check if this is a runtime network error (normal during proxy operation)
+                var isRuntimeNetworkError = IsRuntimeNetworkError(logData);
+                
+                if (!isRuntimeNetworkError)
                 {
-                    ErrorMessage = friendlyError,
-                    Timestamp = DateTime.Now
-                });
+                    // Only report errors that affect user experience
+                    var friendlyError = ParseSingBoxError(logData);
+                    _lastError = friendlyError;
+                    
+                    ProcessError?.Invoke(this, new V2rayErrorEventArgs
+                    {
+                        ErrorMessage = friendlyError,
+                        Timestamp = DateTime.Now
+                    });
+                }
             }
             else if (logData.Contains("WARN"))
             {
@@ -265,6 +282,48 @@ public class V2rayManager : IV2rayManager
         }
     }
 
+    /// <summary>
+    /// Check if the error is a runtime network error that should not be reported to user
+    /// </summary>
+    /// <param name="logData">Log message from sing-box</param>
+    /// <returns>True if this is a normal runtime network error</returns>
+    private bool IsRuntimeNetworkError(string logData)
+    {
+        var lowerLog = logData.ToLower();
+        
+        // Connection timeouts during proxy operation are normal
+        if (lowerLog.Contains("i/o timeout") && lowerLog.Contains("dial tcp"))
+        {
+            return true;
+        }
+        
+        // Individual connection refused errors are normal
+        if (lowerLog.Contains("connection refused") && lowerLog.Contains("dial"))
+        {
+            return true;
+        }
+        
+        // DNS resolution failures for individual domains are normal
+        if (lowerLog.Contains("no such host") && !lowerLog.Contains("dns server"))
+        {
+            return true;
+        }
+        
+        // Network unreachable for individual connections
+        if (lowerLog.Contains("network unreachable") && lowerLog.Contains("dial"))
+        {
+            return true;
+        }
+        
+        // TLS handshake failures for individual connections
+        if (lowerLog.Contains("tls") && lowerLog.Contains("handshake") && lowerLog.Contains("dial"))
+        {
+            return true;
+        }
+        
+        return false;
+    }
+    
     /// <summary>
     /// Parse sing-box error messages and return user-friendly Chinese error messages
     /// </summary>
@@ -478,12 +537,16 @@ public class V2rayManager : IV2rayManager
         _logManager?.AddLog(LogLevel.Error, errorMessage, "v2ray");
         _logManager?.AddLog(LogLevel.Info, "TUN虚拟网络接口已自动清理 (如果使用TUN模式)", "sing-box");
 
-        ProcessError?.Invoke(this, new V2rayErrorEventArgs
+        // Process unexpected exit is a fatal error
+        var errorArgs = new V2rayErrorEventArgs
         {
             ProcessId = process?.Id ?? 0,
             ErrorMessage = errorMessage,
             Timestamp = DateTime.Now
-        });
+        };
+        
+        ProcessFatalError?.Invoke(this, errorArgs);
+        ProcessError?.Invoke(this, errorArgs);
 
         lock (_processLock)
         {
@@ -622,12 +685,16 @@ public class V2rayManager : IV2rayManager
                 Debug.WriteLine($"[sing-box] Process exited immediately: {errorMessage}");
                 _logManager?.AddLog(LogLevel.Error, errorMessage, "v2ray");
                 
-                ProcessError?.Invoke(this, new V2rayErrorEventArgs
+                // Startup failure is a fatal error
+                var errorArgs = new V2rayErrorEventArgs
                 {
                     ProcessId = _v2rayProcess.Id,
                     ErrorMessage = errorMessage,
                     Timestamp = DateTime.Now
-                });
+                };
+                
+                ProcessFatalError?.Invoke(this, errorArgs);
+                ProcessError?.Invoke(this, errorArgs);
                 
                 throw new InvalidOperationException(errorMessage);
             }
@@ -646,11 +713,15 @@ public class V2rayManager : IV2rayManager
                 _v2rayProcess = null;
             }
             
-            ProcessError?.Invoke(this, new V2rayErrorEventArgs
+            // Startup exception is a fatal error
+            var errorArgs = new V2rayErrorEventArgs
             {
                 ErrorMessage = ex.Message,
                 Exception = ex
-            });
+            };
+            
+            ProcessFatalError?.Invoke(this, errorArgs);
+            ProcessError?.Invoke(this, errorArgs);
             
             throw;
         }

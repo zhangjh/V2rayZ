@@ -69,9 +69,14 @@ public interface IV2rayManager : IDisposable
     event EventHandler<V2rayEventArgs>? ProcessStopped;
 
     /// <summary>
-    /// Event raised when v2ray process encounters an error
+    /// Event raised when v2ray process encounters an error (non-fatal, for logging only)
     /// </summary>
     event EventHandler<V2rayErrorEventArgs>? ProcessError;
+    
+    /// <summary>
+    /// Event raised when v2ray process encounters a fatal error (affects connection state)
+    /// </summary>
+    event EventHandler<V2rayErrorEventArgs>? ProcessFatalError;
 }
 
 /// <summary>

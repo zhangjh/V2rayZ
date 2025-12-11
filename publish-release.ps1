@@ -113,6 +113,24 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "  ✓ Application published successfully" -ForegroundColor Green
 
+# Step 4.5: Clean up unnecessary files
+Write-Host ""
+Write-Host "[4.5/5] Cleaning up unnecessary files..." -ForegroundColor Yellow
+
+# Remove XML documentation files (only needed for development)
+Get-ChildItem -Path $OutputDir -Filter "*.xml" -Recurse | ForEach-Object {
+    Remove-Item $_.FullName -Force
+    Write-Host "  Removed: $($_.Name)" -ForegroundColor Gray
+}
+
+# Remove PDB debug files (not needed in release)
+Get-ChildItem -Path $OutputDir -Filter "*.pdb" -Recurse | ForEach-Object {
+    Remove-Item $_.FullName -Force
+    Write-Host "  Removed: $($_.Name)" -ForegroundColor Gray
+}
+
+Write-Host "  ✓ Cleanup completed" -ForegroundColor Green
+
 # Step 5: Verify build
 Write-Host ""
 Write-Host "[5/5] Verifying build..." -ForegroundColor Yellow
