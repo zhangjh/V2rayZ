@@ -20,6 +20,7 @@ V2rayZ的名称来源于两个方面：
 自定义规则页面：
 <img width="1233" height="829" alt="image" src="https://github.com/user-attachments/assets/e057cf80-3d2a-4063-bd8c-3cad00ed6520" />
 
+**从2.0.0版本开始，底层核心迁移sing-box，通知支持TUN透明网关模式，项目保留V2ray，实际已和V2ray无关**
 
 ## ✨ 功能特性
 
