@@ -19,4 +19,9 @@ public class ConnectionState
     /// Connection start time
     /// </summary>
     public DateTime? ConnectedAt { get; set; }
+
+    /// <summary>
+    /// Current proxy mode type (SystemProxy or Tun)
+    /// </summary>
+    public ProxyModeType ProxyModeType { get; set; } = ProxyModeType.SystemProxy;
 }

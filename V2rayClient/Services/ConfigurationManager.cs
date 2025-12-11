@@ -253,6 +253,13 @@ public class ConfigurationManager : IConfigurationManager
         {
             config.CustomRules = new List<DomainRule>();
         }
+        
+        // Ensure TunConfig is initialized with defaults if null
+        if (config.TunConfig == null)
+        {
+            config.TunConfig = new TunModeConfig();
+            Log.Debug("[ConfigManager] Initialized TunConfig with default values");
+        }
     }
 
     /// <summary>
@@ -343,6 +350,8 @@ public class ConfigurationManager : IConfigurationManager
             Servers = new List<ServerConfigWithId>(),
             SelectedServerId = null,
             ProxyMode = ProxyMode.Smart,
+            ProxyModeType = ProxyModeType.SystemProxy,
+            TunConfig = new TunModeConfig(),
             CustomRules = new List<DomainRule>(),
             AutoStart = false,
             AutoConnect = false,

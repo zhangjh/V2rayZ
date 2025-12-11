@@ -26,10 +26,20 @@ export function useNativeEvent<K extends keyof NativeEventData>(
 export function useNativeEventListeners() {
   const handleProcessStarted = (data: NativeEventData['processStarted']) => {
     console.log('Process started:', data)
+    // Refresh connection status when process starts
+    import('@/store/app-store').then(({ useAppStore }) => {
+      const refreshConnectionStatus = useAppStore.getState().refreshConnectionStatus
+      refreshConnectionStatus()
+    })
   }
 
   const handleProcessStopped = (data: NativeEventData['processStopped']) => {
     console.log('Process stopped:', data)
+    // Refresh connection status when process stops
+    import('@/store/app-store').then(({ useAppStore }) => {
+      const refreshConnectionStatus = useAppStore.getState().refreshConnectionStatus
+      refreshConnectionStatus()
+    })
   }
 
   const handleProcessError = (data: NativeEventData['processError']) => {
@@ -108,10 +118,38 @@ export function useNativeEventListeners() {
     })
   }
 
+  const handleProxyModeSwitched = (data: NativeEventData['proxyModeSwitched']) => {
+    console.log('Proxy mode switched:', data)
+    // Import toast dynamically to show notification
+    import('sonner').then(({ toast }) => {
+      const modeText = data.newMode === 'Tun' ? 'TUN模式' : '系统代理模式'
+      toast.success('代理模式切换成功', {
+        description: `已切换到${modeText}`,
+      })
+    })
+    // Reload config to reflect the change
+    import('@/store/app-store').then(({ useAppStore }) => {
+      const loadConfig = useAppStore.getState().loadConfig
+      loadConfig()
+    })
+  }
+
+  const handleProxyModeSwitchFailed = (data: NativeEventData['proxyModeSwitchFailed']) => {
+    console.error('Proxy mode switch failed:', data)
+    // Import toast dynamically to show error notification
+    import('sonner').then(({ toast }) => {
+      toast.error('代理模式切换失败', {
+        description: data.error || '切换过程中发生错误',
+      })
+    })
+  }
+
   useNativeEvent('processStarted', handleProcessStarted)
   useNativeEvent('processStopped', handleProcessStopped)
   useNativeEvent('processError', handleProcessError)
   useNativeEvent('configChanged', handleConfigChanged)
   useNativeEvent('statsUpdated', handleStatsUpdated)
   useNativeEvent('navigateToPage', handleNavigateToPage)
+  useNativeEvent('proxyModeSwitched', handleProxyModeSwitched)
+  useNativeEvent('proxyModeSwitchFailed', handleProxyModeSwitchFailed)
 }

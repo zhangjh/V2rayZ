@@ -1,4 +1,4 @@
-import { GeneralSettings, AppearanceSettings, AdvancedSettings, AboutSettings } from '@/components/settings'
+import { GeneralSettings, AppearanceSettings, AdvancedSettings, AboutSettings, ProxyModeSettings } from '@/components/settings'
 
 export function SettingsPage() {
   return (
@@ -10,6 +10,7 @@ export function SettingsPage() {
 
       <div className="space-y-6">
         <GeneralSettings />
+        <ProxyModeSettings />
         <AppearanceSettings />
         <AdvancedSettings />
         <AboutSettings />

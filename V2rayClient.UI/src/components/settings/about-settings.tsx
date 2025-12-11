@@ -10,7 +10,7 @@ interface VersionInfo {
   appVersion: string
   appName: string
   buildDate: string
-  v2rayVersion: string
+  singBoxVersion: string
   copyright: string
   repositoryUrl: string
 }
@@ -90,8 +90,8 @@ export function AboutSettings() {
           <Separator />
 
           <div>
-            <h4 className="text-sm font-medium text-muted-foreground">V2ray Core 版本</h4>
-            <p className="text-lg font-semibold">{versionInfo?.v2rayVersion || 'Unknown'}</p>
+            <h4 className="text-sm font-medium text-muted-foreground">sing-box 版本</h4>
+            <p className="text-lg font-semibold">{versionInfo?.singBoxVersion || 'Unknown'}</p>
           </div>
 
           <Separator />
@@ -125,7 +125,7 @@ export function AboutSettings() {
 
           <div className="text-xs text-muted-foreground space-y-1">
             <p>{versionInfo?.copyright || '© 2025 V2rayZ. All rights reserved.'}</p>
-            <p>基于 v2ray-core 构建的 Windows 客户端</p>
+            <p>基于 sing-box 构建的 Windows 客户端</p>
           </div>
         </div>
       </CardContent>

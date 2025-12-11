@@ -18,8 +18,8 @@
           Remove this element if your application requires this virtualization for backwards
           compatibility.
         -->
-        <!-- Run as current user without elevation -->
-        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+        <!-- Run with highest available privileges (required for TUN mode) -->
+        <requestedExecutionLevel level="highestAvailable" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

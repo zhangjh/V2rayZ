@@ -15,8 +15,14 @@ export function ProxyModeSelector() {
   const stopProxy = useAppStore((state) => state.stopProxy)
 
   const currentMode = config?.proxyMode || 'Smart'
-  const isConnected = connectionStatus?.v2ray?.running && connectionStatus?.proxy?.enabled
-  const hasError = connectionStatus?.v2ray?.error
+  
+  // Check connection status based on proxy mode type
+  const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy'
+  const isConnected = proxyModeType === 'Tun'
+    ? connectionStatus?.proxyCore?.running === true  // TUN mode: only check proxy core
+    : connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled  // System proxy: check both
+  
+  const hasError = connectionStatus?.proxyCore?.error
 
   // Check if server is configured and selected
   const isServerConfigured = (() => {

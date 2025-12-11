@@ -48,17 +48,39 @@ finally {
     Pop-Location
 }
 
-# Step 3: Download v2ray-core resources (if not present)
+# Step 3: Verify required resources
 Write-Host ""
-Write-Host "[3/5] Checking v2ray-core resources..." -ForegroundColor Yellow
-if (-not (Test-Path "V2rayClient\Resources\v2ray.exe")) {
-    Write-Host "  Downloading v2ray-core resources..." -ForegroundColor Gray
-    & .\download-resources.ps1
-    if ($LASTEXITCODE -ne 0) {
-        throw "Resource download failed"
+Write-Host "[3/5] Verifying required resources..." -ForegroundColor Yellow
+
+$requiredResources = @(
+    @{ Path = "V2rayClient\Resources\sing-box.exe"; Name = "sing-box.exe" }
+    @{ Path = "V2rayClient\Resources\wintun.dll"; Name = "wintun.dll" }
+    @{ Path = "V2rayClient\Resources\geoip.dat"; Name = "geoip.dat" }
+    @{ Path = "V2rayClient\Resources\geosite.dat"; Name = "geosite.dat" }
+)
+
+$missingResources = @()
+foreach ($resource in $requiredResources) {
+    if (Test-Path $resource.Path) {
+        Write-Host "  ✓ $($resource.Name)" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ $($resource.Name) - MISSING" -ForegroundColor Red
+        $missingResources += $resource.Name
     }
 }
-Write-Host "  ✓ Resources ready" -ForegroundColor Green
+
+if ($missingResources.Count -gt 0) {
+    Write-Host ""
+    Write-Host "ERROR: Missing required resources:" -ForegroundColor Red
+    foreach ($missing in $missingResources) {
+        Write-Host "  - $missing" -ForegroundColor Red
+    }
+    Write-Host ""
+    Write-Host "Please ensure all required files are present in V2rayClient\Resources\" -ForegroundColor Yellow
+    throw "Missing required resources"
+}
+
+Write-Host "  ✓ All resources verified" -ForegroundColor Green
 
 # Step 4: Publish .NET application
 Write-Host ""
@@ -102,8 +124,9 @@ $resourcesPath = Join-Path $OutputDir "Resources"
 $checks = @(
     @{ Path = $exePath; Name = "Main executable" }
     @{ Path = $wwwrootPath; Name = "Frontend files" }
-    @{ Path = $resourcesPath; Name = "V2ray resources" }
-    @{ Path = (Join-Path $resourcesPath "v2ray.exe"); Name = "v2ray.exe" }
+    @{ Path = $resourcesPath; Name = "Proxy resources" }
+    @{ Path = (Join-Path $resourcesPath "sing-box.exe"); Name = "sing-box.exe" }
+    @{ Path = (Join-Path $resourcesPath "wintun.dll"); Name = "wintun.dll" }
     @{ Path = (Join-Path $resourcesPath "geoip.dat"); Name = "geoip.dat" }
     @{ Path = (Join-Path $resourcesPath "geosite.dat"); Name = "geosite.dat" }
 )

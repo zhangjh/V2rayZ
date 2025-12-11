@@ -6,7 +6,7 @@ using Serilog;
 namespace V2rayClient.Services;
 
 /// <summary>
-/// Manages application resources including v2ray-core and GeoData files
+/// Manages application resources including sing-box and GeoData files
 /// </summary>
 public class ResourceManager : IDisposable
 {
@@ -21,26 +21,21 @@ public class ResourceManager : IDisposable
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "V2rayZ"
         );
-        _resourcesPath = Path.Combine(_appDataPath, "resources");
+        _resourcesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
     }
 
     /// <summary>
-    /// Gets the path to the v2ray executable
+    /// Gets the path to the sing-box executable
     /// </summary>
-    public string V2rayExePath => Path.Combine(_resourcesPath, "v2ray.exe");
+    public string SingBoxExePath => Path.Combine(_resourcesPath, "sing-box.exe");
 
     /// <summary>
-    /// Gets the path to the geoip.dat file
+    /// Gets the path to the geosite directory for sing-box rule sets
     /// </summary>
-    public string GeoIpPath => Path.Combine(_resourcesPath, "geoip.dat");
+    public string GeositeDir => Path.Combine(_resourcesPath, "geosite");
 
     /// <summary>
-    /// Gets the path to the geosite.dat file
-    /// </summary>
-    public string GeoSitePath => Path.Combine(_resourcesPath, "geosite.dat");
-
-    /// <summary>
-    /// Initializes resources by extracting them to AppData if needed
+    /// Initializes resources by creating necessary directories
     /// </summary>
     public void InitializeResources()
     {
@@ -48,14 +43,8 @@ public class ResourceManager : IDisposable
         {
             _logger.Information("Initializing application resources...");
 
-            // Create directories if they don't exist
+            // Create user data directory for configuration files
             Directory.CreateDirectory(_appDataPath);
-            Directory.CreateDirectory(_resourcesPath);
-
-            // Extract resources if they don't exist or are outdated
-            ExtractResourceIfNeeded("v2ray.exe");
-            ExtractResourceIfNeeded("geoip.dat");
-            ExtractResourceIfNeeded("geosite.dat");
 
             _logger.Information("Resources initialized successfully");
         }
@@ -66,68 +55,7 @@ public class ResourceManager : IDisposable
         }
     }
 
-    /// <summary>
-    /// Extracts a resource file from the application directory to AppData
-    /// </summary>
-    private void ExtractResourceIfNeeded(string fileName)
-    {
-        var targetPath = Path.Combine(_resourcesPath, fileName);
-        var sourcePath = GetSourceResourcePath(fileName);
 
-        // Check if source file exists
-        if (!File.Exists(sourcePath))
-        {
-            _logger.Warning("Resource file not found: {FileName}", fileName);
-            return;
-        }
-
-        // Extract if target doesn't exist or source is newer
-        if (!File.Exists(targetPath) || IsSourceNewer(sourcePath, targetPath))
-        {
-            _logger.Information("Extracting resource: {FileName}", fileName);
-            File.Copy(sourcePath, targetPath, overwrite: true);
-            _logger.Information("Extracted {FileName} to {TargetPath}", fileName, targetPath);
-        }
-        else
-        {
-            _logger.Debug("Resource {FileName} is up to date", fileName);
-        }
-    }
-
-    /// <summary>
-    /// Gets the source path for a resource file
-    /// </summary>
-    private string GetSourceResourcePath(string fileName)
-    {
-        // First try to get from application directory
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
-        var resourcesDir = Path.Combine(appDir, "Resources");
-        var filePath = Path.Combine(resourcesDir, fileName);
-
-        if (File.Exists(filePath))
-        {
-            return filePath;
-        }
-
-        // Fallback to direct path in app directory
-        filePath = Path.Combine(appDir, fileName);
-        if (File.Exists(filePath))
-        {
-            return filePath;
-        }
-
-        throw new FileNotFoundException($"Resource file not found: {fileName}");
-    }
-
-    /// <summary>
-    /// Checks if the source file is newer than the target file
-    /// </summary>
-    private bool IsSourceNewer(string sourcePath, string targetPath)
-    {
-        var sourceTime = File.GetLastWriteTimeUtc(sourcePath);
-        var targetTime = File.GetLastWriteTimeUtc(targetPath);
-        return sourceTime > targetTime;
-    }
 
     /// <summary>
     /// Validates that all required resources are available
@@ -136,7 +64,13 @@ public class ResourceManager : IDisposable
     {
         try
         {
-            var requiredFiles = new[] { V2rayExePath, GeoIpPath, GeoSitePath };
+            var requiredFiles = new[] 
+            { 
+                SingBoxExePath,
+                Path.Combine(GeositeDir, "geosite-cn.srs"),
+                Path.Combine(GeositeDir, "geosite-geolocation-!cn.srs"),
+                Path.Combine(GeositeDir, "geoip-cn.srs")
+            };
 
             foreach (var file in requiredFiles)
             {
@@ -158,20 +92,20 @@ public class ResourceManager : IDisposable
     }
 
     /// <summary>
-    /// Gets the version of v2ray-core
+    /// Gets the version of sing-box
     /// </summary>
-    public string GetV2rayVersion()
+    public string GetSingBoxVersion()
     {
         try
         {
-            if (!File.Exists(V2rayExePath))
+            if (!File.Exists(SingBoxExePath))
             {
                 return "Unknown";
             }
 
-            // Execute v2ray with version command to get version information
+            // Execute sing-box with version command to get version information
             using var process = new System.Diagnostics.Process();
-            process.StartInfo.FileName = V2rayExePath;
+            process.StartInfo.FileName = SingBoxExePath;
             process.StartInfo.Arguments = "version";
             process.StartInfo.UseShellExecute = false;
             process.StartInfo.RedirectStandardOutput = true;
@@ -185,18 +119,11 @@ public class ResourceManager : IDisposable
 
             if (process.ExitCode == 0 && !string.IsNullOrEmpty(output))
             {
-                // Parse version from output like "V2Ray 5.20.0 (V2Fly, a community-driven edition of V2Ray.)"
+                // Parse version from output like "sing-box version 1.8.0"
                 var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                 if (lines.Length > 0)
                 {
                     var versionLine = lines[0].Trim();
-                    // Extract version number from the first line
-                    var parts = versionLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2 && parts[0] == "V2Ray")
-                    {
-                        return $"V2Ray {parts[1]}";
-                    }
-                    // Fallback: return the first line as-is
                     return versionLine;
                 }
             }
@@ -205,36 +132,12 @@ public class ResourceManager : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Failed to get v2ray version");
+            _logger.Error(ex, "Failed to get sing-box version");
             return "Unknown";
         }
     }
 
-    /// <summary>
-    /// Cleans up old resource files
-    /// </summary>
-    public void CleanupResources()
-    {
-        try
-        {
-            _logger.Information("Cleaning up resources...");
 
-            if (Directory.Exists(_resourcesPath))
-            {
-                // Only clean up if we can re-extract
-                var sourcePath = GetSourceResourcePath("v2ray.exe");
-                if (File.Exists(sourcePath))
-                {
-                    Directory.Delete(_resourcesPath, recursive: true);
-                    _logger.Information("Resources cleaned up successfully");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(ex, "Failed to cleanup resources");
-        }
-    }
 
     /// <summary>
     /// Dispose resources

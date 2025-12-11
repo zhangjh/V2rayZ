@@ -24,7 +24,7 @@ export function TrafficStatsCard() {
 
   // Refresh statistics every second when connected
   useEffect(() => {
-    const isConnected = connectionStatus?.v2ray?.running && connectionStatus?.proxy?.enabled
+    const isConnected = connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled
     
     if (!isConnected) {
       return

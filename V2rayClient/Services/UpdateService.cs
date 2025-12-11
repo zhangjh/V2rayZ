@@ -340,10 +340,10 @@ echo.
 REM 切换到应用程序目录
 cd /d ""%~dp0""
 
-REM 强制终止所有 V2rayZ 和 v2ray 进程
+REM 强制终止所有 V2rayZ 和 sing-box 进程
 echo 正在终止进程...
 taskkill /F /IM V2rayZ.exe >nul 2>&1
-taskkill /F /IM v2ray.exe >nul 2>&1
+taskkill /F /IM sing-box.exe >nul 2>&1
 timeout /t 2 /nobreak > nul
 
 REM 等待进程完全退出

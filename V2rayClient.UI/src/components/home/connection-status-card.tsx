@@ -25,12 +25,17 @@ export function ConnectionStatusCard() {
   const selectedServer = servers.find(s => s.id === selectedServerId)
 
   const getStatusInfo = () => {
+    // Use proxyModeType from connectionStatus if available, otherwise fall back to config
+    const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy'
+    const modeText = proxyModeType === 'Tun' ? 'TUN模式' : '系统代理模式'
+
     // Show error from store if present
     if (error) {
       return {
         label: '错误',
         variant: 'destructive' as const,
         description: error,
+        mode: modeText,
       }
     }
 
@@ -39,33 +44,81 @@ export function ConnectionStatusCard() {
         label: '未知',
         variant: 'secondary' as const,
         description: '正在获取状态...',
+        mode: modeText,
       }
     }
 
-    const { v2ray, proxy } = connectionStatus
+    const { proxyCore, proxy } = connectionStatus
 
-    if (v2ray.error) {
+    // Handle proxy core errors with more specific messages
+    if (proxyCore.error) {
+      // Parse TUN mode specific errors
+      let errorDescription = proxyCore.error
+      
+      if (proxyCore.error.includes('权限不足') || proxyCore.error.includes('管理员权限')) {
+        errorDescription = 'TUN模式需要管理员权限，请以管理员身份运行应用'
+      } else if (proxyCore.error.includes('wintun') || proxyCore.error.includes('驱动')) {
+        errorDescription = 'TUN驱动加载失败，请检查wintun.dll是否存在'
+      } else if (proxyCore.error.includes('接口创建失败')) {
+        errorDescription = 'TUN接口创建失败，请检查系统网络设置'
+      } else if (proxyCore.error.includes('sing-box.exe')) {
+        errorDescription = 'sing-box核心文件缺失或无法启动'
+      }
+      
       return {
         label: '错误',
         variant: 'destructive' as const,
-        description: v2ray.error,
+        description: errorDescription,
+        mode: modeText,
       }
     }
 
-    if (v2ray.running && proxy.enabled) {
-      const uptime = v2ray.uptime ? `运行时间: ${Math.floor(v2ray.uptime / 60)} 分钟` : ''
+    // TUN模式下，只需要检查代理核心是否运行
+    if (proxyModeType === 'Tun') {
+      if (proxyCore.running) {
+        const uptime = proxyCore.uptime ? `运行时间: ${Math.floor(proxyCore.uptime / 60)} 分钟` : ''
+        return {
+          label: '已连接',
+          variant: 'default' as const,
+          description: `TUN模式已连接${uptime ? ' - ' + uptime : ''}`,
+          mode: modeText,
+        }
+      }
+
+      if (isLoading) {
+        return {
+          label: '连接中',
+          variant: 'secondary' as const,
+          description: '正在启动 TUN 模式...',
+          mode: modeText,
+        }
+      }
+
+      return {
+        label: '已断开',
+        variant: 'outline' as const,
+        description: 'TUN模式未启用',
+        mode: modeText,
+      }
+    }
+
+    // 系统代理模式下，需要检查代理核心和系统代理
+    if (proxyCore.running && proxy.enabled) {
+      const uptime = proxyCore.uptime ? `运行时间: ${Math.floor(proxyCore.uptime / 60)} 分钟` : ''
       return {
         label: '已连接',
         variant: 'default' as const,
-        description: `代理已启用${uptime ? ' - ' + uptime : ''}`,
+        description: `系统代理已连接${uptime ? ' - ' + uptime : ''}`,
+        mode: modeText,
       }
     }
 
-    if (v2ray.running && !proxy.enabled) {
+    if (proxyCore.running && !proxy.enabled) {
       return {
         label: '连接中',
         variant: 'secondary' as const,
-        description: 'V2ray 运行中，正在启用系统代理...',
+        description: 'sing-box 运行中，正在启用系统代理...',
+        mode: modeText,
       }
     }
 
@@ -73,7 +126,8 @@ export function ConnectionStatusCard() {
       return {
         label: '连接中',
         variant: 'secondary' as const,
-        description: '正在启动 V2ray 进程...',
+        description: '正在启动 sing-box 进程...',
+        mode: modeText,
       }
     }
 
@@ -81,22 +135,17 @@ export function ConnectionStatusCard() {
       label: '已断开',
       variant: 'outline' as const,
       description: '代理未启用',
+      mode: modeText,
     }
   }
 
   const handleServerChange = async (serverId: string) => {
+    if (!config) return
+    
     try {
       const updatedConfig = {
         ...config,
         selectedServerId: serverId,
-        servers: config?.servers || [],
-        proxyMode: config?.proxyMode || 'Smart',
-        customRules: config?.customRules || [],
-        autoStart: config?.autoStart || false,
-        autoConnect: config?.autoConnect || false,
-        minimizeToTray: config?.minimizeToTray || true,
-        socksPort: config?.socksPort || 65534,
-        httpPort: config?.httpPort || 65533,
       }
 
       await saveConfig(updatedConfig)
@@ -123,6 +172,11 @@ export function ConnectionStatusCard() {
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">状态</span>
           <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">代理模式</span>
+          <Badge variant="secondary">{statusInfo.mode}</Badge>
         </div>
 
         {/* 服务器选择区域 */}
@@ -178,17 +232,21 @@ export function ConnectionStatusCard() {
                 <span className="text-sm text-muted-foreground">当前服务器</span>
                 <Select value={selectedServerId} onValueChange={handleServerChange}>
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue placeholder="选择服务器">
+                      {selectedServer && (
+                        <div className="flex items-center gap-2">
+                          <span>{selectedServer.name}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {selectedServer.protocol}
+                          </Badge>
+                        </div>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {servers.map((server) => (
                       <SelectItem key={server.id} value={server.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{server.name}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {server.protocol}
-                          </Badge>
-                        </div>
+                        {server.name} ({server.protocol})
                       </SelectItem>
                     ))}
                   </SelectContent>

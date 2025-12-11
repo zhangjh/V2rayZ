@@ -1,183 +1,230 @@
+using System.IO;
 using V2rayClient.Models;
-using V2rayClient.Models.V2ray;
+using V2rayClient.Models.SingBox;
 
 namespace V2rayClient.Services;
 
 /// <summary>
-/// Service for managing V2ray routing rules
+/// Service for managing sing-box routing rules
 /// </summary>
 public class RoutingRuleManager : IRoutingRuleManager
 {
     /// <summary>
-    /// Generate routing rules based on proxy mode and custom rules
+    /// Event raised when routing rules are updated and require restart
+    /// </summary>
+    public event EventHandler<RoutingRulesChangedEventArgs>? RoutingRulesChanged;
+
+    /// <summary>
+    /// Notify that routing rules have been updated
+    /// </summary>
+    /// <param name="changeType">Type of change that occurred</param>
+    public void NotifyRulesChanged(RuleChangeType changeType)
+    {
+        RoutingRulesChanged?.Invoke(this, new RoutingRulesChangedEventArgs
+        {
+            ChangeType = changeType,
+            Timestamp = DateTime.Now
+        });
+    }
+
+    /// <summary>
+    /// Generate sing-box format routing configuration based on proxy mode and custom rules.
+    /// This is the primary method for generating routing rules for sing-box core.
     /// </summary>
     /// <param name="mode">Proxy mode (Global, Smart, Direct)</param>
     /// <param name="customRules">List of custom domain rules</param>
-    /// <returns>List of routing rules for V2ray configuration</returns>
-    public List<RoutingRule> GenerateRoutingRules(ProxyMode mode, List<DomainRule> customRules)
+    /// <returns>RouteConfig for sing-box configuration</returns>
+    public RouteConfig GenerateSingBoxRouting(ProxyMode mode, List<DomainRule> customRules)
     {
-        var rules = new List<RoutingRule>();
+        var routeConfig = new RouteConfig
+        {
+            Rules = new List<RouteRule>(),
+            DefaultDomainResolver = "dns-local"
+        };
 
         // Priority 1: Custom domain rules (highest priority)
-        rules.AddRange(GenerateCustomRules(customRules));
+        routeConfig.Rules.AddRange(GenerateSingBoxCustomRules(customRules));
 
         // Priority 2: Mode-specific rules
         switch (mode)
         {
             case ProxyMode.Global:
-                rules.AddRange(GenerateGlobalModeRules());
+                routeConfig.Final = "proxy";
                 break;
             case ProxyMode.Smart:
-                rules.AddRange(GenerateSmartModeRules());
+                routeConfig.RuleSet = GenerateSingBoxRuleSets();
+                routeConfig.Rules.AddRange(GenerateSingBoxSmartModeRules());
+                routeConfig.Final = "proxy";
                 break;
             case ProxyMode.Direct:
-                rules.AddRange(GenerateDirectModeRules());
+                routeConfig.Final = "direct";
                 break;
         }
 
-        return rules;
+        return routeConfig;
     }
 
     /// <summary>
-    /// Generate routing rules from custom domain rules
+    /// Generate sing-box routing rules from custom domain rules
     /// </summary>
-    private List<RoutingRule> GenerateCustomRules(List<DomainRule> customRules)
+    private List<RouteRule> GenerateSingBoxCustomRules(List<DomainRule> customRules)
     {
-        var rules = new List<RoutingRule>();
+        var rules = new List<RouteRule>();
 
         if (customRules == null || customRules.Count == 0)
         {
             return rules;
         }
 
-        // Group enabled rules by strategy
-        var proxyDomains = customRules
-            .Where(r => r.Enabled && r.Strategy == RuleStrategy.Proxy)
-            .SelectMany(r => r.Domains.Select(ConvertDomainPattern))
-            .ToList();
-
-        var directDomains = customRules
-            .Where(r => r.Enabled && r.Strategy == RuleStrategy.Direct)
-            .SelectMany(r => r.Domains.Select(ConvertDomainPattern))
-            .ToList();
-
-        // Add proxy rule for custom domains
-        if (proxyDomains.Count > 0)
+        // Process each custom rule individually to maintain order
+        foreach (var customRule in customRules.Where(r => r.Enabled))
         {
-            rules.Add(new RoutingRule
+            var (exactDomains, suffixDomains) = SplitDomainsBySingBoxFormat(customRule.Domains);
+            
+            var (action, outbound) = customRule.Strategy switch
             {
-                Type = "field",
-                Domain = proxyDomains,
-                OutboundTag = "proxy"
-            });
-        }
-
-        // Add direct rule for custom domains
-        if (directDomains.Count > 0)
-        {
-            rules.Add(new RoutingRule
-            {
-                Type = "field",
-                Domain = directDomains,
-                OutboundTag = "direct"
-            });
+                RuleStrategy.Proxy => ("route", "proxy"),
+                RuleStrategy.Direct => ("route", "direct"),
+                RuleStrategy.Block => ("reject", null),
+                _ => ("route", "direct")
+            };
+            
+            var rule = new RouteRule { Action = action };
+            if (outbound != null) rule.Outbound = outbound;
+            if (exactDomains.Count > 0) rule.Domain = exactDomains;
+            if (suffixDomains.Count > 0) rule.DomainSuffix = suffixDomains;
+            
+            rules.Add(rule);
         }
 
         return rules;
     }
 
     /// <summary>
-    /// Generate routing rules for Global proxy mode
-    /// All traffic goes through proxy
+    /// Generate sing-box rule sets for Smart mode
     /// </summary>
-    private List<RoutingRule> GenerateGlobalModeRules()
+    private List<RuleSet> GenerateSingBoxRuleSets()
     {
-        return new List<RoutingRule>
+        var geositeDir = App.ResourceManager?.GeositeDir 
+            ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "geosite");
+        
+        return new List<RuleSet>
         {
-            // Route all traffic to proxy
-            new RoutingRule
+            new RuleSet
             {
-                Type = "field",
-                Ip = new List<string> { "0.0.0.0/0", "::/0" },
-                OutboundTag = "proxy"
+                Tag = "geosite-cn",
+                Type = "local",
+                Format = "binary",
+                Path = Path.Combine(geositeDir, "geosite-cn.srs")
+            },
+            new RuleSet
+            {
+                Tag = "geosite-geolocation-!cn",
+                Type = "local",
+                Format = "binary",
+                Path = Path.Combine(geositeDir, "geosite-geolocation-!cn.srs")
+            },
+            new RuleSet
+            {
+                Tag = "geoip-cn",
+                Type = "local",
+                Format = "binary",
+                Path = Path.Combine(geositeDir, "geoip-cn.srs")
             }
         };
     }
 
     /// <summary>
-    /// Generate routing rules for Smart mode (China direct, others proxy)
-    /// Uses geoip:cn for Chinese IP addresses
+    /// Generate sing-box routing rules for Smart mode (China direct, others proxy)
     /// </summary>
-    private List<RoutingRule> GenerateSmartModeRules()
+    private List<RouteRule> GenerateSingBoxSmartModeRules()
     {
-        return new List<RoutingRule>
+        return new List<RouteRule>
         {
-            // Chinese domains go direct
-            new RoutingRule
+            // DNS hijacking
+            new RouteRule
             {
-                Type = "field",
-                Domain = new List<string> { "geosite:cn" },
-                OutboundTag = "direct"
+                Protocol = "dns",
+                Action = "hijack-dns"
+            },
+            // Block QUIC to prevent UDP-based protocols
+            new RouteRule
+            {
+                Protocol = "quic",
+                Action = "reject"
+            },
+            // Foreign domains go proxy
+            new RouteRule
+            {
+                RuleSet = "geosite-geolocation-!cn",
+                Action = "route",
+                Outbound = "proxy"
+            },
+            // Chinese domains go direct
+            new RouteRule
+            {
+                RuleSet = "geosite-cn",
+                Action = "route",
+                Outbound = "direct"
             },
             // Chinese IPs go direct
-            new RoutingRule
+            new RouteRule
             {
-                Type = "field",
-                Ip = new List<string> { "geoip:cn", "geoip:private" },
-                OutboundTag = "direct"
-            },
-            // Everything else goes through proxy
-            new RoutingRule
-            {
-                Type = "field",
-                Ip = new List<string> { "0.0.0.0/0", "::/0" },
-                OutboundTag = "proxy"
+                RuleSet = "geoip-cn",
+                Action = "route",
+                Outbound = "direct"
             }
         };
     }
 
     /// <summary>
-    /// Generate routing rules for Direct mode
-    /// All traffic goes direct (no proxy)
+    /// Split domains into exact match and suffix match for sing-box format
     /// </summary>
-    private List<RoutingRule> GenerateDirectModeRules()
+    /// <param name="domains">List of domain patterns</param>
+    /// <returns>Tuple of (exact domains, suffix domains)</returns>
+    private (List<string> exactDomains, List<string> suffixDomains) SplitDomainsBySingBoxFormat(List<string> domains)
     {
-        return new List<RoutingRule>
+        var exactDomains = new List<string>();
+        var suffixDomains = new List<string>();
+
+        foreach (var domain in domains)
         {
-            // Route all traffic directly
-            new RoutingRule
+            if (string.IsNullOrWhiteSpace(domain))
             {
-                Type = "field",
-                Ip = new List<string> { "0.0.0.0/0", "::/0" },
-                OutboundTag = "direct"
+                continue;
             }
-        };
+
+            var trimmedDomain = domain.Trim().ToLowerInvariant();
+
+            // If domain starts with *., it's a suffix match
+            // *.example.com -> example.com (matches example.com and all subdomains)
+            if (trimmedDomain.StartsWith("*."))
+            {
+                suffixDomains.Add(trimmedDomain.Substring(2));
+            }
+            else
+            {
+                // Exact domain match
+                exactDomains.Add(trimmedDomain);
+            }
+        }
+
+        return (exactDomains, suffixDomains);
     }
 
     /// <summary>
-    /// Convert domain pattern to V2ray format
-    /// Supports wildcards like *.example.com
+    /// [Obsolete] Generate v2ray-core format routing rules.
+    /// This method is deprecated and kept only for backward compatibility.
+    /// Use GenerateSingBoxRouting instead for all new code.
     /// </summary>
-    /// <param name="domain">Domain pattern</param>
-    /// <returns>V2ray formatted domain pattern</returns>
-    private string ConvertDomainPattern(string domain)
+    /// <param name="mode">Proxy mode (Global, Smart, Direct)</param>
+    /// <param name="customRules">List of custom domain rules</param>
+    /// <returns>Empty list (v2ray-core support has been removed)</returns>
+    [Obsolete("This method is deprecated. Use GenerateSingBoxRouting instead. V2ray-core support has been removed in favor of sing-box.")]
+    public List<object> GenerateRoutingRules(ProxyMode mode, List<DomainRule> customRules)
     {
-        if (string.IsNullOrWhiteSpace(domain))
-        {
-            return string.Empty;
-        }
-
-        domain = domain.Trim().ToLowerInvariant();
-
-        // If domain starts with *., convert to V2ray's domain: prefix
-        // *.example.com -> domain:example.com (matches example.com and all subdomains)
-        if (domain.StartsWith("*."))
-        {
-            return $"domain:{domain.Substring(2)}";
-        }
-
-        // Exact domain match
-        // example.com -> full:example.com (matches only example.com)
-        return $"full:{domain}";
+        // V2ray-core support has been removed. This method returns an empty list for backward compatibility.
+        // All routing should now use GenerateSingBoxRouting which returns RouteConfig for sing-box.
+        return new List<object>();
     }
 }

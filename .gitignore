@@ -75,8 +75,8 @@ dist-ssr/
 V2rayClient/wwwroot/*
 !V2rayClient/wwwroot/.gitkeep
 
-# Resources (v2ray binaries and GeoData files)
-V2rayClient/Resources/v2ray.exe
+# Resources (proxy core binaries and GeoData files)
+V2rayClient/Resources/sing-box.exe
 V2rayClient/Resources/geoip.dat
 V2rayClient/Resources/geosite.dat
 V2rayClient/Resources/*.zip

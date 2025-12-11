@@ -75,6 +75,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   startProxy: async () => {
     set({ isLoading: true, error: null })
     try {
+      // Check if TUN mode is selected
+      const config = get().config
+      if (config?.proxyModeType === 'Tun') {
+        // Check administrator permissions for TUN mode
+        const adminCheckResponse = await nativeApi.isAdministrator()
+        if (adminCheckResponse.success && adminCheckResponse.data) {
+          const isAdmin = adminCheckResponse.data.isAdministrator
+          
+          if (!isAdmin) {
+            // Show error and prompt user to restart with admin rights
+            set({ 
+              error: 'TUN模式需要管理员权限。请以管理员身份重新运行应用程序。', 
+              isLoading: false 
+            })
+            
+            // Optionally, we could show a dialog here asking if user wants to restart with admin rights
+            // For now, just show the error
+            return
+          }
+        }
+      }
+      
       const response = await nativeApi.startProxy()
       if (!response.success) {
         set({ error: response.error || 'Failed to start proxy', isLoading: false })
@@ -95,34 +117,41 @@ export const useAppStore = create<AppState>((set, get) => ({
         
         // Debug logging
         console.log(`[StartProxy] Polling attempt ${attempts}:`, {
-          v2rayRunning: status?.v2ray?.running,
+          proxyCoreRunning: status?.proxyCore?.running,
           proxyEnabled: status?.proxy?.enabled,
-          v2rayError: status?.v2ray?.error,
-          v2rayPid: status?.v2ray?.pid
+          proxyCoreError: status?.proxyCore?.error,
+          proxyCorePid: status?.proxyCore?.pid
         })
         
-        // Check if connected (both V2ray running AND proxy enabled)
-        if (status?.v2ray?.running && status?.proxy?.enabled) {
-          console.log('[StartProxy] Connection successful!')
+        // Check if connected based on proxy mode type
+        const isTunMode = status?.proxyModeType === 'Tun'
+        const isConnected = isTunMode
+          ? status?.proxyCore?.running // TUN mode: only check if proxy core is running
+          : status?.proxyCore?.running && status?.proxy?.enabled // System proxy mode: check both
+        
+        if (isConnected) {
+          console.log('[StartProxy] Connection successful!', { mode: status?.proxyModeType })
+          // Ensure final status update before completing
+          await get().refreshConnectionStatus()
           set({ isLoading: false })
           return
         }
         
-        // Check for V2ray errors
-        if (status?.v2ray?.error) {
-          console.log('[StartProxy] V2ray error detected:', status.v2ray.error)
+        // Check for proxy core errors
+        if (status?.proxyCore?.error) {
+          console.log('[StartProxy] Proxy core error detected:', status.proxyCore.error)
           set({ 
-            error: status.v2ray.error, 
+            error: status.proxyCore.error, 
             isLoading: false 
           })
           return
         }
         
-        // Check if V2ray failed to start (not running and no error means startup failed)
-        if (attempts > 3 && !status?.v2ray?.running) {
-          console.log('[StartProxy] V2ray failed to start')
+        // Check if proxy core failed to start (not running and no error means startup failed)
+        if (attempts > 3 && !status?.proxyCore?.running) {
+          console.log('[StartProxy] Proxy core failed to start')
           set({ 
-            error: 'V2ray 启动失败：进程无法正常启动，请检查服务器配置', 
+            error: 'sing-box 启动失败：进程无法正常启动，请检查服务器配置', 
             isLoading: false 
           })
           return
@@ -181,6 +210,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         console.log('[Store] Config loaded successfully:', response.data)
         
         const config = response.data
+        
+        // 确保有默认的TUN配置
+        if (!config.tunConfig) {
+          config.tunConfig = {
+            interfaceName: 'V2rayZ-TUN',
+            ipv4Address: '10.0.85.1/24',
+            ipv6Address: 'fdfe:dcba:9876::1/126',
+            enableIpv6: true,
+            dnsServers: ['8.8.8.8', '8.8.4.4'],
+            mtu: 9000,
+            enableDnsHijack: true,
+          }
+        }
+        
+        // 确保有默认的代理模式类型
+        if (!config.proxyModeType) {
+          config.proxyModeType = 'SystemProxy'
+        }
         
         set({ config })
       } else {

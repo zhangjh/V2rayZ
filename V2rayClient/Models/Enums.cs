@@ -44,7 +44,8 @@ public enum ProxyMode
 public enum RuleStrategy
 {
     Proxy,
-    Direct
+    Direct,
+    Block
 }
 
 /// <summary>
@@ -78,4 +79,20 @@ public enum LogLevel
     Info,
     Warning,
     Error
+}
+
+/// <summary>
+/// Proxy implementation mode
+/// </summary>
+public enum ProxyModeType
+{
+    /// <summary>
+    /// System proxy mode (SOCKS/HTTP)
+    /// </summary>
+    SystemProxy,
+    
+    /// <summary>
+    /// TUN transparent proxy mode
+    /// </summary>
+    Tun
 }

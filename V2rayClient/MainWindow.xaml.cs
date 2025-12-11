@@ -31,7 +31,6 @@ public partial class MainWindow : Window
     private ILogManager? _logManager;
     private IStartupManager? _startupManager;
     private UpdateService? _updateService;
-    private IGeoDataUpdateService? _geoDataUpdateService;
 
     public MainWindow()
     {
@@ -82,7 +81,6 @@ public partial class MainWindow : Window
         _statsManager = new StatisticsManager();
         _startupManager = new StartupManager(App.Logger, _v2rayManager, _proxyManager);
         _updateService = new UpdateService();
-        _geoDataUpdateService = new GeoDataUpdateService(App.Logger, App.ResourceManager!);
 
         // Create view model
         _viewModel = new AppViewModel(
@@ -156,7 +154,7 @@ public partial class MainWindow : Window
     {
         if (_v2rayManager == null || _configManager == null || _proxyManager == null || 
             _statsManager == null || _routingManager == null || _logManager == null || 
-            _startupManager == null || _geoDataUpdateService == null)
+            _startupManager == null)
         {
             return;
         }
@@ -174,7 +172,6 @@ public partial class MainWindow : Window
             _logManager,
             _startupManager,
             protocolParser,
-            _geoDataUpdateService,
             SendEventToJavaScript
         );
 

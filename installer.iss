@@ -70,7 +70,12 @@ Source: "publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 ; Frontend files (wwwroot)
 Source: "publish\wwwroot\*"; DestDir: "{app}\wwwroot"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; V2ray resources
+; Proxy core resources
+; This includes:
+;   - sing-box.exe (unified proxy core for all modes)
+;   - wintun.dll (Windows TUN driver for TUN mode)
+;   - geoip.dat (IP geolocation database)
+;   - geosite.dat (domain routing database)
 Source: "publish\Resources\*"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Additional DLLs (if any - for framework-dependent builds)

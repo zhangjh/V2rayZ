@@ -1,40 +1,62 @@
 using V2rayClient.Models;
-using V2rayClient.Models.V2ray;
+using V2rayClient.Models.SingBox;
 
 namespace V2rayClient.Services;
 
 /// <summary>
-/// Interface for V2ray process management
+/// Interface for sing-box process management
 /// </summary>
 public interface IV2rayManager : IDisposable
 {
     /// <summary>
-    /// Start v2ray core with the specified configuration
+    /// Start sing-box with the specified configuration
     /// </summary>
-    /// <param name="config">V2ray configuration</param>
-    Task StartAsync(V2rayConfig config);
+    /// <param name="config">sing-box configuration</param>
+    /// <param name="userConfig">User configuration (required for mode determination)</param>
+    Task StartAsync(SingBoxConfig config, UserConfig? userConfig = null);
 
     /// <summary>
-    /// Stop v2ray core
+    /// Stop sing-box
     /// </summary>
     Task StopAsync();
 
     /// <summary>
-    /// Restart v2ray core with new configuration
+    /// Restart sing-box with new configuration
     /// </summary>
-    /// <param name="config">V2ray configuration</param>
-    Task RestartAsync(V2rayConfig config);
+    /// <param name="config">sing-box configuration</param>
+    Task RestartAsync(SingBoxConfig config);
 
     /// <summary>
-    /// Get current v2ray process status
+    /// Get current sing-box process status
     /// </summary>
     V2rayStatus GetStatus();
 
     /// <summary>
-    /// Generate v2ray configuration from user configuration
+    /// Generate sing-box configuration based on proxy mode
     /// </summary>
     /// <param name="userConfig">User configuration</param>
-    V2rayConfig GenerateConfig(UserConfig userConfig);
+    /// <param name="proxyMode">Proxy mode type (SystemProxy or TUN)</param>
+    SingBoxConfig GenerateSingBoxConfig(UserConfig userConfig, ProxyModeType proxyMode);
+
+    /// <summary>
+    /// Switch proxy mode between SystemProxy and TUN
+    /// </summary>
+    /// <param name="targetMode">Target proxy mode type</param>
+    /// <param name="userConfig">User configuration</param>
+    /// <param name="configManager">Configuration manager for saving config</param>
+    /// <param name="proxyManager">System proxy manager for cleanup</param>
+    /// <returns>True if switch was successful, false otherwise</returns>
+    Task<bool> SwitchProxyModeAsync(
+        ProxyModeType targetMode, 
+        UserConfig userConfig, 
+        IConfigurationManager configManager,
+        ISystemProxyManager? proxyManager = null);
+
+    /// <summary>
+    /// Validate TUN mode availability and requirements
+    /// </summary>
+    /// <returns>Tuple containing validation result and error message if validation failed</returns>
+    Task<(bool IsAvailable, string? ErrorMessage)> ValidateTunModeAsync();
 
     /// <summary>
     /// Event raised when v2ray process starts

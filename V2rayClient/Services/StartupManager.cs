@@ -123,11 +123,11 @@ public class StartupManager : IStartupManager
             // Wait a bit for the application to fully initialize
             await Task.Delay(2000);
 
-            // Generate V2ray configuration
-            var v2rayConfig = _v2rayManager.GenerateConfig(config);
+            // Generate sing-box configuration based on proxy mode type
+            var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
             
-            // Start V2ray with the configuration
-            await _v2rayManager.StartAsync(v2rayConfig);
+            // Start sing-box with the configuration
+            await _v2rayManager.StartAsync(singBoxConfig, config);
             
             // Wait a bit for V2ray to start
             await Task.Delay(1000);

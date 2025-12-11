@@ -1,5 +1,5 @@
 export { ConnectionStatusCard } from './connection-status-card'
 export { ProxyModeSelector } from './proxy-mode-selector'
 export { TrafficStatsCard } from './traffic-stats-card'
-export { ProxyControlButtons } from './proxy-control-buttons'
 export { RealTimeLogs } from './real-time-logs'
+export { AdminPermissionDialog } from './admin-permission-dialog'

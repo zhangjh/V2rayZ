@@ -20,6 +20,7 @@ export interface ConnectionStatus {
     enabled: boolean;
     server?: string;
   };
+  proxyModeType: 'SystemProxy' | 'Tun';
 }
 
 export interface TrafficStats {
@@ -66,10 +67,22 @@ export interface DomainRule {
   enabled: boolean;
 }
 
+export interface TunModeConfig {
+  interfaceName: string;
+  ipv4Address: string;
+  ipv6Address?: string;
+  enableIpv6: boolean;
+  dnsServers: string[];
+  mtu: number;
+  enableDnsHijack: boolean;
+}
+
 export interface UserConfig {
   servers: ServerConfigWithId[];
   selectedServerId?: string;
   proxyMode: 'Global' | 'Smart' | 'Direct';
+  proxyModeType: 'SystemProxy' | 'Tun';
+  tunConfig: TunModeConfig;
   customRules: DomainRule[];
   autoStart: boolean;
   autoConnect: boolean;
@@ -78,12 +91,23 @@ export interface UserConfig {
   httpPort: number;
 }
 
+export interface TunModeValidationResult {
+  isAvailable: boolean;
+  errorMessage?: string;
+}
+
 export interface NativeEventData {
   processStarted: { processId: number; timestamp: string };
   processStopped: { processId: number; timestamp: string };
   processError: { processId: number; timestamp: string; error: string };
   configChanged: { key?: string; oldValue?: any; newValue?: any };
   statsUpdated: TrafficStats;
+  proxyModeSwitched: { success: boolean; newMode: string };
+  proxyModeSwitchFailed: { success: boolean; error: string };
+  geoDataUpdateChecked: any;
+  geoDataUpdateCheckFailed: { error: string };
+  geoDataUpdated: any;
+  geoDataUpdateFailed: any;
 }
 
 export interface NativeApi {
@@ -119,6 +143,15 @@ export interface NativeApi {
   // Version and Updates
   getVersionInfo(): Promise<string>;
   checkForUpdates(): Promise<string>;
+
+  // TUN Mode Configuration
+  getProxyModeType(): Promise<string>;
+  setProxyModeType(modeType: 'SystemProxy' | 'Tun'): Promise<string>;
+  getTunConfig(): Promise<string>;
+  setTunConfig(tunConfig: TunModeConfig): Promise<string>;
+  validateTunMode(): Promise<string>;
+  switchProxyMode(targetModeType: 'SystemProxy' | 'Tun'): Promise<string>;
+  isAdministrator(): Promise<string>;
 }
 
 export interface NativeEventListener<K extends keyof NativeEventData> {

@@ -25,6 +25,16 @@ public class UserConfig
     public ProxyMode ProxyMode { get; set; } = ProxyMode.Smart;
 
     /// <summary>
+    /// Proxy implementation mode type
+    /// </summary>
+    public ProxyModeType ProxyModeType { get; set; } = ProxyModeType.SystemProxy;
+    
+    /// <summary>
+    /// TUN mode configuration
+    /// </summary>
+    public TunModeConfig TunConfig { get; set; } = new();
+
+    /// <summary>
     /// Custom domain routing rules
     /// </summary>
     public List<DomainRule> CustomRules { get; set; } = new();

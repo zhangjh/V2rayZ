@@ -66,7 +66,7 @@ if (-not (Test-Path $PublishDir)) {
 $requiredFiles = @(
     "V2rayZ.exe",
     "wwwroot\index.html",
-    "Resources\v2ray.exe"
+    "Resources\sing-box.exe"
 )
 
 $missingFiles = @()

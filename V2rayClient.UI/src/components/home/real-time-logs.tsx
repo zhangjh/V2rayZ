@@ -113,7 +113,7 @@ export function RealTimeLogs() {
         >
           {logs.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              {connectionStatus?.v2ray?.running ? '等待日志输出...' : '请先启动代理服务'}
+              {connectionStatus?.proxyCore?.running ? '等待日志输出...' : '请先启动代理服务'}
             </div>
           ) : (
             <div className="space-y-1">

@@ -9,7 +9,7 @@ export interface ApiResponse<T = any> {
 }
 
 export interface ConnectionStatus {
-  v2ray: {
+  proxyCore: {
     running: boolean
     pid?: number
     uptime?: number
@@ -19,6 +19,7 @@ export interface ConnectionStatus {
     enabled: boolean
     server?: string
   }
+  proxyModeType: ProxyModeType
 }
 
 export interface TrafficStats {
@@ -36,6 +37,18 @@ export interface LogEntry {
 }
 
 export type ProtocolType = 'Vless' | 'Trojan'
+
+export type ProxyModeType = 'SystemProxy' | 'Tun'
+
+export interface TunModeConfig {
+  interfaceName: string
+  ipv4Address: string
+  ipv6Address?: string
+  enableIpv6: boolean
+  dnsServers: string[]
+  mtu: number
+  enableDnsHijack: boolean
+}
 
 export interface ServerConfig {
   protocol: ProtocolType
@@ -83,6 +96,8 @@ export interface UserConfig {
   selectedServerId?: string
   server?: ServerConfig // Legacy field for backward compatibility
   proxyMode: 'Global' | 'Smart' | 'Direct'
+  proxyModeType: ProxyModeType
+  tunConfig: TunModeConfig
   customRules: DomainRule[]
   autoStart: boolean
   autoConnect: boolean
@@ -101,6 +116,12 @@ export interface NativeEventData {
   statsUpdated: TrafficStats
   logReceived: LogEntry
   navigateToPage: string
+  proxyModeSwitched: { success: boolean; newMode: string }
+  proxyModeSwitchFailed: { success: boolean; error: string }
+  geoDataUpdateChecked: any
+  geoDataUpdateCheckFailed: { error: string }
+  geoDataUpdated: any
+  geoDataUpdateFailed: any
 }
 
 export type NativeEventListener<K extends keyof NativeEventData> = (

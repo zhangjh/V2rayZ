@@ -38,18 +38,12 @@ export function ServerPage() {
   }
 
   const handleSelectServer = async (serverId: string) => {
+    if (!config) return
+    
     try {
       const updatedConfig = {
         ...config,
         selectedServerId: serverId,
-        servers: config?.servers || [],
-        proxyMode: config?.proxyMode || 'Smart',
-        customRules: config?.customRules || [],
-        autoStart: config?.autoStart || false,
-        autoConnect: config?.autoConnect || false,
-        minimizeToTray: config?.minimizeToTray || true,
-        socksPort: config?.socksPort || 65534,
-        httpPort: config?.httpPort || 65533,
       }
 
       await saveConfig(updatedConfig)
@@ -84,17 +78,13 @@ export function ServerPage() {
         updatedServers = [...servers, newServer]
       }
 
+      if (!config) {
+        throw new Error('配置未加载')
+      }
+
       const updatedConfig = {
         ...config,
         servers: updatedServers,
-        selectedServerId: config?.selectedServerId,
-        proxyMode: config?.proxyMode || 'Smart',
-        customRules: config?.customRules || [],
-        autoStart: config?.autoStart || false,
-        autoConnect: config?.autoConnect || false,
-        minimizeToTray: config?.minimizeToTray || true,
-        socksPort: config?.socksPort || 65534,
-        httpPort: config?.httpPort || 65533,
       }
 
       await saveConfig(updatedConfig)

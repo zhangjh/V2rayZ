@@ -23,7 +23,6 @@ public class NativeApi
     private readonly ILogManager _logManager;
     private readonly IStartupManager _startupManager;
     private readonly IProtocolParser _protocolParser;
-    private readonly IGeoDataUpdateService _geoDataUpdateService;
     private readonly Action<string, string> _sendEvent;
     
     // JSON serialization options for consistent camelCase naming
@@ -45,7 +44,6 @@ public class NativeApi
         ILogManager logManager,
         IStartupManager startupManager,
         IProtocolParser protocolParser,
-        IGeoDataUpdateService geoDataUpdateService,
         Action<string, string> sendEvent)
     {
         _v2rayManager = v2rayManager;
@@ -56,7 +54,6 @@ public class NativeApi
         _logManager = logManager;
         _startupManager = startupManager;
         _protocolParser = protocolParser;
-        _geoDataUpdateService = geoDataUpdateService;
         _sendEvent = sendEvent;
 
         // Subscribe to events
@@ -90,41 +87,51 @@ public class NativeApi
             
             // Step 2: Add log entry
             System.Diagnostics.Debug.WriteLine("[NativeApi] Step 3: Adding log entry...");
-            _logManager.AddLog(Models.LogLevel.Info, "正在启动代理连接...", "system");
+            var modeText = config.ProxyModeType == Models.ProxyModeType.Tun ? "TUN模式" : "系统代理模式";
+            _logManager.AddLog(Models.LogLevel.Info, $"正在启动代理连接 ({modeText})...", "system");
             System.Diagnostics.Debug.WriteLine("[NativeApi] Step 3 COMPLETE: Log entry added");
             
-            // Step 3: Generate V2ray configuration
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 4: Generating V2ray configuration...");
-            var v2rayConfig = _v2rayManager.GenerateConfig(config);
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 4 COMPLETE: V2ray configuration generated");
+            // Step 3: Generate sing-box configuration based on proxy mode type
+            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 4: Generating sing-box configuration...");
+            System.Diagnostics.Debug.WriteLine($"[NativeApi] Proxy mode type: {config.ProxyModeType}");
             
-            // Step 4: Start V2ray process (non-blocking)
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 5: Starting V2ray process...");
+            var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
+            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 4 COMPLETE: sing-box configuration generated");
             
-            // Start V2ray asynchronously without blocking
+            // Step 4: Start sing-box process (non-blocking)
+            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 5: Starting sing-box process...");
+            
+            // Start sing-box asynchronously without blocking
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _v2rayManager.StartAsync(v2rayConfig);
-                    System.Diagnostics.Debug.WriteLine("[NativeApi] V2ray startup completed successfully");
+                    await _v2rayManager.StartAsync(singBoxConfig, config);
+                    System.Diagnostics.Debug.WriteLine("[NativeApi] sing-box startup completed successfully");
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[NativeApi] V2ray startup failed: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[NativeApi] sing-box startup failed: {ex.Message}");
                 }
             });
             
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 5 COMPLETE: V2ray startup initiated (non-blocking)");
+            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 5 COMPLETE: sing-box startup initiated (non-blocking)");
             
-            // Step 5: Enable system proxy
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 6: Enabling system proxy...");
-            _proxyManager.EnableProxy("127.0.0.1", config.HttpPort);
-            System.Diagnostics.Debug.WriteLine("[NativeApi] Step 6 COMPLETE: System proxy enabled");
+            // Step 5: Enable system proxy only for system proxy mode
+            if (config.ProxyModeType == Models.ProxyModeType.SystemProxy)
+            {
+                System.Diagnostics.Debug.WriteLine("[NativeApi] Step 6: Enabling system proxy...");
+                _proxyManager.EnableProxy("127.0.0.1", config.HttpPort);
+                System.Diagnostics.Debug.WriteLine("[NativeApi] Step 6 COMPLETE: System proxy enabled");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("[NativeApi] Step 6: Skipping system proxy (TUN mode uses transparent proxy)");
+            }
             
             // Step 6: Add success log
             System.Diagnostics.Debug.WriteLine("[NativeApi] Step 7: Adding success log...");
-            _logManager.AddLog(Models.LogLevel.Info, "代理启动流程完成，连接状态将通过事件更新", "system");
+            _logManager.AddLog(Models.LogLevel.Info, $"{modeText}启动流程完成，连接状态将通过事件更新", "system");
             System.Diagnostics.Debug.WriteLine("[NativeApi] Step 7 COMPLETE: Success log added");
             
             System.Diagnostics.Debug.WriteLine("[NativeApi] ========== StartProxy SUCCESS ==========");
@@ -187,7 +194,11 @@ public class NativeApi
     {
         try
         {
-            _logManager.AddLog(Models.LogLevel.Info, "正在停止代理连接...", "system");
+            // Load configuration to determine proxy mode type
+            var config = _configManager.LoadConfig();
+            var modeText = config.ProxyModeType == Models.ProxyModeType.Tun ? "TUN模式" : "系统代理模式";
+            
+            _logManager.AddLog(Models.LogLevel.Info, $"正在停止代理连接 ({modeText})...", "system");
             
             // Stop statistics monitoring if it was started
             try
@@ -199,23 +210,32 @@ public class NativeApi
                 System.Diagnostics.Debug.WriteLine($"[StopProxy] Statistics monitoring stop failed (non-critical): {ex.Message}");
             }
             
-            // Disable system proxy immediately
-            _proxyManager.DisableProxy();
-            _logManager.AddLog(Models.LogLevel.Info, "系统代理已禁用", "system");
+            // Disable system proxy only for system proxy mode
+            if (config.ProxyModeType == Models.ProxyModeType.SystemProxy)
+            {
+                _proxyManager.DisableProxy();
+                _logManager.AddLog(Models.LogLevel.Info, "系统代理已禁用", "system");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("[StopProxy] Skipping system proxy cleanup (TUN mode)");
+                _logManager.AddLog(Models.LogLevel.Info, "TUN接口将在sing-box停止时自动清理", "system");
+            }
             
-            // Stop V2ray asynchronously without blocking
+            // Stop sing-box asynchronously without blocking
+            // TUN interface will be automatically cleaned up when sing-box stops
             _ = Task.Run(async () =>
             {
                 try
                 {
                     await _v2rayManager.StopAsync();
-                    _logManager.AddLog(Models.LogLevel.Info, "V2ray进程已停止", "system");
-                    System.Diagnostics.Debug.WriteLine("[StopProxy] V2ray process stopped successfully");
+                    _logManager.AddLog(Models.LogLevel.Info, "sing-box进程已停止", "system");
+                    System.Diagnostics.Debug.WriteLine("[StopProxy] sing-box process stopped successfully");
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[StopProxy] V2ray stop failed: {ex.Message}");
-                    _logManager.AddLog(Models.LogLevel.Warning, $"V2ray停止时出现问题: {ex.Message}", "system");
+                    System.Diagnostics.Debug.WriteLine($"[StopProxy] sing-box stop failed: {ex.Message}");
+                    _logManager.AddLog(Models.LogLevel.Warning, $"sing-box停止时出现问题: {ex.Message}", "system");
                 }
             });
             
@@ -352,6 +372,27 @@ public class NativeApi
             // Get old configuration to check for changes
             var oldConfig = _configManager.LoadConfig();
             
+            // Check if server configuration changed
+            bool serverConfigChanged = false;
+            if (config.SelectedServerId == oldConfig.SelectedServerId)
+            {
+                var oldServer = oldConfig.GetSelectedServer();
+                var newServer = config.GetSelectedServer();
+                
+                if (oldServer != null && newServer != null)
+                {
+                    // Check if any server properties changed
+                    serverConfigChanged = 
+                        oldServer.Address != newServer.Address ||
+                        oldServer.Port != newServer.Port ||
+                        oldServer.Protocol != newServer.Protocol ||
+                        oldServer.Uuid != newServer.Uuid ||
+                        oldServer.Password != newServer.Password ||
+                        oldServer.Security != newServer.Security ||
+                        oldServer.Network != newServer.Network;
+                }
+            }
+            
             // Validate and save configuration
             _configManager.SaveConfig(config);
             
@@ -369,6 +410,26 @@ public class NativeApi
                 {
                     _logManager.AddLog(Models.LogLevel.Warning, 
                         "设置开机启动失败，可能需要管理员权限", "config");
+                }
+            }
+            
+            // Restart proxy if running and server config changed
+            if (serverConfigChanged)
+            {
+                var status = _v2rayManager.GetStatus();
+                if (status.Running)
+                {
+                    System.Diagnostics.Debug.WriteLine("[NativeApi] Server config changed, restarting proxy...");
+                    _logManager.AddLog(Models.LogLevel.Info, "服务器配置已更改，正在重启代理...", "config");
+                    
+                    // Stop current connection
+                    _v2rayManager.StopAsync().Wait(TimeSpan.FromSeconds(5));
+                    
+                    // Start with new server configuration
+                    var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
+                    _v2rayManager.StartAsync(singBoxConfig, config).Wait(TimeSpan.FromSeconds(10));
+                    
+                    _logManager.AddLog(Models.LogLevel.Info, "代理已使用新配置重启", "config");
                 }
             }
             
@@ -411,21 +472,21 @@ public class NativeApi
             var status = _v2rayManager.GetStatus();
             if (status.Running)
             {
-                var v2rayConfig = _v2rayManager.GenerateConfig(config);
+                var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
                 
                 // Use Task.Run to avoid blocking the UI thread
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await _v2rayManager.RestartAsync(v2rayConfig);
+                        await _v2rayManager.RestartAsync(singBoxConfig);
                         _logManager.AddLog(Models.LogLevel.Info, $"代理已使用新模式 {mode} 重启", "config");
-                        System.Diagnostics.Debug.WriteLine("[UpdateProxyMode] V2ray restarted successfully with new mode");
+                        System.Diagnostics.Debug.WriteLine("[UpdateProxyMode] sing-box restarted successfully with new mode");
                     }
                     catch (Exception ex)
                     {
                         _logManager.AddLog(Models.LogLevel.Error, $"重启代理失败: {ex.Message}", "config");
-                        System.Diagnostics.Debug.WriteLine($"[UpdateProxyMode] V2ray restart failed: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[UpdateProxyMode] sing-box restart failed: {ex.Message}");
                     }
                 });
             }
@@ -467,9 +528,9 @@ public class NativeApi
                 // Stop current connection
                 _v2rayManager.StopAsync().Wait(TimeSpan.FromSeconds(5));
                 
-                // Start with new server configuration
-                var v2rayConfig = _v2rayManager.GenerateConfig(config);
-                _v2rayManager.StartAsync(v2rayConfig).Wait(TimeSpan.FromSeconds(10));
+                // Start with new server configuration using sing-box
+                var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
+                _v2rayManager.StartAsync(singBoxConfig, config).Wait(TimeSpan.FromSeconds(10));
             }
 
             return JsonSerializer.Serialize(new { success = true }, JsonOptions);
@@ -617,10 +678,11 @@ public class NativeApi
         {
             var v2rayStatus = _v2rayManager.GetStatus();
             var proxyStatus = _proxyManager.GetProxyStatus();
+            var config = _configManager.LoadConfig();
 
             var status = new
             {
-                v2ray = new
+                proxyCore = new
                 {
                     running = v2rayStatus.Running,
                     pid = v2rayStatus.Pid,
@@ -631,14 +693,15 @@ public class NativeApi
                 {
                     enabled = proxyStatus.Enabled,
                     server = proxyStatus.Server
-                }
+                },
+                proxyModeType = config.ProxyModeType.ToString()
             };
 
             // Debug logging
-            System.Diagnostics.Debug.WriteLine($"[GetConnectionStatus] V2ray running: {v2rayStatus.Running}, Proxy enabled: {proxyStatus.Enabled}");
+            System.Diagnostics.Debug.WriteLine($"[GetConnectionStatus] ProxyCore running: {v2rayStatus.Running}, Proxy enabled: {proxyStatus.Enabled}, Mode: {config.ProxyModeType}");
             if (!string.IsNullOrEmpty(v2rayStatus.Error))
             {
-                System.Diagnostics.Debug.WriteLine($"[GetConnectionStatus] V2ray error: {v2rayStatus.Error}");
+                System.Diagnostics.Debug.WriteLine($"[GetConnectionStatus] ProxyCore error: {v2rayStatus.Error}");
             }
 
             return JsonSerializer.Serialize(new { success = true, data = status }, JsonOptions);
@@ -704,22 +767,32 @@ public class NativeApi
             config.CustomRules.Add(rule);
             _configManager.SaveConfig(config);
 
+            _logManager.AddLog(Models.LogLevel.Info, $"已添加路由规则: {string.Join(", ", rule.Domains)}", "routing");
+
+            // Notify routing manager about the change
+            _routingManager.NotifyRulesChanged(RuleChangeType.Added);
+
             // Restart proxy if running (non-blocking)
             var status = _v2rayManager.GetStatus();
             if (status.Running)
             {
-                var v2rayConfig = _v2rayManager.GenerateConfig(config);
+                _logManager.AddLog(Models.LogLevel.Info, "正在应用新规则...", "routing");
+                
+                var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
+                
                 // Use Task.Run to avoid blocking the UI thread
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await _v2rayManager.RestartAsync(v2rayConfig);
-                        System.Diagnostics.Debug.WriteLine("[AddCustomRule] V2ray restarted successfully");
+                        await _v2rayManager.RestartAsync(singBoxConfig);
+                        System.Diagnostics.Debug.WriteLine("[AddCustomRule] sing-box restarted successfully");
+                        _logManager.AddLog(Models.LogLevel.Info, "新规则已应用", "routing");
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AddCustomRule] V2ray restart failed: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[AddCustomRule] sing-box restart failed: {ex.Message}");
+                        _logManager.AddLog(Models.LogLevel.Error, $"应用新规则失败: {ex.Message}", "routing");
                     }
                 });
             }
@@ -757,22 +830,32 @@ public class NativeApi
             existingRule.Enabled = rule.Enabled;
             _configManager.SaveConfig(config);
 
+            _logManager.AddLog(Models.LogLevel.Info, $"已更新路由规则: {string.Join(", ", rule.Domains)}", "routing");
+
+            // Notify routing manager about the change
+            _routingManager.NotifyRulesChanged(RuleChangeType.Updated);
+
             // Restart proxy if running (non-blocking)
             var status = _v2rayManager.GetStatus();
             if (status.Running)
             {
-                var v2rayConfig = _v2rayManager.GenerateConfig(config);
+                _logManager.AddLog(Models.LogLevel.Info, "正在应用新规则...", "routing");
+                
+                var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
+                
                 // Use Task.Run to avoid blocking the UI thread
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await _v2rayManager.RestartAsync(v2rayConfig);
-                        System.Diagnostics.Debug.WriteLine("[UpdateCustomRule] V2ray restarted successfully");
+                        await _v2rayManager.RestartAsync(singBoxConfig);
+                        System.Diagnostics.Debug.WriteLine("[UpdateCustomRule] sing-box restarted successfully");
+                        _logManager.AddLog(Models.LogLevel.Info, "新规则已应用", "routing");
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[UpdateCustomRule] V2ray restart failed: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[UpdateCustomRule] sing-box restart failed: {ex.Message}");
+                        _logManager.AddLog(Models.LogLevel.Error, $"应用新规则失败: {ex.Message}", "routing");
                     }
                 });
             }
@@ -799,25 +882,36 @@ public class NativeApi
                 return JsonSerializer.Serialize(new { success = false, error = "Rule not found" }, JsonOptions);
             }
 
+            var domains = string.Join(", ", rule.Domains);
             config.CustomRules.Remove(rule);
             _configManager.SaveConfig(config);
+
+            _logManager.AddLog(Models.LogLevel.Info, $"已删除路由规则: {domains}", "routing");
+
+            // Notify routing manager about the change
+            _routingManager.NotifyRulesChanged(RuleChangeType.Deleted);
 
             // Restart proxy if running (non-blocking)
             var status = _v2rayManager.GetStatus();
             if (status.Running)
             {
-                var v2rayConfig = _v2rayManager.GenerateConfig(config);
+                _logManager.AddLog(Models.LogLevel.Info, "正在应用新规则...", "routing");
+                
+                var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
+                
                 // Use Task.Run to avoid blocking the UI thread
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await _v2rayManager.RestartAsync(v2rayConfig);
-                        System.Diagnostics.Debug.WriteLine("[DeleteCustomRule] V2ray restarted successfully");
+                        await _v2rayManager.RestartAsync(singBoxConfig);
+                        System.Diagnostics.Debug.WriteLine("[DeleteCustomRule] sing-box restarted successfully");
+                        _logManager.AddLog(Models.LogLevel.Info, "新规则已应用", "routing");
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[DeleteCustomRule] V2ray restart failed: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[DeleteCustomRule] sing-box restart failed: {ex.Message}");
+                        _logManager.AddLog(Models.LogLevel.Error, $"应用新规则失败: {ex.Message}", "routing");
                     }
                 });
             }
@@ -857,22 +951,32 @@ public class NativeApi
             // Save config once
             _configManager.SaveConfig(config);
 
+            _logManager.AddLog(Models.LogLevel.Info, $"已批量添加 {rules.Length} 条路由规则", "routing");
+
+            // Notify routing manager about the change
+            _routingManager.NotifyRulesChanged(RuleChangeType.BatchAdded);
+
             // Restart proxy only once if running (non-blocking)
             var status = _v2rayManager.GetStatus();
             if (status.Running)
             {
-                var v2rayConfig = _v2rayManager.GenerateConfig(config);
+                _logManager.AddLog(Models.LogLevel.Info, "正在应用新规则...", "routing");
+                
+                var singBoxConfig = _v2rayManager.GenerateSingBoxConfig(config, config.ProxyModeType);
+                
                 // Use Task.Run to avoid blocking the UI thread
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await _v2rayManager.RestartAsync(v2rayConfig);
-                        System.Diagnostics.Debug.WriteLine("[AddCustomRulesBatch] V2ray restarted successfully");
+                        await _v2rayManager.RestartAsync(singBoxConfig);
+                        System.Diagnostics.Debug.WriteLine("[AddCustomRulesBatch] sing-box restarted successfully");
+                        _logManager.AddLog(Models.LogLevel.Info, "新规则已应用", "routing");
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AddCustomRulesBatch] V2ray restart failed: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[AddCustomRulesBatch] sing-box restart failed: {ex.Message}");
+                        _logManager.AddLog(Models.LogLevel.Error, $"应用新规则失败: {ex.Message}", "routing");
                     }
                 });
             }
@@ -900,7 +1004,7 @@ public class NativeApi
             {
                 appVersion = VersionInfo.Version,
                 appName = VersionInfo.ApplicationName,
-                v2rayVersion = App.ResourceManager?.GetV2rayVersion() ?? "Unknown",
+                singBoxVersion = App.ResourceManager?.GetSingBoxVersion() ?? "Unknown",
                 copyright = VersionInfo.Copyright,
                 repositoryUrl = VersionInfo.RepositoryUrl
             };
@@ -973,17 +1077,19 @@ public class NativeApi
 
     #endregion
 
-    #region GeoData Management
+
+
+    #region TUN Mode Configuration
 
     /// <summary>
-    /// Get GeoData file information
+    /// Get current proxy mode type (SystemProxy or Tun)
     /// </summary>
-    public string GetGeoDataInfo()
+    public string GetProxyModeType()
     {
         try
         {
-            var info = _geoDataUpdateService.GetGeoDataInfo();
-            return JsonSerializer.Serialize(new { success = true, data = info }, JsonOptions);
+            var config = _configManager.LoadConfig();
+            return JsonSerializer.Serialize(new { success = true, data = config.ProxyModeType.ToString() }, JsonOptions);
         }
         catch (Exception ex)
         {
@@ -992,43 +1098,25 @@ public class NativeApi
     }
 
     /// <summary>
-    /// Check for GeoData updates
+    /// Set proxy mode type (SystemProxy or Tun)
     /// </summary>
-    public string CheckGeoDataUpdates()
+    public string SetProxyModeType(string modeType)
     {
         try
         {
-            _logManager.AddLog(Models.LogLevel.Info, "正在检查 GeoData 更新...", "system");
-            
-            // Run check asynchronously to avoid blocking
-            _ = Task.Run(async () =>
+            if (!Enum.TryParse<ProxyModeType>(modeType, true, out var parsedMode))
             {
-                try
-                {
-                    var updateInfo = await _geoDataUpdateService.CheckForUpdatesAsync();
-                    
-                    // Send result to frontend via event
-                    var data = JsonSerializer.Serialize(updateInfo, JsonOptions);
-                    _sendEvent("geoDataUpdateChecked", data);
-                    
-                    var hasUpdates = updateInfo.GeoIpNeedsUpdate || updateInfo.GeoSiteNeedsUpdate;
-                    if (hasUpdates)
-                    {
-                        _logManager.AddLog(Models.LogLevel.Info, "发现 GeoData 更新", "system");
-                    }
-                    else
-                    {
-                        _logManager.AddLog(Models.LogLevel.Info, "GeoData 文件已是最新", "system");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logManager.AddLog(Models.LogLevel.Error, $"检查 GeoData 更新失败: {ex.Message}", "system");
-                    _sendEvent("geoDataUpdateCheckFailed", JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions));
-                }
-            });
+                return JsonSerializer.Serialize(new { success = false, error = $"Invalid proxy mode type: {modeType}" }, JsonOptions);
+            }
+
+            var config = _configManager.LoadConfig();
+            var oldMode = config.ProxyModeType;
+            config.ProxyModeType = parsedMode;
+            _configManager.SaveConfig(config);
             
-            return JsonSerializer.Serialize(new { success = true, message = "GeoData update check initiated" }, JsonOptions);
+            _logManager.AddLog(Models.LogLevel.Info, $"代理模式类型已从 {oldMode} 切换到 {parsedMode}", "config");
+
+            return JsonSerializer.Serialize(new { success = true }, JsonOptions);
         }
         catch (Exception ex)
         {
@@ -1037,44 +1125,179 @@ public class NativeApi
     }
 
     /// <summary>
-    /// Update GeoData files
+    /// Get TUN mode configuration
     /// </summary>
-    public string UpdateGeoData(bool updateGeoIp, bool updateGeoSite)
+    public string GetTunConfig()
     {
         try
         {
-            _logManager.AddLog(Models.LogLevel.Info, "开始更新 GeoData 文件...", "system");
+            var config = _configManager.LoadConfig();
+            return JsonSerializer.Serialize(new { success = true, data = config.TunConfig }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Set TUN mode configuration
+    /// </summary>
+    public string SetTunConfig(string tunConfigJson)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(tunConfigJson))
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "TUN configuration JSON is empty" }, JsonOptions);
+            }
+
+            var tunConfig = JsonSerializer.Deserialize<TunModeConfig>(tunConfigJson, JsonOptions);
+            if (tunConfig == null)
+            {
+                return JsonSerializer.Serialize(new { success = false, error = "Failed to deserialize TUN configuration" }, JsonOptions);
+            }
+
+            // Validate DNS addresses
+            foreach (var dns in tunConfig.DnsServers)
+            {
+                var (isValid, errorMessage) = DnsValidator.ValidateDnsAddress(dns);
+                if (!isValid)
+                {
+                    return JsonSerializer.Serialize(new { success = false, error = $"Invalid DNS address '{dns}': {errorMessage}" }, JsonOptions);
+                }
+            }
+
+            var config = _configManager.LoadConfig();
+            config.TunConfig = tunConfig;
+            _configManager.SaveConfig(config);
             
-            // Run update asynchronously
+            _logManager.AddLog(Models.LogLevel.Info, "TUN模式配置已更新", "config");
+
+            return JsonSerializer.Serialize(new { success = true }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Validate if TUN mode is available on the system
+    /// </summary>
+    public string ValidateTunMode()
+    {
+        try
+        {
+            // Run validation asynchronously
+            var validationTask = _v2rayManager.ValidateTunModeAsync();
+            validationTask.Wait(TimeSpan.FromSeconds(5));
+            
+            var (isAvailable, errorMessage) = validationTask.Result;
+            
+            if (isAvailable)
+            {
+                return JsonSerializer.Serialize(new { success = true, data = new { isAvailable = true } }, JsonOptions);
+            }
+            else
+            {
+                return JsonSerializer.Serialize(new { success = true, data = new { isAvailable = false, errorMessage } }, JsonOptions);
+            }
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Switch proxy mode (between SystemProxy and Tun)
+    /// </summary>
+    public string SwitchProxyMode(string targetModeType)
+    {
+        try
+        {
+            if (!Enum.TryParse<ProxyModeType>(targetModeType, true, out var parsedMode))
+            {
+                return JsonSerializer.Serialize(new { success = false, error = $"Invalid proxy mode type: {targetModeType}" }, JsonOptions);
+            }
+
+            var config = _configManager.LoadConfig();
+            var currentMode = config.ProxyModeType;
+            
+            // If already in target mode, no need to switch
+            if (currentMode == parsedMode)
+            {
+                return JsonSerializer.Serialize(new { success = true, message = "Already in target mode" }, JsonOptions);
+            }
+
+            _logManager.AddLog(Models.LogLevel.Info, $"正在从 {currentMode} 切换到 {parsedMode}...", "system");
+
+            // Run mode switch asynchronously
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    var success = await _geoDataUpdateService.UpdateGeoDataAsync(updateGeoIp, updateGeoSite);
+                    var success = await _v2rayManager.SwitchProxyModeAsync(
+                        parsedMode, 
+                        config, 
+                        _configManager, 
+                        _proxyManager
+                    );
                     
                     if (success)
                     {
-                        _logManager.AddLog(Models.LogLevel.Info, "GeoData 文件更新成功", "system");
+                        _logManager.AddLog(Models.LogLevel.Info, $"代理模式已成功切换到 {parsedMode}", "system");
                         
-                        // Send event to frontend
-                        var info = _geoDataUpdateService.GetGeoDataInfo();
-                        var data = JsonSerializer.Serialize(info, JsonOptions);
-                        _sendEvent("geoDataUpdated", data);
+                        // Send success event to frontend
+                        var data = JsonSerializer.Serialize(new { 
+                            success = true, 
+                            newMode = parsedMode.ToString() 
+                        }, JsonOptions);
+                        _sendEvent("proxyModeSwitched", data);
                     }
                     else
                     {
-                        _logManager.AddLog(Models.LogLevel.Warning, "GeoData 文件更新失败", "system");
-                        _sendEvent("geoDataUpdateFailed", "{}");
+                        _logManager.AddLog(Models.LogLevel.Error, "代理模式切换失败", "system");
+                        
+                        // Send failure event to frontend
+                        var data = JsonSerializer.Serialize(new { 
+                            success = false, 
+                            error = "Mode switch failed" 
+                        }, JsonOptions);
+                        _sendEvent("proxyModeSwitchFailed", data);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logManager.AddLog(Models.LogLevel.Error, $"GeoData 更新错误: {ex.Message}", "system");
-                    _sendEvent("geoDataUpdateFailed", JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions));
+                    _logManager.AddLog(Models.LogLevel.Error, $"代理模式切换错误: {ex.Message}", "system");
+                    
+                    // Send error event to frontend
+                    var data = JsonSerializer.Serialize(new { 
+                        success = false, 
+                        error = ex.Message 
+                    }, JsonOptions);
+                    _sendEvent("proxyModeSwitchFailed", data);
                 }
             });
-            
-            return JsonSerializer.Serialize(new { success = true, message = "GeoData update initiated" }, JsonOptions);
+
+            return JsonSerializer.Serialize(new { success = true, message = "Mode switch initiated" }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
+    /// <summary>
+    /// Check if current process has administrator permissions
+    /// </summary>
+    public string IsAdministrator()
+    {
+        try
+        {
+            var isAdmin = PermissionHelper.IsAdministrator();
+            return JsonSerializer.Serialize(new { success = true, data = new { isAdministrator = isAdmin } }, JsonOptions);
         }
         catch (Exception ex)
         {

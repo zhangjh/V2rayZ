@@ -3,7 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using V2rayClient.Models;
-using V2rayClient.Models.V2ray;
+using V2rayClient.Models.SingBox;
 
 namespace V2rayClient.Services;
 
@@ -18,6 +18,9 @@ public class V2rayManager : IV2rayManager
     private bool _disposed;
     private string? _lastError;
     private ILogManager? _logManager;
+    private string? _lastLogMessage;
+    private int _repeatedLogCount = 0;
+    private readonly object _logLock = new();
 
     public event EventHandler<V2rayEventArgs>? ProcessStarted;
     public event EventHandler<V2rayEventArgs>? ProcessStopped;
@@ -30,172 +33,24 @@ public class V2rayManager : IV2rayManager
     }
 
     /// <inheritdoc/>
-    public async Task StartAsync(V2rayConfig config)
+    public async Task StartAsync(SingBoxConfig config, UserConfig? userConfig = null)
     {
         Debug.WriteLine("[V2rayManager] ========== StartAsync CALLED ==========");
-        _logManager?.AddLog(LogLevel.Info, "V2rayManager.StartAsync 被调用", "v2ray");
+        _logManager?.AddLog(LogLevel.Info, "V2rayManager.StartAsync 被调用", "sing-box");
         
-        lock (_processLock)
+        // UserConfig is required for unified sing-box approach
+        if (userConfig == null)
         {
-            if (_v2rayProcess != null && !_v2rayProcess.HasExited)
-            {
-                Debug.WriteLine("V2ray process is already running");
-                _logManager?.AddLog(LogLevel.Warning, "V2ray进程已在运行", "v2ray");
-                return;
-            }
-            
-            // Clear previous error
-            _lastError = null;
+            throw new InvalidOperationException("UserConfig is required");
         }
         
-        // Additional check: see if any V2ray process is already listening on our ports
-        try
-        {
-            var socksPort = config.Inbounds?.FirstOrDefault(i => i.Protocol == "socks")?.Port ?? 65534;
-            var httpPort = config.Inbounds?.FirstOrDefault(i => i.Protocol == "http")?.Port ?? 65535;
-            
-            // Quick port check to see if V2ray might already be running
-            using (var tcpClient = new System.Net.Sockets.TcpClient())
-            {
-                var connectTask = tcpClient.ConnectAsync("127.0.0.1", socksPort);
-                if (connectTask.Wait(1000) && tcpClient.Connected)
-                {
-                    Debug.WriteLine("[V2rayManager] V2ray appears to be already running (port check)");
-                    _logManager?.AddLog(LogLevel.Info, "检测到V2ray可能已在运行", "v2ray");
-                    return;
-                }
-            }
-        }
-        catch
-        {
-            // Port check failed, continue with normal startup
-        }
-
-        try
-        {
-            // Write configuration to temp file
-            var configPath = await WriteConfigFileAsync(config);
-            Debug.WriteLine($"[V2rayManager] Configuration written to: {configPath}");
-
-            // Start v2ray process
-            var v2rayPath = GetV2rayExecutablePath();
-            
-            Debug.WriteLine($"[V2rayManager] Starting v2ray process:");
-            Debug.WriteLine($"[V2rayManager] Executable: {v2rayPath}");
-            Debug.WriteLine($"[V2rayManager] Config: {configPath}");
-            Debug.WriteLine($"[V2rayManager] Working Directory: {Path.GetDirectoryName(v2rayPath)}");
-
-            var processStartInfo = new ProcessStartInfo
-            {
-                FileName = v2rayPath,
-                Arguments = $"run -c \"{configPath}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                WorkingDirectory = Path.GetDirectoryName(v2rayPath) ?? AppDomain.CurrentDomain.BaseDirectory
-            };
-            
-            Debug.WriteLine($"[V2rayManager] Full command: {processStartInfo.FileName} {processStartInfo.Arguments}");
-
-            // Set environment variables for GeoData files if using ResourceManager
-            if (App.ResourceManager != null)
-            {
-                processStartInfo.Environment["V2RAY_LOCATION_ASSET"] = Path.GetDirectoryName(App.ResourceManager.GeoIpPath) ?? "";
-            }
-
-            _v2rayProcess = new Process
-            {
-                StartInfo = processStartInfo,
-                EnableRaisingEvents = true
-            };
-
-            // Subscribe to process events
-            _v2rayProcess.OutputDataReceived += OnOutputDataReceived;
-            _v2rayProcess.ErrorDataReceived += OnErrorDataReceived;
-            _v2rayProcess.Exited += OnProcessExited;
-
-            // Start the process
-            Debug.WriteLine("[V2rayManager] Attempting to start process...");
-            
-            if (!_v2rayProcess.Start())
-            {
-                var errorMessage = "Failed to start v2ray process - Process.Start() returned false";
-                Debug.WriteLine($"[V2rayManager] {errorMessage}");
-                throw new InvalidOperationException(errorMessage);
-            }
-
-            _startTime = DateTime.Now;
-
-            // Begin async reading of output
-            _v2rayProcess.BeginOutputReadLine();
-            _v2rayProcess.BeginErrorReadLine();
-
-            Debug.WriteLine($"[V2rayManager] V2ray process started with PID: {_v2rayProcess.Id}");
-            _logManager?.AddLog(LogLevel.Info, $"V2ray进程已启动 (PID: {_v2rayProcess.Id})", "v2ray");
-
-            // Raise event
-            ProcessStarted?.Invoke(this, new V2rayEventArgs
-            {
-                ProcessId = _v2rayProcess.Id,
-                Timestamp = DateTime.Now
-            });
-
-            // Wait a bit to ensure process started successfully
-            Debug.WriteLine("[V2rayManager] Waiting for process to stabilize...");
-            await Task.Delay(1000);
-
-            if (_v2rayProcess.HasExited)
-            {
-                var exitCode = _v2rayProcess.ExitCode;
-                var errorMessage = $"V2ray 进程启动失败 (退出码: {exitCode})";
-                _lastError = errorMessage;
-                
-                Debug.WriteLine($"[V2rayManager] Process exited immediately: {errorMessage}");
-                
-                ProcessError?.Invoke(this, new V2rayErrorEventArgs
-                {
-                    ProcessId = _v2rayProcess.Id,
-                    ErrorMessage = errorMessage,
-                    Timestamp = DateTime.Now
-                });
-                
-                throw new InvalidOperationException(errorMessage);
-            }
-            
-            Debug.WriteLine("[V2rayManager] V2ray process started successfully and is running");
-            _logManager?.AddLog(LogLevel.Info, "V2ray进程启动成功，代理服务已就绪", "v2ray");
-        }
-        catch (NotSupportedException ex)
-        {
-            // Handle unsupported protocol error
-            var errorMessage = $"不支持的协议类型: {ex.Message}";
-            Debug.WriteLine($"[Protocol Error] {errorMessage}");
-            
-            _lastError = errorMessage;
-            
-            ProcessError?.Invoke(this, new V2rayErrorEventArgs
-            {
-                ErrorMessage = errorMessage,
-                Exception = ex
-            });
-
-            throw new InvalidOperationException(errorMessage, ex);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Failed to start v2ray process: {ex.Message}");
-            
-            _lastError = ex.Message;
-            
-            ProcessError?.Invoke(this, new V2rayErrorEventArgs
-            {
-                ErrorMessage = ex.Message,
-                Exception = ex
-            });
-
-            throw;
-        }
+        // Determine mode from UserConfig.ProxyModeType
+        var modeType = userConfig.ProxyModeType == ProxyModeType.Tun ? "TUN模式" : "系统代理模式";
+        Debug.WriteLine($"[V2rayManager] Starting in {modeType}");
+        _logManager?.AddLog(LogLevel.Info, $"正在以{modeType}启动", "sing-box");
+        
+        // Always use sing-box for both TUN and System Proxy modes
+        await StartSingBoxAsync(userConfig);
     }
 
     /// <inheritdoc/>
@@ -212,7 +67,7 @@ public class V2rayManager : IV2rayManager
 
         if (processToStop == null)
         {
-            Debug.WriteLine("No v2ray process to stop");
+            Debug.WriteLine("[sing-box] No process to stop");
             return;
         }
 
@@ -220,12 +75,13 @@ public class V2rayManager : IV2rayManager
         {
             if (!processToStop.HasExited)
             {
-                Debug.WriteLine($"Stopping v2ray process (PID: {processToStop.Id})");
+                Debug.WriteLine($"[sing-box] Stopping process (PID: {processToStop.Id})");
+                _logManager?.AddLog(LogLevel.Info, $"正在停止 sing-box 进程 (PID: {processToStop.Id})", "sing-box");
 
-                // Unsubscribe from events before killing
-                processToStop.OutputDataReceived -= OnOutputDataReceived;
-                processToStop.ErrorDataReceived -= OnErrorDataReceived;
-                processToStop.Exited -= OnProcessExited;
+                // Unsubscribe from sing-box events before killing
+                processToStop.OutputDataReceived -= OnSingBoxOutputDataReceived;
+                processToStop.ErrorDataReceived -= OnSingBoxErrorDataReceived;
+                processToStop.Exited -= OnSingBoxProcessExited;
 
                 // Try graceful shutdown first
                 processToStop.Kill(entireProcessTree: true);
@@ -235,12 +91,13 @@ public class V2rayManager : IV2rayManager
 
                 if (!processToStop.HasExited)
                 {
-                    Debug.WriteLine("V2ray process did not exit gracefully, forcing termination");
+                    Debug.WriteLine("[sing-box] Process did not exit gracefully, forcing termination");
+                    _logManager?.AddLog(LogLevel.Warning, "sing-box 进程未正常退出，强制终止", "sing-box");
                     processToStop.Kill(entireProcessTree: true);
                 }
 
-                Debug.WriteLine("V2ray process stopped");
-                _logManager?.AddLog(LogLevel.Info, "V2ray进程已停止", "v2ray");
+                Debug.WriteLine("[sing-box] Process stopped");
+                _logManager?.AddLog(LogLevel.Info, "sing-box 进程已停止", "sing-box");
 
                 ProcessStopped?.Invoke(this, new V2rayEventArgs
                 {
@@ -261,14 +118,14 @@ public class V2rayManager : IV2rayManager
     }
 
     /// <inheritdoc/>
-    public async Task RestartAsync(V2rayConfig config)
+    public async Task RestartAsync(SingBoxConfig config)
     {
-        Debug.WriteLine("Restarting v2ray process");
-        _logManager?.AddLog(LogLevel.Info, "正在重启V2ray进程...", "v2ray");
+        Debug.WriteLine("[sing-box] Restarting process");
+        _logManager?.AddLog(LogLevel.Info, "正在重启 sing-box 进程...", "sing-box");
         await StopAsync();
         await Task.Delay(1000); // Wait a bit before restarting
         await StartAsync(config);
-        _logManager?.AddLog(LogLevel.Info, "V2ray进程重启完成", "v2ray");
+        _logManager?.AddLog(LogLevel.Info, "sing-box 进程重启完成", "sing-box");
     }
 
     /// <inheritdoc/>
@@ -300,463 +157,326 @@ public class V2rayManager : IV2rayManager
     private readonly IRoutingRuleManager _routingManager;
 
     /// <inheritdoc/>
-    public V2rayConfig GenerateConfig(UserConfig userConfig)
+    public SingBoxConfig GenerateSingBoxConfig(UserConfig userConfig, ProxyModeType proxyMode)
     {
-        Debug.WriteLine("Generating v2ray configuration");
+        Debug.WriteLine($"Generating sing-box configuration for {proxyMode} mode");
+        _logManager?.AddLog(LogLevel.Info, $"正在生成 sing-box {proxyMode} 模式配置", "sing-box");
 
-        // Get the selected server configuration
-        var selectedServer = userConfig.GetSelectedServer();
-        if (selectedServer == null)
-        {
-            throw new InvalidOperationException("没有选择服务器配置。请先在服务器页面选择一个服务器。");
-        }
-
-        var config = new V2rayConfig
-        {
-            Log = new LogConfig
-            {
-                LogLevel = "warning"
-            }
-        };
-
-        // Configure inbounds (SOCKS and HTTP proxy)
-        config.Inbounds.Add(new Inbound
-        {
-            Tag = "socks-in",
-            Protocol = "socks",
-            Listen = "127.0.0.1",
-            Port = userConfig.SocksPort,
-            Settings = new InboundSettings
-            {
-                Udp = true
-            }
-        });
-
-        config.Inbounds.Add(new Inbound
-        {
-            Tag = "http-in",
-            Protocol = "http",
-            Listen = "127.0.0.1",
-            Port = userConfig.HttpPort
-        });
-
-        // Configure API inbound for statistics
-        config.Inbounds.Add(new Inbound
-        {
-            Tag = "api",
-            Protocol = "dokodemo-door",
-            Listen = "127.0.0.1",
-            Port = 10085,
-            Settings = new InboundSettings
-            {
-                Address = "127.0.0.1"
-            }
-        });
-
-        // Configure outbounds
-        // 1. Proxy outbound using selected server
-        config.Outbounds.Add(CreateProxyOutbound(selectedServer));
-
-        // 2. Direct outbound
-        config.Outbounds.Add(new Outbound
-        {
-            Tag = "direct",
-            Protocol = "freedom"
-        });
-
-        // 3. Block outbound
-        config.Outbounds.Add(new Outbound
-        {
-            Tag = "block",
-            Protocol = "blackhole"
-        });
-
-        // Configure routing with actual rules from RoutingRuleManager
-        var routingRules = _routingManager.GenerateRoutingRules(userConfig.ProxyMode, userConfig.CustomRules);
-        config.Routing = new Routing
-        {
-            DomainStrategy = "IPIfNonMatch",
-            Rules = routingRules
-        };
-
-        Debug.WriteLine($"Generated {routingRules.Count} routing rules for mode: {userConfig.ProxyMode}");
-
-        // Enable statistics
-        config.Stats = new StatsConfig();
-        
-        // Configure API for statistics
-        config.Api = new ApiConfig
-        {
-            Tag = "api",
-            Services = new List<string> { "StatsService" }
-        };
-
-        // Configure policy for statistics
-        config.Policy = new PolicyConfig
-        {
-            System = new SystemPolicy
-            {
-                StatsInboundUplink = true,
-                StatsInboundDownlink = true,
-                StatsOutboundUplink = true,
-                StatsOutboundDownlink = true
-            }
-        };
-
-        return config;
+        return proxyMode == ProxyModeType.Tun
+            ? GenerateSingBoxTunConfig(userConfig)
+            : GenerateSingBoxSystemProxyConfig(userConfig);
     }
 
-    private Outbound CreateProxyOutbound(ServerConfig server)
-    {
-        try
-        {
-            return server.Protocol switch
-            {
-                ProtocolType.Vless => CreateVlessOutbound(server),
-                ProtocolType.Trojan => CreateTrojanOutbound(server),
-                _ => throw new NotSupportedException($"协议 '{server.Protocol}' 暂不支持。当前仅支持 VLESS 和 Trojan 协议。")
-            };
-        }
-        catch (NotSupportedException ex)
-        {
-            Debug.WriteLine($"[Protocol Error] Unsupported protocol: {server.Protocol}");
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[Config Error] Failed to create {server.Protocol} outbound: {ex.Message}");
-            throw new InvalidOperationException($"创建 {server.Protocol} 协议配置失败: {ex.Message}", ex);
-        }
-    }
 
-    private Outbound CreateVlessOutbound(ServerConfig server)
-    {
-        var outbound = new Outbound
-        {
-            Tag = "proxy",
-            Protocol = "vless",
-            Settings = new OutboundSettings
-            {
-                Vnext = new List<VnextServer>
-                {
-                    new VnextServer
-                    {
-                        Address = server.Address,
-                        Port = server.Port,
-                        Users = new List<VlessUser>
-                        {
-                            new VlessUser
-                            {
-                                Id = server.Uuid!,
-                                Encryption = server.Encryption ?? "none"
-                            }
-                        }
-                    }
-                }
-            }
-        };
 
-        // Configure stream settings
-        ConfigureStreamSettings(outbound, server);
-
-        return outbound;
-    }
-
-    private Outbound CreateTrojanOutbound(ServerConfig server)
-    {
-        var outbound = new Outbound
-        {
-            Tag = "proxy",
-            Protocol = "trojan",
-            Settings = new OutboundSettings
-            {
-                Servers = new List<TrojanServer>
-                {
-                    new TrojanServer
-                    {
-                        Address = server.Address,
-                        Port = server.Port,
-                        Password = server.Password!
-                    }
-                }
-            }
-        };
-
-        // Configure stream settings
-        ConfigureStreamSettings(outbound, server);
-
-        return outbound;
-    }
-
-    private void ConfigureStreamSettings(Outbound outbound, ServerConfig server)
-    {
-        outbound.StreamSettings = new StreamSettings
-        {
-            Network = server.Network.ToString().ToLower()
-        };
-
-        // Configure TLS if enabled
-        if (server.Security == SecurityType.Tls)
-        {
-            outbound.StreamSettings.Security = "tls";
-            
-            if (server.TlsSettings != null)
-            {
-                outbound.StreamSettings.TlsSettings = new TlsStreamSettings
-                {
-                    ServerName = server.TlsSettings.ServerName,
-                    AllowInsecure = server.TlsSettings.AllowInsecure
-                };
-            }
-        }
-
-        // Configure WebSocket if enabled
-        if (server.Network == NetworkType.Ws)
-        {
-            outbound.StreamSettings.WsSettings = new WsStreamSettings
-            {
-                Path = server.WsSettings?.Path ?? "/",
-                Headers = !string.IsNullOrEmpty(server.WsSettings?.Host) 
-                    ? new Dictionary<string, string> { { "Host", server.WsSettings.Host } }
-                    : null
-            };
-        }
-    }
-
-    private async Task<string> WriteConfigFileAsync(V2rayConfig config)
-    {
-        var appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "V2rayZ"
-        );
-
-        Directory.CreateDirectory(appDataPath);
-
-        var configPath = Path.Combine(appDataPath, "v2ray_config.json");
-
-        var options = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        };
-
-        var json = JsonSerializer.Serialize(config, options);
-        
-        Debug.WriteLine($"[V2rayManager] Generated V2ray config:");
-        Debug.WriteLine($"[V2rayManager] {json}");
-        
-        // Use UTF8 without BOM to avoid V2ray parsing issues
-        var utf8WithoutBom = new UTF8Encoding(false);
-        await File.WriteAllTextAsync(configPath, json, utf8WithoutBom);
-
-        Debug.WriteLine($"[V2rayManager] V2ray configuration written to: {configPath}");
-
-        return configPath;
-    }
-
-    private string GetV2rayExecutablePath()
-    {
-        Debug.WriteLine("[V2rayManager] Looking for v2ray executable...");
-        
-        // Use ResourceManager to get the v2ray executable path
-        if (App.ResourceManager != null)
-        {
-            var v2rayPath = App.ResourceManager.V2rayExePath;
-            Debug.WriteLine($"[V2rayManager] ResourceManager path: {v2rayPath}");
-            
-            if (File.Exists(v2rayPath))
-            {
-                Debug.WriteLine($"[V2rayManager] Found v2ray at ResourceManager path: {v2rayPath}");
-                return v2rayPath;
-            }
-            else
-            {
-                Debug.WriteLine($"[V2rayManager] v2ray not found at ResourceManager path: {v2rayPath}");
-            }
-        }
-        else
-        {
-            Debug.WriteLine("[V2rayManager] ResourceManager is null");
-        }
-
-        // Fallback: check in Resources folder relative to application
-        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        var resourcePath = Path.Combine(appDirectory, "Resources", "v2ray.exe");
-        Debug.WriteLine($"[V2rayManager] Checking fallback path: {resourcePath}");
-
-        if (File.Exists(resourcePath))
-        {
-            Debug.WriteLine($"[V2rayManager] Found v2ray at fallback path: {resourcePath}");
-            return resourcePath;
-        }
-
-        // Fallback: check in application directory
-        var appPath = Path.Combine(appDirectory, "v2ray.exe");
-        Debug.WriteLine($"[V2rayManager] Checking app directory path: {appPath}");
-        
-        if (File.Exists(appPath))
-        {
-            Debug.WriteLine($"[V2rayManager] Found v2ray at app directory: {appPath}");
-            return appPath;
-        }
-
-        var errorMessage = $"V2ray executable not found. Searched paths:\n" +
-                          $"1. ResourceManager: {App.ResourceManager?.V2rayExePath ?? "null"}\n" +
-                          $"2. Resources folder: {resourcePath}\n" +
-                          $"3. App directory: {appPath}";
-        
-        Debug.WriteLine($"[V2rayManager] {errorMessage}");
-        throw new FileNotFoundException(errorMessage);
-    }
-
-    private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
+    private void OnSingBoxOutputDataReceived(object sender, DataReceivedEventArgs e)
     {
         if (!string.IsNullOrEmpty(e.Data))
         {
-            Debug.WriteLine($"[V2ray] {e.Data}");
+            Debug.WriteLine($"[sing-box] {e.Data}");
             _logManager?.AddLog(LogLevel.Info, e.Data, "v2ray");
         }
     }
 
-    private void OnErrorDataReceived(object sender, DataReceivedEventArgs e)
+    private void OnSingBoxErrorDataReceived(object sender, DataReceivedEventArgs e)
     {
         if (!string.IsNullOrEmpty(e.Data))
         {
-            Debug.WriteLine($"[V2ray Error] {e.Data}");
-            _logManager?.AddLog(LogLevel.Error, e.Data, "v2ray");
+            // sing-box outputs all logs to stderr, parse the actual log level
+            var logLevel = LogLevel.Info;
+            var logData = e.Data;
             
-            // Parse and categorize V2Ray errors
-            var parsedError = ParseV2rayError(e.Data);
-            if (!string.IsNullOrEmpty(parsedError))
+            // Remove ANSI color codes
+            logData = System.Text.RegularExpressions.Regex.Replace(logData, @"\x1B\[[0-9;]*[mK]", "");
+            
+            // Filter out repetitive connection logs
+            var normalizedLog = System.Text.RegularExpressions.Regex.Replace(
+                logData, 
+                @"\[\d+\s+\d+ms\]", 
+                "[X Xms]"
+            );
+            
+            lock (_logLock)
             {
+                if (normalizedLog == _lastLogMessage)
+                {
+                    _repeatedLogCount++;
+                    if (_repeatedLogCount == 10)
+                    {
+                        Debug.WriteLine($"[sing-box] (重复日志已省略 10 次)");
+                        _logManager?.AddLog(LogLevel.Warning, "(重复日志已省略，连接可能存在问题)", "v2ray");
+                    }
+                    else if (_repeatedLogCount > 10 && _repeatedLogCount % 100 == 0)
+                    {
+                        Debug.WriteLine($"[sing-box] (重复日志已省略 {_repeatedLogCount} 次)");
+                    }
+                    return;
+                }
+                
+                if (_repeatedLogCount > 0)
+                {
+                    Debug.WriteLine($"[sing-box] (上一条日志重复了 {_repeatedLogCount} 次)");
+                    if (_repeatedLogCount >= 10)
+                    {
+                        _logManager?.AddLog(LogLevel.Warning, $"上一条日志重复了 {_repeatedLogCount} 次", "v2ray");
+                    }
+                }
+                
+                _lastLogMessage = normalizedLog;
+                _repeatedLogCount = 0;
+            }
+            
+            // Parse log level from sing-box output
+            if (logData.Contains("FATAL") || logData.Contains("PANIC"))
+            {
+                logLevel = LogLevel.Error;
+                var friendlyError = ParseSingBoxError(logData);
+                _lastError = friendlyError;
+                
                 ProcessError?.Invoke(this, new V2rayErrorEventArgs
                 {
-                    ErrorMessage = parsedError,
+                    ErrorMessage = friendlyError,
                     Timestamp = DateTime.Now
                 });
             }
+            else if (logData.Contains("ERROR"))
+            {
+                logLevel = LogLevel.Error;
+                var friendlyError = ParseSingBoxError(logData);
+                _lastError = friendlyError;
+                
+                ProcessError?.Invoke(this, new V2rayErrorEventArgs
+                {
+                    ErrorMessage = friendlyError,
+                    Timestamp = DateTime.Now
+                });
+            }
+            else if (logData.Contains("WARN"))
+            {
+                logLevel = LogLevel.Warning;
+            }
+            else if (logData.Contains("DEBUG") || logData.Contains("TRACE"))
+            {
+                logLevel = LogLevel.Debug;
+            }
+            
+            Debug.WriteLine($"[sing-box] {logData}");
+            _logManager?.AddLog(logLevel, logData, "v2ray");
         }
     }
 
     /// <summary>
-    /// Parse V2Ray error output and convert to user-friendly Chinese messages
+    /// Parse sing-box error messages and return user-friendly Chinese error messages
     /// </summary>
-    private string ParseV2rayError(string errorOutput)
+    /// <param name="errorOutput">Raw error output from sing-box</param>
+    /// <returns>User-friendly error message in Chinese</returns>
+    private string ParseSingBoxError(string errorOutput)
     {
         if (string.IsNullOrEmpty(errorOutput))
-            return string.Empty;
-
-        var lowerError = errorOutput.ToLower();
-
-        // Trojan-specific errors
-        if (lowerError.Contains("trojan"))
         {
-            if (lowerError.Contains("authentication failed") || 
-                lowerError.Contains("invalid password") ||
-                lowerError.Contains("auth fail"))
-            {
-                return "Trojan 认证失败：密码错误，请检查服务器密码配置";
-            }
-            
-            if (lowerError.Contains("connection refused") || 
-                lowerError.Contains("connect: connection refused"))
-            {
-                return "Trojan 连接被拒绝：无法连接到服务器，请检查服务器地址和端口";
-            }
-            
-            if (lowerError.Contains("timeout") || 
-                lowerError.Contains("i/o timeout"))
-            {
-                return "Trojan 连接超时：服务器响应超时，请检查网络连接或服务器状态";
-            }
-            
-            if (lowerError.Contains("tls handshake") || 
-                lowerError.Contains("certificate") ||
-                lowerError.Contains("x509"))
-            {
-                return "Trojan TLS 握手失败：证书验证失败，请检查 TLS 设置或启用\"允许不安全连接\"";
-            }
-            
-            if (lowerError.Contains("invalid config") || 
-                lowerError.Contains("config error"))
-            {
-                return "Trojan 配置错误：配置格式不正确，请检查服务器配置";
-            }
+            return "未知错误";
         }
 
-        // VLESS-specific errors
-        if (lowerError.Contains("vless"))
-        {
-            if (lowerError.Contains("invalid user") || 
-                lowerError.Contains("uuid"))
-            {
-                return "VLESS 认证失败：UUID 错误，请检查用户 UUID 配置";
-            }
-            
-            if (lowerError.Contains("connection refused"))
-            {
-                return "VLESS 连接被拒绝：无法连接到服务器，请检查服务器地址和端口";
-            }
-        }
-
-        // General connection errors
-        if (lowerError.Contains("connection refused"))
-        {
-            return "连接被拒绝：无法连接到服务器，请检查服务器地址和端口";
-        }
+        // Remove ANSI color codes if not already removed
+        var cleanError = System.Text.RegularExpressions.Regex.Replace(errorOutput, @"\x1B\[[0-9;]*[mK]", "");
         
-        if (lowerError.Contains("timeout") || lowerError.Contains("i/o timeout"))
+        // Convert to lowercase for case-insensitive matching
+        var lowerError = cleanError.ToLower();
+
+        // Configuration errors
+        if (lowerError.Contains("parse config") || lowerError.Contains("decode config") || 
+            lowerError.Contains("unmarshal") || lowerError.Contains("invalid config"))
         {
-            return "连接超时：服务器响应超时，请检查网络连接";
-        }
-        
-        if (lowerError.Contains("network is unreachable") || 
-            lowerError.Contains("no route to host"))
-        {
-            return "网络不可达：无法访问目标服务器，请检查网络连接";
-        }
-        
-        if (lowerError.Contains("tls") || 
-            lowerError.Contains("certificate") ||
-            lowerError.Contains("x509"))
-        {
-            return "TLS 连接失败：证书验证失败，请检查 TLS 配置";
-        }
-        
-        if (lowerError.Contains("dns") || 
-            lowerError.Contains("no such host"))
-        {
-            return "DNS 解析失败：无法解析服务器域名，请检查域名是否正确";
+            return "配置文件格式错误，请检查配置是否正确";
         }
 
-        // Config errors
-        if (lowerError.Contains("failed to parse") || 
-            lowerError.Contains("json") ||
-            lowerError.Contains("invalid config"))
+        if (lowerError.Contains("missing") && (lowerError.Contains("field") || lowerError.Contains("required")))
         {
-            return "配置解析失败：配置文件格式错误";
+            return "配置文件缺少必需字段，请检查配置完整性";
         }
 
-        // Only return parsed error for critical errors
-        if (lowerError.Contains("error") || 
-            lowerError.Contains("failed") || 
-            lowerError.Contains("fatal"))
+        // Port binding errors
+        if (lowerError.Contains("address already in use") || lowerError.Contains("bind") && lowerError.Contains("failed"))
         {
-            return string.Empty; // Let the raw error be logged, but don't show to user
+            // Try to extract port number
+            var portMatch = System.Text.RegularExpressions.Regex.Match(cleanError, @":(\d+)");
+            if (portMatch.Success)
+            {
+                return $"端口 {portMatch.Groups[1].Value} 已被占用，请更改端口设置或关闭占用端口的程序";
+            }
+            return "端口已被占用，请更改端口设置或关闭占用端口的程序";
         }
 
-        return string.Empty;
+        if (lowerError.Contains("listen") && lowerError.Contains("failed"))
+        {
+            return "无法监听指定端口，请检查端口是否被占用或权限是否足够";
+        }
+
+        // Connection errors
+        if (lowerError.Contains("connection refused") || lowerError.Contains("connect: connection refused"))
+        {
+            return "无法连接到代理服务器，请检查服务器地址和端口是否正确";
+        }
+
+        if (lowerError.Contains("connection timeout") || lowerError.Contains("i/o timeout"))
+        {
+            return "连接服务器超时，请检查网络连接或服务器是否可用";
+        }
+
+        if (lowerError.Contains("no route to host") || lowerError.Contains("network unreachable"))
+        {
+            return "网络不可达，请检查网络连接";
+        }
+
+        if (lowerError.Contains("dial") && lowerError.Contains("failed"))
+        {
+            return "连接服务器失败，请检查服务器配置是否正确";
+        }
+
+        // Authentication errors
+        if (lowerError.Contains("authentication failed") || lowerError.Contains("auth failed"))
+        {
+            return "服务器认证失败，请检查密码或 UUID 是否正确";
+        }
+
+        if (lowerError.Contains("invalid uuid") || lowerError.Contains("invalid password"))
+        {
+            return "UUID 或密码格式不正确，请检查服务器配置";
+        }
+
+        // TLS/SSL errors
+        if (lowerError.Contains("tls") || lowerError.Contains("ssl"))
+        {
+            if (lowerError.Contains("certificate") || lowerError.Contains("cert"))
+            {
+                if (lowerError.Contains("verify") || lowerError.Contains("validation"))
+                {
+                    return "TLS 证书验证失败，请检查服务器证书或尝试允许不安全连接";
+                }
+                return "TLS 证书错误，请检查证书配置";
+            }
+            if (lowerError.Contains("handshake"))
+            {
+                return "TLS 握手失败，请检查 TLS 配置或服务器名称";
+            }
+            return "TLS 连接失败，请检查 TLS 设置";
+        }
+
+        // DNS errors
+        if (lowerError.Contains("dns") || lowerError.Contains("resolve"))
+        {
+            if (lowerError.Contains("no such host") || lowerError.Contains("not found"))
+            {
+                return "无法解析域名，请检查域名是否正确或 DNS 设置";
+            }
+            return "DNS 解析失败，请检查 DNS 配置";
+        }
+
+        // Protocol errors
+        if (lowerError.Contains("protocol") && lowerError.Contains("error"))
+        {
+            return "协议错误，请检查服务器协议配置是否正确";
+        }
+
+        if (lowerError.Contains("invalid protocol") || lowerError.Contains("unsupported protocol"))
+        {
+            return "不支持的协议类型，请检查服务器配置";
+        }
+
+        // Transport errors
+        if (lowerError.Contains("websocket") || lowerError.Contains("ws"))
+        {
+            if (lowerError.Contains("handshake"))
+            {
+                return "WebSocket 握手失败，请检查 WebSocket 路径和 Host 配置";
+            }
+            return "WebSocket 连接失败，请检查 WebSocket 配置";
+        }
+
+        // TUN mode specific errors
+        if (lowerError.Contains("tun") || lowerError.Contains("wintun"))
+        {
+            if (lowerError.Contains("permission") || lowerError.Contains("access denied"))
+            {
+                return "TUN 模式需要管理员权限，请以管理员身份运行程序";
+            }
+            if (lowerError.Contains("create") && lowerError.Contains("failed"))
+            {
+                return "创建 TUN 虚拟网卡失败，请检查 wintun.dll 是否存在或重启程序";
+            }
+            if (lowerError.Contains("interface"))
+            {
+                return "TUN 网络接口错误，请检查网络适配器设置";
+            }
+            return "TUN 模式启动失败，请检查系统权限和网络配置";
+        }
+
+        // Permission errors
+        if (lowerError.Contains("permission denied") || lowerError.Contains("access denied"))
+        {
+            return "权限不足，某些功能可能需要管理员权限";
+        }
+
+        // File errors
+        if (lowerError.Contains("no such file") || lowerError.Contains("file not found"))
+        {
+            return "找不到必需的文件，请检查程序完整性";
+        }
+
+        // Routing errors
+        if (lowerError.Contains("route") || lowerError.Contains("routing"))
+        {
+            if (lowerError.Contains("rule"))
+            {
+                return "路由规则配置错误，请检查路由规则设置";
+            }
+            return "路由配置错误，请检查路由设置";
+        }
+
+        // Inbound/Outbound errors
+        if (lowerError.Contains("inbound") && lowerError.Contains("failed"))
+        {
+            return "入站配置错误，请检查监听端口和协议设置";
+        }
+
+        if (lowerError.Contains("outbound") && lowerError.Contains("failed"))
+        {
+            return "出站配置错误，请检查服务器配置";
+        }
+
+        // Generic errors
+        if (lowerError.Contains("failed to start") || lowerError.Contains("start failed"))
+        {
+            return "sing-box 启动失败，请查看详细日志";
+        }
+
+        if (lowerError.Contains("panic") || lowerError.Contains("fatal"))
+        {
+            return "sing-box 遇到严重错误，请重启程序或查看详细日志";
+        }
+
+        // If no specific error pattern matched, return a cleaned version of the original error
+        // but limit the length to avoid overwhelming the user
+        if (cleanError.Length > 200)
+        {
+            return cleanError.Substring(0, 200) + "...";
+        }
+
+        return cleanError;
     }
 
-    private void OnProcessExited(object? sender, EventArgs e)
+    private void OnSingBoxProcessExited(object? sender, EventArgs e)
     {
         var process = sender as Process;
         var exitCode = process?.ExitCode ?? -1;
 
-        Debug.WriteLine($"V2ray process exited unexpectedly with code: {exitCode}");
+        Debug.WriteLine($"[sing-box] Process exited unexpectedly with code: {exitCode}");
 
-        var errorMessage = $"V2ray 进程意外退出 (退出码: {exitCode})";
+        var errorMessage = $"sing-box 进程意外退出 (退出码: {exitCode})";
         _lastError = errorMessage;
+        
+        _logManager?.AddLog(LogLevel.Error, errorMessage, "v2ray");
+        _logManager?.AddLog(LogLevel.Info, "TUN虚拟网络接口已自动清理 (如果使用TUN模式)", "sing-box");
 
         ProcessError?.Invoke(this, new V2rayErrorEventArgs
         {
@@ -770,6 +490,463 @@ public class V2rayManager : IV2rayManager
             _v2rayProcess = null;
             _startTime = null;
         }
+    }
+
+
+
+    /// <summary>
+    /// Start sing-box process for both TUN and System Proxy modes
+    /// </summary>
+    private async Task StartSingBoxAsync(UserConfig userConfig)
+    {
+        var modeType = userConfig.ProxyModeType == ProxyModeType.Tun ? "TUN模式" : "系统代理模式";
+        Debug.WriteLine($"[V2rayManager] Starting sing-box for {modeType}");
+        _logManager?.AddLog(LogLevel.Info, $"正在启动 sing-box ({modeType})", "sing-box");
+
+        lock (_processLock)
+        {
+            if (_v2rayProcess != null && !_v2rayProcess.HasExited)
+            {
+                Debug.WriteLine("[sing-box] Process is already running");
+                _logManager?.AddLog(LogLevel.Warning, "sing-box进程已在运行", "sing-box");
+                return;
+            }
+            _lastError = null;
+        }
+
+        try
+        {
+            // Generate sing-box config based on mode
+            var singBoxConfig = userConfig.ProxyModeType == ProxyModeType.Tun
+                ? GenerateSingBoxTunConfig(userConfig)
+                : GenerateSingBoxSystemProxyConfig(userConfig);
+
+            // Write sing-box configuration (unified path: singbox_config.json)
+            var appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "V2rayZ"
+            );
+            Directory.CreateDirectory(appDataPath);
+            var configPath = Path.Combine(appDataPath, "singbox_config.json");
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            var json = JsonSerializer.Serialize(singBoxConfig, options);
+            Debug.WriteLine($"[sing-box] Generated configuration:");
+            Debug.WriteLine(json);
+
+            var utf8WithoutBom = new UTF8Encoding(false);
+            await File.WriteAllTextAsync(configPath, json, utf8WithoutBom);
+            Debug.WriteLine($"[sing-box] Configuration written to: {configPath}");
+
+            // Get sing-box executable path
+            var singBoxPath = App.ResourceManager?.SingBoxExePath 
+                ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "sing-box.exe");
+            
+            if (!File.Exists(singBoxPath))
+            {
+                throw new FileNotFoundException($"sing-box.exe not found at: {singBoxPath}");
+            }
+
+            var workingDir = Path.GetDirectoryName(singBoxPath) ?? AppDomain.CurrentDomain.BaseDirectory;
+            
+            Debug.WriteLine($"[sing-box] Executable: {singBoxPath}");
+            Debug.WriteLine($"[sing-box] Config: {configPath}");
+            Debug.WriteLine($"[sing-box] Working Directory: {workingDir}");
+            Debug.WriteLine($"[sing-box] Mode: {modeType}");
+            
+            _logManager?.AddLog(LogLevel.Info, $"正在启动 sing-box 核心进程 ({modeType})...", "sing-box");
+
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = singBoxPath,
+                Arguments = $"run -c \"{configPath}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = workingDir
+            };
+
+            _v2rayProcess = new Process
+            {
+                StartInfo = processStartInfo,
+                EnableRaisingEvents = true
+            };
+
+            // Subscribe to sing-box specific process events
+            _v2rayProcess.OutputDataReceived += OnSingBoxOutputDataReceived;
+            _v2rayProcess.ErrorDataReceived += OnSingBoxErrorDataReceived;
+            _v2rayProcess.Exited += OnSingBoxProcessExited;
+
+            // Start the process
+            Debug.WriteLine("[sing-box] Attempting to start process...");
+            
+            if (!_v2rayProcess.Start())
+            {
+                var errorMessage = "Failed to start sing-box process - Process.Start() returned false";
+                Debug.WriteLine($"[sing-box] {errorMessage}");
+                throw new InvalidOperationException(errorMessage);
+            }
+
+            _startTime = DateTime.Now;
+
+            // Begin async reading of output
+            _v2rayProcess.BeginOutputReadLine();
+            _v2rayProcess.BeginErrorReadLine();
+
+            Debug.WriteLine($"[sing-box] Process started with PID: {_v2rayProcess.Id}");
+            _logManager?.AddLog(LogLevel.Info, $"sing-box 核心进程已启动 (PID: {_v2rayProcess.Id}, 模式: {modeType})", "sing-box");
+
+            // Raise event
+            ProcessStarted?.Invoke(this, new V2rayEventArgs
+            {
+                ProcessId = _v2rayProcess.Id,
+                Timestamp = DateTime.Now
+            });
+
+            // Wait a bit to ensure process started successfully
+            Debug.WriteLine("[sing-box] Waiting for process to stabilize...");
+            await Task.Delay(1000);
+
+            if (_v2rayProcess.HasExited)
+            {
+                var exitCode = _v2rayProcess.ExitCode;
+                var errorMessage = $"sing-box 进程启动失败 (退出码: {exitCode}, 模式: {modeType})";
+                _lastError = errorMessage;
+                
+                Debug.WriteLine($"[sing-box] Process exited immediately: {errorMessage}");
+                _logManager?.AddLog(LogLevel.Error, errorMessage, "v2ray");
+                
+                ProcessError?.Invoke(this, new V2rayErrorEventArgs
+                {
+                    ProcessId = _v2rayProcess.Id,
+                    ErrorMessage = errorMessage,
+                    Timestamp = DateTime.Now
+                });
+                
+                throw new InvalidOperationException(errorMessage);
+            }
+            
+            Debug.WriteLine($"[sing-box] Process started successfully and is running");
+            _logManager?.AddLog(LogLevel.Info, $"sing-box 核心进程启动成功，{modeType}代理服务已就绪", "sing-box");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[sing-box] Failed to start: {ex.Message}");
+            _logManager?.AddLog(LogLevel.Error, $"sing-box启动失败: {ex.Message}", "sing-box");
+            _lastError = ex.Message;
+            
+            lock (_processLock)
+            {
+                _v2rayProcess = null;
+            }
+            
+            ProcessError?.Invoke(this, new V2rayErrorEventArgs
+            {
+                ErrorMessage = ex.Message,
+                Exception = ex
+            });
+            
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Generate sing-box configuration for System Proxy mode
+    /// </summary>
+    private SingBoxConfig GenerateSingBoxSystemProxyConfig(UserConfig userConfig)
+    {
+        Debug.WriteLine("Generating sing-box System Proxy mode configuration");
+        _logManager?.AddLog(LogLevel.Info, "正在生成sing-box系统代理模式配置", "sing-box");
+
+        var selectedServer = userConfig.GetSelectedServer();
+        if (selectedServer == null)
+        {
+            throw new InvalidOperationException("没有选择服务器配置。请先在服务器页面选择一个服务器。");
+        }
+
+        var config = new SingBoxConfig
+        {
+            Log = new LogConfig
+            {
+                Level = "warn",
+                Timestamp = true
+            }
+        };
+
+        // Configure DNS
+        config.Dns = new DnsConfig
+        {
+            Servers = new List<object>
+            {
+                new Dictionary<string, object> { { "address", "8.8.8.8" } },
+                new Dictionary<string, object> { { "address", "8.8.4.4" } }
+            },
+            Strategy = "prefer_ipv4"
+        };
+
+        // Configure HTTP inbound
+        var httpInbound = new Inbound
+        {
+            Type = "http",
+            Tag = "http-in",
+            Listen = "127.0.0.1",
+            ListenPort = userConfig.HttpPort
+        };
+        config.Inbounds.Add(httpInbound);
+        _logManager?.AddLog(LogLevel.Info, $"HTTP入站配置: 端口={userConfig.HttpPort}", "sing-box");
+
+        // Configure SOCKS inbound
+        var socksInbound = new Inbound
+        {
+            Type = "socks",
+            Tag = "socks-in",
+            Listen = "127.0.0.1",
+            ListenPort = userConfig.SocksPort
+        };
+        config.Inbounds.Add(socksInbound);
+        _logManager?.AddLog(LogLevel.Info, $"SOCKS入站配置: 端口={userConfig.SocksPort}", "sing-box");
+
+        // Configure proxy outbound
+        config.Outbounds.Add(CreateSingBoxProxyOutbound(selectedServer));
+        _logManager?.AddLog(LogLevel.Info, $"代理出站配置: 协议={selectedServer.Protocol}, 服务器={selectedServer.Address}:{selectedServer.Port}", "sing-box");
+
+        // Configure direct outbound
+        config.Outbounds.Add(new Outbound
+        {
+            Type = "direct",
+            Tag = "direct"
+        });
+
+        // Configure block outbound
+        config.Outbounds.Add(new Outbound
+        {
+            Type = "block",
+            Tag = "block"
+        });
+
+        // Configure routing
+        config.Route = _routingManager.GenerateSingBoxRouting(userConfig.ProxyMode, userConfig.CustomRules);
+        _logManager?.AddLog(LogLevel.Info, $"路由配置: 模式={userConfig.ProxyMode}", "sing-box");
+
+        // Enable cache file for rule sets
+        if (config.Route?.RuleSet?.Count > 0)
+        {
+            config.Experimental = new ExperimentalConfig
+            {
+                CacheFile = new CacheFileConfig 
+                { 
+                    Enabled = true,
+                    Path = "cache.db"
+                }
+            };
+        }
+
+        _logManager?.AddLog(LogLevel.Info, "sing-box系统代理配置生成完成", "sing-box");
+        return config;
+    }
+
+    /// <summary>
+    /// Generate sing-box configuration for TUN mode
+    /// </summary>
+    private SingBoxConfig GenerateSingBoxTunConfig(UserConfig userConfig)
+    {
+        Debug.WriteLine("Generating sing-box TUN mode configuration");
+        _logManager?.AddLog(LogLevel.Info, "正在生成sing-box TUN模式配置", "sing-box");
+
+        var selectedServer = userConfig.GetSelectedServer();
+        if (selectedServer == null)
+        {
+            throw new InvalidOperationException("没有选择服务器配置");
+        }
+
+        var tunConfig = userConfig.TunConfig;
+        var config = new SingBoxConfig
+        {
+            Log = new LogConfig
+            {
+                Level = "error",
+                Timestamp = true
+            }
+        };
+
+        // Configure DNS - use UDP for better compatibility
+        config.Dns = new DnsConfig
+        {
+            Servers = new List<object>
+            {
+                // Remote DNS through proxy
+                new Dictionary<string, object>
+                {
+                    { "tag", "dns-remote" },
+                    { "type", "udp" },
+                    { "server", "8.8.8.8" },
+                    { "detour", "proxy" }
+                },
+                // Local DNS for direct connections
+                new Dictionary<string, object>
+                {
+                    { "tag", "dns-local" },
+                    { "type", "udp" },
+                    { "server", "223.5.5.5" }
+                }
+            },
+            Rules = new List<object>
+            {
+                new Dictionary<string, object>
+                {
+                    { "rule_set", "geosite-cn" },
+                    { "server", "dns-local" }
+                },
+                new Dictionary<string, object>
+                {
+                    { "rule_set", "geosite-geolocation-!cn" },
+                    { "server", "dns-remote" }
+                }
+            },
+            Final = "dns-remote",
+            Strategy = "ipv4_only"
+        };
+
+        // Configure TUN inbound
+        var tunInbound = new Inbound
+        {
+            Type = "tun",
+            Tag = "tun-in",
+            InterfaceName = "tun0",
+            Address = new List<string> { "172.19.0.1/30" },
+            Mtu = 1400,
+            AutoRoute = true,
+            StrictRoute = true,
+            Stack = "gvisor",
+            Sniff = true,
+            Platform = new Dictionary<string, object>
+            {
+                {
+                    "http_proxy", new Dictionary<string, object>
+                    {
+                        { "enabled", true },
+                        { "server", "127.0.0.1" },
+                        { "server_port", 2080 }
+                    }
+                }
+            }
+        };
+
+        config.Inbounds.Add(tunInbound);
+        _logManager?.AddLog(LogLevel.Info, "TUN入站配置: 地址=172.19.0.1/30, MTU=1400", "sing-box");
+
+        // Configure proxy outbound
+        config.Outbounds.Add(CreateSingBoxProxyOutbound(selectedServer));
+
+        // Configure direct outbound
+        config.Outbounds.Add(new Outbound
+        {
+            Type = "direct",
+            Tag = "direct"
+        });
+
+        // Configure block outbound
+        config.Outbounds.Add(new Outbound
+        {
+            Type = "block",
+            Tag = "block"
+        });
+
+        // Configure routing
+        config.Route = _routingManager.GenerateSingBoxRouting(userConfig.ProxyMode, userConfig.CustomRules);
+        config.Route.DefaultDomainResolver = "dns-local";
+        config.Route.AutoDetectInterface = true;
+
+        // Enable cache file for rule sets
+        config.Experimental = new ExperimentalConfig
+        {
+            CacheFile = new CacheFileConfig 
+            { 
+                Enabled = true,
+                Path = "cache.db"
+            }
+        };
+
+        _logManager?.AddLog(LogLevel.Info, "sing-box TUN配置生成完成", "sing-box");
+        return config;
+    }
+
+    private Outbound CreateSingBoxProxyOutbound(ServerConfig server)
+    {
+        var outbound = new Outbound
+        {
+            Tag = "proxy",
+            Server = server.Address,
+            ServerPort = server.Port
+        };
+
+        if (server.Protocol == ProtocolType.Vless)
+        {
+            outbound.Type = "vless";
+            outbound.Uuid = server.Uuid;
+            outbound.Flow = "xtls-rprx-vision";
+            outbound.PacketEncoding = "xudp";
+        }
+        else if (server.Protocol == ProtocolType.Trojan)
+        {
+            outbound.Type = "trojan";
+            outbound.Password = server.Password;
+        }
+
+        // Configure TLS
+        if (server.Security == SecurityType.Tls)
+        {
+            outbound.Tls = new TlsConfig
+            {
+                Enabled = true,
+                ServerName = server.TlsSettings?.ServerName ?? server.Address,
+                Insecure = server.TlsSettings?.AllowInsecure ?? false,
+                Utls = new UtlsConfig
+                {
+                    Enabled = true,
+                    Fingerprint = "chrome"
+                }
+            };
+        }
+
+        // Configure transport
+        if (server.Network == NetworkType.Ws && server.WsSettings != null)
+        {
+            outbound.Transport = new TransportConfig
+            {
+                Type = "ws",
+                Path = server.WsSettings.Path ?? "/",
+                Headers = string.IsNullOrEmpty(server.WsSettings.Host)
+                    ? null
+                    : new Dictionary<string, string> { { "Host", server.WsSettings.Host } }
+            };
+        }
+
+        return outbound;
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SwitchProxyModeAsync(
+        ProxyModeType targetMode, 
+        UserConfig userConfig, 
+        IConfigurationManager configManager,
+        ISystemProxyManager? proxyManager = null)
+    {
+        // This method will be implemented in a future task
+        throw new NotImplementedException("SwitchProxyModeAsync will be implemented in Task 5+");
+    }
+
+    /// <inheritdoc/>
+    public async Task<(bool IsAvailable, string? ErrorMessage)> ValidateTunModeAsync()
+    {
+        // This method will be implemented in a future task
+        throw new NotImplementedException("ValidateTunModeAsync will be implemented in Task 5+");
     }
 
     public void Dispose()

@@ -82,6 +82,16 @@ export async function getConfig(): Promise<ApiResponse<UserConfig>> {
     servers: [],
     selectedServerId: undefined,
     proxyMode: 'Smart',
+    proxyModeType: 'SystemProxy',
+    tunConfig: {
+      interfaceName: 'V2rayZ-TUN',
+      ipv4Address: '10.0.85.1/24',
+      ipv6Address: 'fdfe:dcba:9876::1/126',
+      enableIpv6: true,
+      dnsServers: ['8.8.8.8', '8.8.4.4'],
+      mtu: 9000,
+      enableDnsHijack: true,
+    },
     customRules: [],
     autoStart: false,
     autoConnect: false,
@@ -269,8 +279,8 @@ export async function getLogs(count?: number): Promise<ApiResponse<LogEntry[]>> 
       {
         timestamp: new Date().toLocaleTimeString(),
         level: 'info',
-        message: 'V2ray service started successfully',
-        source: 'v2ray'
+        message: 'sing-box service started successfully',
+        source: 'sing-box'
       },
       {
         timestamp: new Date().toLocaleTimeString(),
@@ -320,7 +330,7 @@ export async function getVersionInfo(): Promise<ApiResponse<{
   appVersion: string
   appName: string
   buildDate: string
-  v2rayVersion: string
+  singBoxVersion: string
   copyright: string
   repositoryUrl: string
 }>> {
@@ -415,4 +425,20 @@ export function removeEventListener<K extends keyof NativeEventData>(
   }
   
   window.removeNativeEventListener(eventName, callback)
+}
+
+/**
+ * Permission Check APIs
+ */
+export async function isAdministrator(): Promise<ApiResponse<{ isAdministrator: boolean }>> {
+  if (!isWebView2()) {
+    return { success: false, error: 'Not running in WebView2 environment' }
+  }
+  
+  try {
+    const result = await window.nativeApi.isAdministrator()
+    return parseResponse<{ isAdministrator: boolean }>(result)
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
 }
