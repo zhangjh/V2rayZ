@@ -95,7 +95,7 @@ TestResults/
 *.sln.docstates
 
 # Development and testing files (not for production)
-.kiro/
+# .kiro/
 V2rayClient.Tests/
 **/TASK_*.md
 build-debug.ps1
