@@ -201,10 +201,7 @@ public partial class MainWindow : Window
                     getVersionInfo: () => chrome.webview.hostObjects.nativeApi.GetVersionInfo(),
                     checkForUpdates: () => chrome.webview.hostObjects.nativeApi.CheckForUpdates(),
                     parseProtocolUrl: (url) => chrome.webview.hostObjects.nativeApi.ParseProtocolUrl(url),
-                    addServerFromUrl: (url, name) => chrome.webview.hostObjects.nativeApi.AddServerFromUrl(url, name),
-                    getGeoDataInfo: () => chrome.webview.hostObjects.nativeApi.GetGeoDataInfo(),
-                    checkGeoDataUpdates: () => chrome.webview.hostObjects.nativeApi.CheckGeoDataUpdates(),
-                    updateGeoData: (updateGeoIp, updateGeoSite) => chrome.webview.hostObjects.nativeApi.UpdateGeoData(updateGeoIp, updateGeoSite)
+                    addServerFromUrl: (url, name) => chrome.webview.hostObjects.nativeApi.AddServerFromUrl(url, name)
                 };
 
                 // Event listener system

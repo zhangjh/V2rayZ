@@ -40,11 +40,6 @@ declare global {
       // Update Management
       checkForUpdates: () => Promise<string>
 
-      // GeoData Management
-      getGeoDataInfo: () => Promise<string>
-      checkGeoDataUpdates: () => Promise<string>
-      updateGeoData: (updateGeoIp: boolean, updateGeoSite: boolean) => Promise<string>
-
       // Permission Check
       isAdministrator: () => Promise<string>
     }

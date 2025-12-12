@@ -10,7 +10,7 @@ public static class VersionInfo
     /// V2rayZ 应用版本号 - 唯一的版本号，用于更新检查
     /// 修改版本时只需要更新这个值
     /// </summary>
-    public const string Version = "2.0.0";
+    public const string Version = "2.0.1";
 
     /// <summary>
     /// 应用程序名称
