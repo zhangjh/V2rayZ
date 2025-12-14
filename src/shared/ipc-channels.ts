@@ -1,48 +1,63 @@
-// IPC 通道常量定义
+/**
+ * IPC 通道常量定义
+ * 用于主进程和渲染进程之间的通信
+ */
+
 export const IPC_CHANNELS = {
   // 代理控制
   PROXY_START: 'proxy:start',
   PROXY_STOP: 'proxy:stop',
   PROXY_GET_STATUS: 'proxy:getStatus',
   PROXY_RESTART: 'proxy:restart',
-  
+
   // 配置管理
   CONFIG_GET: 'config:get',
   CONFIG_SAVE: 'config:save',
   CONFIG_UPDATE_MODE: 'config:updateMode',
-  
+  CONFIG_GET_VALUE: 'config:getValue',
+  CONFIG_SET_VALUE: 'config:setValue',
+
   // 服务器管理
   SERVER_SWITCH: 'server:switch',
   SERVER_PARSE_URL: 'server:parseUrl',
   SERVER_ADD_FROM_URL: 'server:addFromUrl',
-  SERVER_DELETE: 'server:delete',
+  SERVER_ADD: 'server:add',
   SERVER_UPDATE: 'server:update',
-  
-  // 路由规则
-  RULE_ADD: 'rule:add',
-  RULE_DELETE: 'rule:delete',
-  RULE_UPDATE: 'rule:update',
-  
-  // 系统代理
+  SERVER_DELETE: 'server:delete',
+  SERVER_GET_ALL: 'server:getAll',
+
+  // 路由规则管理
+  RULES_GET_ALL: 'rules:getAll',
+  RULES_ADD: 'rules:add',
+  RULES_UPDATE: 'rules:update',
+  RULES_DELETE: 'rules:delete',
+
+  // 日志管理
+  LOGS_GET: 'logs:get',
+  LOGS_CLEAR: 'logs:clear',
+  LOGS_SET_LEVEL: 'logs:setLevel',
+
+  // 系统代理管理
   SYSTEM_PROXY_ENABLE: 'systemProxy:enable',
   SYSTEM_PROXY_DISABLE: 'systemProxy:disable',
   SYSTEM_PROXY_GET_STATUS: 'systemProxy:getStatus',
-  
-  // 自启动
+
+  // 自启动管理
   AUTO_START_SET: 'autoStart:set',
   AUTO_START_GET_STATUS: 'autoStart:getStatus',
-  
-  // 日志
-  LOG_GET: 'log:get',
-  LOG_CLEAR: 'log:clear',
-  
-  // 事件 (Main -> Renderer)
+
+  // 统计信息
+  STATS_GET: 'stats:get',
+  STATS_RESET: 'stats:reset',
+
+  // 事件 (主进程 -> 渲染进程)
   EVENT_PROXY_STARTED: 'event:proxyStarted',
   EVENT_PROXY_STOPPED: 'event:proxyStopped',
   EVENT_PROXY_ERROR: 'event:proxyError',
   EVENT_CONFIG_CHANGED: 'event:configChanged',
   EVENT_LOG_RECEIVED: 'event:logReceived',
-  EVENT_STATS_UPDATE: 'event:statsUpdate',
+  EVENT_STATS_UPDATED: 'event:statsUpdated',
+  EVENT_CONNECTION_STATE_CHANGED: 'event:connectionStateChanged',
 } as const;
 
-export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS];
+export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

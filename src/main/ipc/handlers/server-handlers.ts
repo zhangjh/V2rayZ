@@ -1,0 +1,122 @@
+/**
+ * 服务器管理 IPC 处理器
+ * 处理服务器配置相关的 IPC 请求
+ */
+
+import { IpcMainInvokeEvent } from 'electron';
+import { IPC_CHANNELS } from '../../../shared/ipc-channels';
+import type { ServerConfig } from '../../../shared/types';
+import { registerIpcHandler } from '../ipc-handler';
+import { ProtocolParser } from '../../services/ProtocolParser';
+import { ConfigManager } from '../../services/ConfigManager';
+
+/**
+ * 注册服务器管理相关的 IPC 处理器
+ */
+export function registerServerHandlers(
+  protocolParser: ProtocolParser,
+  configManager: ConfigManager
+): void {
+  // 解析协议 URL
+  registerIpcHandler<{ url: string }, ServerConfig>(
+    IPC_CHANNELS.SERVER_PARSE_URL,
+    async (_event: IpcMainInvokeEvent, args: { url: string }) => {
+      return protocolParser.parseUrl(args.url);
+    }
+  );
+
+  // 从 URL 添加服务器
+  registerIpcHandler<{ url: string }, ServerConfig>(
+    IPC_CHANNELS.SERVER_ADD_FROM_URL,
+    async (_event: IpcMainInvokeEvent, args: { url: string }) => {
+      // 解析 URL
+      const serverConfig = protocolParser.parseUrl(args.url);
+
+      // 加载当前配置
+      const config = await configManager.loadConfig();
+
+      // 添加服务器到配置
+      config.servers.push(serverConfig);
+
+      // 保存配置
+      await configManager.saveConfig(config);
+
+      return serverConfig;
+    }
+  );
+
+  // 添加服务器
+  registerIpcHandler<{ server: ServerConfig }, void>(
+    IPC_CHANNELS.SERVER_ADD,
+    async (_event: IpcMainInvokeEvent, args: { server: ServerConfig }) => {
+      const config = await configManager.loadConfig();
+      config.servers.push(args.server);
+      await configManager.saveConfig(config);
+    }
+  );
+
+  // 更新服务器
+  registerIpcHandler<{ server: ServerConfig }, void>(
+    IPC_CHANNELS.SERVER_UPDATE,
+    async (_event: IpcMainInvokeEvent, args: { server: ServerConfig }) => {
+      const config = await configManager.loadConfig();
+      const index = config.servers.findIndex((s) => s.id === args.server.id);
+
+      if (index === -1) {
+        throw new Error(`服务器不存在: ${args.server.id}`);
+      }
+
+      config.servers[index] = args.server;
+      await configManager.saveConfig(config);
+    }
+  );
+
+  // 删除服务器
+  registerIpcHandler<{ serverId: string }, void>(
+    IPC_CHANNELS.SERVER_DELETE,
+    async (_event: IpcMainInvokeEvent, args: { serverId: string }) => {
+      const config = await configManager.loadConfig();
+      const index = config.servers.findIndex((s) => s.id === args.serverId);
+
+      if (index === -1) {
+        throw new Error(`服务器不存在: ${args.serverId}`);
+      }
+
+      config.servers.splice(index, 1);
+
+      // 如果删除的是当前选中的服务器，清除选中状态
+      if (config.selectedServerId === args.serverId) {
+        config.selectedServerId = null;
+      }
+
+      await configManager.saveConfig(config);
+    }
+  );
+
+  // 获取所有服务器
+  registerIpcHandler<void, ServerConfig[]>(
+    IPC_CHANNELS.SERVER_GET_ALL,
+    async (_event: IpcMainInvokeEvent) => {
+      const config = await configManager.loadConfig();
+      return config.servers;
+    }
+  );
+
+  // 切换服务器
+  registerIpcHandler<{ serverId: string }, void>(
+    IPC_CHANNELS.SERVER_SWITCH,
+    async (_event: IpcMainInvokeEvent, args: { serverId: string }) => {
+      const config = await configManager.loadConfig();
+      const server = config.servers.find((s) => s.id === args.serverId);
+
+      if (!server) {
+        throw new Error(`服务器不存在: ${args.serverId}`);
+      }
+
+      config.selectedServerId = args.serverId;
+      await configManager.saveConfig(config);
+    }
+  );
+
+  console.log('[Server Handlers] Registered all server IPC handlers');
+}

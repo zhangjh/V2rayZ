@@ -1,0 +1,196 @@
+import { app } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs/promises';
+
+/**
+ * 资源文件管理器
+ * 根据平台和架构返回对应的资源文件路径
+ */
+export class ResourceManager {
+  private readonly isDev: boolean;
+  private readonly platform: string;
+  private readonly arch: string;
+
+  constructor() {
+    this.isDev = !app.isPackaged;
+    this.platform = process.platform;
+    this.arch = process.arch;
+  }
+
+  /**
+   * 获取 sing-box 可执行文件路径
+   */
+  getSingBoxPath(): string {
+    const filename = this.platform === 'win32' ? 'sing-box.exe' : 'sing-box';
+    const platformDir = this.getPlatformResourceDir();
+    const singboxPath = path.join(platformDir, filename);
+
+    return singboxPath;
+  }
+
+  /**
+   * 获取应用图标路径
+   */
+  getAppIconPath(): string {
+    const filename = this.platform === 'win32' ? 'app.ico' : 'app.icns';
+    const platformDir = this.getPlatformResourceDir();
+    return path.join(platformDir, filename);
+  }
+
+  /**
+   * 获取托盘图标路径
+   * @param _connected 是否为连接状态（暂时未使用，未来可以通过不同图标文件区分状态）
+   */
+  getTrayIconPath(_connected: boolean = false): string {
+    const platformDir = this.getPlatformResourceDir();
+    
+    if (this.platform === 'darwin') {
+      // macOS 托盘图标需要 PNG 格式
+      // 优先使用 trayTemplate.png（模板图像，系统会自动适配明暗模式）
+      // 如果不存在，返回空字符串，让 TrayManager 使用内置图标
+      return path.join(platformDir, 'trayTemplate.png');
+    } else {
+      // Windows 使用 ico 格式
+      return path.join(platformDir, 'app.ico');
+    }
+  }
+
+  /**
+   * 获取 GeoIP 数据文件路径
+   */
+  getGeoIPPath(): string {
+    const dataDir = this.getDataResourceDir();
+    return path.join(dataDir, 'geoip-cn.srs');
+  }
+
+  /**
+   * 获取 GeoSite 中国数据文件路径
+   */
+  getGeoSiteCNPath(): string {
+    const dataDir = this.getDataResourceDir();
+    return path.join(dataDir, 'geosite-cn.srs');
+  }
+
+  /**
+   * 获取 GeoSite 非中国数据文件路径
+   */
+  getGeoSiteNonCNPath(): string {
+    const dataDir = this.getDataResourceDir();
+    return path.join(dataDir, 'geosite-geolocation-!cn.srs');
+  }
+
+  /**
+   * 检查资源文件是否存在
+   */
+  async checkResourcesExist(): Promise<{ exists: boolean; missing: string[] }> {
+    const missing: string[] = [];
+
+    // 检查 sing-box 可执行文件
+    const singboxPath = this.getSingBoxPath();
+    if (!(await this.fileExists(singboxPath))) {
+      missing.push(`sing-box executable: ${singboxPath}`);
+    }
+
+    // 检查 GeoIP/GeoSite 数据文件
+    const geoFiles = [
+      { name: 'GeoIP CN', path: this.getGeoIPPath() },
+      { name: 'GeoSite CN', path: this.getGeoSiteCNPath() },
+      { name: 'GeoSite Non-CN', path: this.getGeoSiteNonCNPath() },
+    ];
+
+    for (const file of geoFiles) {
+      if (!(await this.fileExists(file.path))) {
+        missing.push(`${file.name}: ${file.path}`);
+      }
+    }
+
+    return {
+      exists: missing.length === 0,
+      missing,
+    };
+  }
+
+  /**
+   * 获取平台特定的资源目录
+   */
+  private getPlatformResourceDir(): string {
+    const baseDir = this.getResourcesBaseDir();
+
+    if (this.platform === 'win32') {
+      return path.join(baseDir, 'win');
+    } else if (this.platform === 'darwin') {
+      // macOS 根据架构选择不同的目录
+      if (this.arch === 'arm64') {
+        return path.join(baseDir, 'mac-arm64');
+      } else {
+        return path.join(baseDir, 'mac-x64');
+      }
+    }
+
+    throw new Error(`Unsupported platform: ${this.platform}`);
+  }
+
+  /**
+   * 获取数据文件目录
+   */
+  private getDataResourceDir(): string {
+    const baseDir = this.getResourcesBaseDir();
+    return path.join(baseDir, 'data');
+  }
+
+  /**
+   * 获取资源文件基础目录
+   * 开发环境和生产环境路径不同
+   */
+  private getResourcesBaseDir(): string {
+    if (this.isDev) {
+      // 开发环境：项目根目录下的 resources
+      return path.join(process.cwd(), 'resources');
+    } else {
+      // 生产环境：打包后的 resources 目录
+      // process.resourcesPath 指向 Contents/Resources
+      // extraResources 被复制到 Contents/Resources/resources 子目录
+      return path.join(process.resourcesPath, 'resources');
+    }
+  }
+
+  /**
+   * 检查文件是否存在
+   */
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 获取资源信息（用于调试）
+   */
+  getResourceInfo(): {
+    isDev: boolean;
+    platform: string;
+    arch: string;
+    baseDir: string;
+    singboxPath: string;
+    geoIPPath: string;
+    geoSiteCNPath: string;
+    geoSiteNonCNPath: string;
+  } {
+    return {
+      isDev: this.isDev,
+      platform: this.platform,
+      arch: this.arch,
+      baseDir: this.getResourcesBaseDir(),
+      singboxPath: this.getSingBoxPath(),
+      geoIPPath: this.getGeoIPPath(),
+      geoSiteCNPath: this.getGeoSiteCNPath(),
+      geoSiteNonCNPath: this.getGeoSiteNonCNPath(),
+    };
+  }
+}
+
+// 导出单例实例
+export const resourceManager = new ResourceManager();

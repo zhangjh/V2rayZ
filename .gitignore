@@ -127,3 +127,5 @@ resources/mac-x64/sing-box
 resources/mac-arm64/sing-box
 resources/data/*.dat
 resources/data/*.db
+
+dist-package

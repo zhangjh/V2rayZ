@@ -1,9 +1,13 @@
-// Electron API 类型声明
-interface ElectronAPI {
-  invoke: (channel: string, ...args: any[]) => Promise<any>;
-  on: (channel: string, callback: (...args: any[]) => void) => () => void;
+/**
+ * 全局类型声明
+ */
+
+import { ElectronAPI } from '../main/preload';
+
+declare global {
+  interface Window {
+    electron: ElectronAPI;
+  }
 }
 
-interface Window {
-  electronAPI: ElectronAPI;
-}
+export {};

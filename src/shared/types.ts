@@ -1,87 +1,227 @@
-// 用户配置
-export interface UserConfig {
-  servers: ServerConfig[];
-  selectedServerId: string | null;
-  proxyMode: 'global' | 'smart' | 'direct';
-  proxyModeType: 'systemProxy' | 'tun';
-  tunConfig: TunModeConfig;
-  customRules: DomainRule[];
-  autoStart: boolean;
-  autoConnect: boolean;
-  minimizeToTray: boolean;
-  socksPort: number;
-  httpPort: number;
-}
+/**
+ * 共享类型定义
+ * 用于主进程和渲染进程之间的数据传输
+ */
 
+// ============================================================================
+// 基础类型
+// ============================================================================
+
+export type ProxyMode = 'global' | 'smart' | 'direct';
+export type ProxyModeType = 'systemProxy' | 'tun';
+export type Protocol = 'vless' | 'trojan';
+export type Network = 'tcp' | 'ws' | 'grpc' | 'http';
+export type Security = 'none' | 'tls' | 'reality';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type RuleAction = 'proxy' | 'direct' | 'block';
+export type TunStack = 'system' | 'gvisor' | 'mixed';
+
+// ============================================================================
 // 服务器配置
-export interface ServerConfig {
-  id: string;
-  name: string;
-  protocol: 'vless' | 'trojan';
-  address: string;
-  port: number;
-  uuid?: string;
-  password?: string;
-  encryption?: string;
-  network?: 'tcp' | 'ws' | 'grpc';
-  security?: 'none' | 'tls';
-  tlsSettings?: TlsSettings;
-  wsSettings?: WebSocketSettings;
-}
+// ============================================================================
 
-// TLS 设置
 export interface TlsSettings {
   serverName?: string;
   allowInsecure?: boolean;
   alpn?: string[];
+  fingerprint?: string;
 }
 
-// WebSocket 设置
 export interface WebSocketSettings {
   path?: string;
   headers?: Record<string, string>;
+  maxEarlyData?: number;
+  earlyDataHeaderName?: string;
 }
 
+export interface GrpcSettings {
+  serviceName?: string;
+  multiMode?: boolean;
+}
+
+export interface HttpSettings {
+  host?: string[];
+  path?: string;
+  method?: string;
+  headers?: Record<string, string[]>;
+}
+
+export interface ServerConfig {
+  id: string;
+  name: string;
+  protocol: Protocol;
+  address: string;
+  port: number;
+  
+  // VLESS 特定
+  uuid?: string;
+  encryption?: string;
+  flow?: string;
+  
+  // Trojan 特定
+  password?: string;
+  
+  // 传输层配置
+  network?: Network;
+  security?: Security;
+  
+  // TLS 配置
+  tlsSettings?: TlsSettings;
+  
+  // 传输层特定配置
+  wsSettings?: WebSocketSettings;
+  grpcSettings?: GrpcSettings;
+  httpSettings?: HttpSettings;
+  
+  // 元数据
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// ============================================================================
+// 路由规则
+// ============================================================================
+
+export interface DomainRule {
+  id: string;
+  domain: string;
+  action: RuleAction;
+  enabled: boolean;
+}
+
+// ============================================================================
 // TUN 模式配置
+// ============================================================================
+
 export interface TunModeConfig {
   mtu: number;
-  stack: 'system' | 'gvisor' | 'mixed';
+  stack: TunStack;
   autoRoute: boolean;
   strictRoute: boolean;
+  interfaceName?: string;
+  inet4Address?: string;
+  inet6Address?: string;
 }
 
-// 域名规则
-export interface DomainRule {
-  domain: string;
-  action: 'proxy' | 'direct' | 'block';
+// ============================================================================
+// 用户配置
+// ============================================================================
+
+export interface UserConfig {
+  // 服务器配置
+  servers: ServerConfig[];
+  selectedServerId: string | null;
+  
+  // 代理模式
+  proxyMode: ProxyMode;
+  proxyModeType: ProxyModeType;
+  
+  // TUN 模式配置
+  tunConfig: TunModeConfig;
+  
+  // 路由规则
+  customRules: DomainRule[];
+  
+  // 应用设置
+  autoStart: boolean;
+  autoConnect: boolean;
+  minimizeToTray: boolean;
+  
+  // 端口配置
+  socksPort: number;
+  httpPort: number;
+  
+  // 日志设置
+  logLevel: LogLevel;
 }
 
+// ============================================================================
 // 代理状态
+// ============================================================================
+
 export interface ProxyStatus {
   running: boolean;
   pid?: number;
+  startTime?: Date;
   uptime?: number;
   error?: string;
+  currentServer?: ServerConfig;
 }
 
+// ============================================================================
+// 系统代理状态
+// ============================================================================
+
+export interface SystemProxyStatus {
+  enabled: boolean;
+  httpProxy?: string;
+  httpsProxy?: string;
+  socksProxy?: string;
+  bypassList?: string[];
+}
+
+// ============================================================================
 // 日志条目
+// ============================================================================
+
 export interface LogEntry {
-  timestamp: Date;
-  level: 'info' | 'warn' | 'error' | 'debug';
+  timestamp: string;
+  level: LogLevel;
   message: string;
   source: string;
+  stack?: string;
 }
 
+// ============================================================================
+// 流量统计
+// ============================================================================
+
+export interface TrafficStats {
+  uploadSpeed: number;
+  downloadSpeed: number;
+  totalUpload: number;
+  totalDownload: number;
+}
+
+// ============================================================================
 // API 响应
+// ============================================================================
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
+  code?: string;
 }
 
-// 系统代理状态
-export interface SystemProxyStatus {
+// ============================================================================
+// 连接状态
+// ============================================================================
+
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error';
+
+export interface ConnectionStateInfo {
+  state: ConnectionState;
+  message?: string;
+  error?: string;
+}
+
+// ============================================================================
+// 自启动状态
+// ============================================================================
+
+export interface AutoStartStatus {
   enabled: boolean;
-  address?: string;
-  port?: number;
+  path?: string;
+}
+
+// ============================================================================
+// 平台信息
+// ============================================================================
+
+export interface PlatformInfo {
+  platform: NodeJS.Platform;
+  arch: string;
+  version: string;
+  isAdmin: boolean;
 }

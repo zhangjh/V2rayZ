@@ -1,13 +1,17 @@
 {
   "appId": "com.v2rayz.electron",
   "productName": "V2rayZ",
+  "copyright": "Copyright © 2025",
   "directories": {
-    "output": "release",
+    "output": "dist-package",
     "buildResources": "build"
   },
   "files": [
     "dist/**/*",
     "package.json"
+  ],
+  "asarUnpack": [
+    "dist/renderer/**/*"
   ],
   "extraResources": [
     {
@@ -27,15 +31,32 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "build/icon.ico",
-    "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+    "icon": "resources/win/app.ico",
+    "artifactName": "${productName}-${version}-win-${arch}.${ext}",
+    "extraResources": [
+      {
+        "from": "resources/win",
+        "to": "resources/win",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/data",
+        "to": "resources/data",
+        "filter": ["**/*"]
+      }
+    ]
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "V2rayZ"
+    "shortcutName": "V2rayZ",
+    "include": "installer.nsh",
+    "installerIcon": "resources/win/app.ico",
+    "uninstallerIcon": "resources/win/app.ico",
+    "installerHeaderIcon": "resources/win/app.ico",
+    "deleteAppDataOnUninstall": false
   },
   "mac": {
     "target": [
@@ -48,9 +69,25 @@
         "arch": ["x64", "arm64"]
       }
     ],
-    "icon": "build/icon.icns",
+    "icon": "resources/mac-x64/app.icns",
     "category": "public.app-category.utilities",
-    "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "extraResources": [
+      {
+        "from": "resources/mac-${arch}",
+        "to": "resources/mac",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/data",
+        "to": "resources/data",
+        "filter": ["**/*"]
+      }
+    ]
   },
   "dmg": {
     "contents": [
@@ -64,11 +101,19 @@
         "type": "link",
         "path": "/Applications"
       }
-    ]
+    ],
+    "title": "${productName} ${version}",
+    "icon": "resources/mac-x64/app.icns",
+    "background": null,
+    "window": {
+      "width": 540,
+      "height": 380
+    }
   },
   "linux": {
     "target": ["AppImage", "deb"],
     "category": "Network",
-    "icon": "build/icon.png"
-  }
+    "icon": "resources/win/app.ico"
+  },
+  "publish": null
 }

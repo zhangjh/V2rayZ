@@ -34,7 +34,6 @@
     {
       "type": "tun",
       "tag": "tun-in",
-      "interface_name": "tun0",
       "address": [
         "172.19.0.1/30"
       ],
@@ -57,11 +56,11 @@
       "type": "trojan",
       "tag": "proxy",
       "server": "xxx",
-      "server_port": 123,
+      "server_port": 1234,
       "password": "xxx",
       "tls": {
         "enabled": true,
-        "server_name": "xx",
+        "server_name": "xxx",
         "utls": {
           "enabled": true,
           "fingerprint": "chrome"
@@ -83,19 +82,19 @@
         "tag": "geosite-cn",
         "type": "local",
         "format": "binary",
-        "path": "./geosite/geosite-cn.srs"
+        "path": "./resources/data/geosite-cn.srs"
       },
       {
         "tag": "geosite-geolocation-!cn",
         "type": "local",
         "format": "binary",
-        "path": "./geosite/geosite-geolocation-!cn.srs"
+        "path": "./resources/data/geosite-geolocation-!cn.srs"
       },
       {
         "tag": "geoip-cn",
         "type": "local",
         "format": "binary",
-        "path": "./geosite/geoip-cn.srs"
+        "path": "./resources/data/geoip-cn.srs"
       }
     ],
     "rules": [
@@ -130,7 +129,7 @@
   "experimental": {
     "cache_file": {
       "enabled": true,
-      "path": "cache.db"
+      "path": "./cache.db"
     }
   }
 }

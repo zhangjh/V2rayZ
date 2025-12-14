@@ -17,8 +17,15 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@': path.join(__dirname, 'src/renderer'),
       '@shared': path.join(__dirname, 'src/shared'),
       '@renderer': path.join(__dirname, 'src/renderer'),
+      '@components': path.join(__dirname, 'src/renderer/components'),
+      '@lib': path.join(__dirname, 'src/renderer/lib'),
+      '@hooks': path.join(__dirname, 'src/renderer/hooks'),
+      '@store': path.join(__dirname, 'src/renderer/store'),
+      '@pages': path.join(__dirname, 'src/renderer/pages'),
+      '@bridge': path.join(__dirname, 'src/renderer/bridge'),
     },
   },
   server: {

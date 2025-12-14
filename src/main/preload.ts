@@ -1,20 +1,58 @@
-import { contextBridge, ipcRenderer } from 'electron';
+/**
+ * Preload 脚本
+ * 在渲染进程中暴露安全的 IPC 接口
+ */
 
-// 暴露安全的 API 给渲染进程
-contextBridge.exposeInMainWorld('electronAPI', {
-  // IPC 调用方法
-  invoke: (channel: string, ...args: any[]) => {
-    return ipcRenderer.invoke(channel, ...args);
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+
+/**
+ * 暴露给渲染进程的 Electron API
+ */
+const electronAPI = {
+  ipcRenderer: {
+    /**
+     * 调用主进程方法
+     */
+    invoke: <T = any>(channel: string, args?: any): Promise<T> => {
+      return ipcRenderer.invoke(channel, args);
+    },
+
+    /**
+     * 监听主进程事件
+     */
+    on: (channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) => {
+      ipcRenderer.on(channel, listener);
+    },
+
+    /**
+     * 监听主进程事件（仅一次）
+     */
+    once: (channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) => {
+      ipcRenderer.once(channel, listener);
+    },
+
+    /**
+     * 取消监听主进程事件
+     */
+    off: (channel: string, listener: (...args: any[]) => void) => {
+      ipcRenderer.off(channel, listener);
+    },
+
+    /**
+     * 移除所有监听器
+     */
+    removeAllListeners: (channel: string) => {
+      ipcRenderer.removeAllListeners(channel);
+    },
   },
-  
-  // IPC 事件监听
-  on: (channel: string, callback: (...args: any[]) => void) => {
-    const subscription = (_event: any, ...args: any[]) => callback(...args);
-    ipcRenderer.on(channel, subscription);
-    
-    // 返回取消订阅函数
-    return () => {
-      ipcRenderer.removeListener(channel, subscription);
-    };
-  },
-});
+};
+
+/**
+ * 通过 contextBridge 暴露 API
+ */
+contextBridge.exposeInMainWorld('electron', electronAPI);
+
+/**
+ * TypeScript 类型声明
+ */
+export type ElectronAPI = typeof electronAPI;

@@ -1,8 +1,49 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import * as path from 'path';
+import { ConfigManager } from './services/ConfigManager';
+import { ProtocolParser } from './services/ProtocolParser';
+import { LogManager } from './services/LogManager';
+import { TrayManager } from './services/TrayManager';
+import { ProxyManager } from './services/ProxyManager';
+import { createSystemProxyManager } from './services/SystemProxyManager';
+import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers } from './ipc/handlers';
+import { ipcEventEmitter } from './ipc/ipc-events';
 
 let mainWindow: BrowserWindow | null = null;
+let trayManager: TrayManager | null = null;
 const isDevelopment = process.env.NODE_ENV === 'development';
+
+// 初始化服务
+const configManager = new ConfigManager();
+const protocolParser = new ProtocolParser();
+const logManager = new LogManager();
+let proxyManager: ProxyManager | null = null;
+const systemProxyManager = createSystemProxyManager();
+
+// 全局异常捕获 - 主进程
+process.on('uncaughtException', (error: Error) => {
+  console.error('Uncaught Exception:', error);
+  logManager.addLog('fatal', `未捕获的异常: ${error.message}\n${error.stack}`, 'Main');
+  
+  // 在开发环境显示错误对话框
+  if (isDevelopment) {
+    dialog.showErrorBox('未捕获的异常', `${error.message}\n\n${error.stack}`);
+  }
+  
+  // 不退出应用，尝试继续运行
+});
+
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  const errorMessage = reason instanceof Error ? reason.message : String(reason);
+  const errorStack = reason instanceof Error ? reason.stack : '';
+  logManager.addLog('error', `未处理的 Promise 拒绝: ${errorMessage}\n${errorStack}`, 'Main');
+  
+  // 在开发环境显示错误对话框
+  if (isDevelopment && reason instanceof Error) {
+    dialog.showErrorBox('未处理的 Promise 拒绝', `${errorMessage}\n\n${errorStack}`);
+  }
+});
 
 // 开发环境启用热重载
 if (isDevelopment) {
@@ -16,34 +57,253 @@ if (isDevelopment) {
   }
 }
 
+/**
+ * 显示主窗口
+ * 如果窗口不存在则创建，如果已存在则显示并聚焦
+ */
+function showWindow() {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    createWindow();
+  }
+}
+
 function createWindow() {
+  // 创建主窗口
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    title: 'V2rayZ',
+    show: false, // 先不显示，等待加载完成
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      devTools: true, // 始终启用开发者工具以便调试
     },
+    // macOS 特定配置
+    ...(process.platform === 'darwin' && {
+      titleBarStyle: 'hiddenInset',
+    }),
+  });
+
+  // 注册窗口到 IPC 事件发送器，以便接收广播事件
+  ipcEventEmitter.registerWindow(mainWindow);
+
+  // 更新托盘管理器的窗口引用
+  if (trayManager) {
+    trayManager.setMainWindow(mainWindow);
+  }
+
+  // 窗口加载完成后显示
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+    logManager.addLog('info', 'Main window shown', 'Main');
   });
 
   // 开发环境加载 Vite 开发服务器
   if (isDevelopment) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173').catch((err) => {
+      logManager.addLog('error', `Failed to load dev server: ${err.message}`, 'Main');
+    });
     mainWindow.webContents.openDevTools();
   } else {
     // 生产环境加载打包后的文件
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    let indexPath: string;
+    
+    if (__dirname.includes('app.asar')) {
+      // 在 asar 包中，使用 app.asar.unpacked 路径
+      const asarPath = __dirname.replace('app.asar', 'app.asar.unpacked');
+      indexPath = path.join(asarPath, '../../renderer/index.html');
+    } else {
+      // 不在 asar 包中
+      indexPath = path.join(__dirname, '../../renderer/index.html');
+    }
+    
+    mainWindow.loadFile(indexPath).catch((err) => {
+      logManager.addLog('error', `Failed to load index.html: ${err.message}`, 'Main');
+    });
   }
+
+  // 处理窗口加载错误
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    logManager.addLog('error', `Window failed to load: ${errorDescription} (${errorCode})`, 'Main');
+  });
+
+  // 处理窗口关闭事件
+  mainWindow.on('close', async (event) => {
+    // 保存窗口引用，因为在异步操作后 mainWindow 可能变为 null
+    const window = mainWindow;
+    if (!window || window.isDestroyed()) return;
+
+    // 获取用户配置
+    const config = await configManager.loadConfig();
+    
+    // 再次检查窗口是否仍然有效
+    if (window.isDestroyed()) return;
+    
+    // 如果配置为最小化到托盘，则阻止窗口关闭，改为隐藏
+    if (config.minimizeToTray) {
+      event.preventDefault();
+      window.hide();
+      logManager.addLog('info', 'Window hidden to tray', 'Main');
+    } else {
+      // 否则允许窗口关闭，应用将退出
+      logManager.addLog('info', 'Window closing, app will quit', 'Main');
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    if (trayManager) {
+      trayManager.setMainWindow(null);
+    }
+    logManager.addLog('info', 'Main window closed', 'Main');
   });
 }
 
-app.whenReady().then(() => {
+/**
+ * 清理应用资源
+ * 在应用退出前调用，确保清理系统代理和终止进程
+ */
+async function cleanupResources(): Promise<void> {
+  logManager.addLog('info', 'Cleaning up resources before exit...', 'Main');
+
+  try {
+    // 1. 停止代理进程
+    if (proxyManager) {
+      const status = proxyManager.getStatus();
+      if (status.running) {
+        logManager.addLog('info', 'Stopping proxy process...', 'Main');
+        await proxyManager.stop();
+        logManager.addLog('info', 'Proxy process stopped', 'Main');
+      }
+    }
+
+    // 2. 清理系统代理设置
+    try {
+      const proxyStatus = await systemProxyManager.getProxyStatus();
+      if (proxyStatus.enabled) {
+        logManager.addLog('info', 'Disabling system proxy...', 'Main');
+        await systemProxyManager.disableProxy();
+        logManager.addLog('info', 'System proxy disabled', 'Main');
+      }
+    } catch (error) {
+      // 系统代理清理失败不应阻止应用退出
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logManager.addLog('warn', `Failed to disable system proxy: ${errorMessage}`, 'Main');
+      console.warn('Failed to disable system proxy:', error);
+    }
+
+    logManager.addLog('info', 'Resource cleanup completed', 'Main');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logManager.addLog('error', `Error during cleanup: ${errorMessage}`, 'Main');
+    console.error('Error during cleanup:', error);
+  }
+}
+
+/**
+ * 导出托盘管理器（用于测试）
+ */
+export function getTrayManager(): TrayManager | null {
+  return trayManager;
+}
+
+app.whenReady().then(async () => {
+  // 记录应用启动日志
+  logManager.addLog('info', 'Application started', 'Main');
+  
+  // 加载配置并处理错误
+  try {
+    const config = await configManager.loadConfig();
+    logManager.addLog('info', 'Configuration loaded successfully', 'Main');
+    
+    // 检查配置是否为默认配置（可能是因为加载失败）
+    if (config.servers.length === 0 && config.selectedServerId === null) {
+      // 这可能是首次启动或配置文件损坏
+      logManager.addLog('warn', 'Using default configuration', 'Main');
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logManager.addLog('error', `Failed to load configuration: ${errorMessage}`, 'Main');
+    
+    // 显示错误对话框通知用户
+    dialog.showErrorBox(
+      '配置加载失败',
+      `无法加载配置文件，将使用默认配置。\n\n错误信息: ${errorMessage}`
+    );
+  }
+  
   createWindow();
+
+  // 初始化 ProxyManager（需要在窗口创建后）
+  proxyManager = new ProxyManager(logManager, mainWindow || undefined);
+
+  // 注册 IPC 处理器（需要在 ProxyManager 创建后）
+  registerConfigHandlers(configManager);
+  registerServerHandlers(protocolParser, configManager);
+  registerLogHandlers(logManager);
+  registerProxyHandlers(proxyManager, systemProxyManager);
+
+  // 创建托盘图标
+  trayManager = new TrayManager(mainWindow, logManager, {
+    onStartProxy: async () => {
+      try {
+        const config = await configManager.loadConfig();
+        if (proxyManager) {
+          await proxyManager.start(config);
+          
+          // 系统代理模式：设置系统代理
+          const modeType = (config.proxyModeType || 'tun').toLowerCase();
+          if (modeType === 'systemproxy') {
+            await systemProxyManager.enableProxy(
+              '127.0.0.1',
+              config.httpPort || 65533,
+              config.socksPort || 65534
+            );
+          }
+          
+          logManager.addLog('info', 'Proxy started from tray', 'Main');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logManager.addLog('error', `Failed to start proxy: ${errorMessage}`, 'Main');
+      }
+    },
+    onStopProxy: async () => {
+      try {
+        // 先禁用系统代理（不管当前状态如何，都尝试禁用）
+        await systemProxyManager.disableProxy();
+        
+        if (proxyManager) {
+          await proxyManager.stop();
+          logManager.addLog('info', 'Proxy stopped from tray', 'Main');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logManager.addLog('error', `Failed to stop proxy: ${errorMessage}`, 'Main');
+      }
+    },
+    onShowWindow: () => {
+      showWindow();
+    },
+    onQuit: async () => {
+      // 清理资源后退出
+      await cleanupResources();
+      app.exit(0);
+    },
+  });
+  trayManager.createTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -53,7 +313,46 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  // 在 macOS 上，即使所有窗口关闭，应用也应该继续运行（托盘模式）
+  // 在其他平台上，如果启用了托盘，也应该继续运行
+  if (process.platform !== 'darwin' && !trayManager) {
     app.quit();
   }
+});
+
+// 使用 will-quit 事件来清理资源
+app.on('will-quit', async (_event) => {
+  // 阻止默认退出，先清理资源
+  _event.preventDefault();
+
+  try {
+    // 清理资源
+    await cleanupResources();
+
+    // 清理托盘图标
+    if (trayManager) {
+      trayManager.destroyTray();
+      trayManager = null;
+    }
+
+    // 现在可以安全退出了
+    app.exit(0);
+  } catch (error) {
+    console.error('Error during app quit:', error);
+    // 即使清理失败，也要退出
+    app.exit(1);
+  }
+});
+
+// 处理 SIGINT 和 SIGTERM 信号
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT, cleaning up...');
+  await cleanupResources();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM, cleaning up...');
+  await cleanupResources();
+  process.exit(0);
 });
