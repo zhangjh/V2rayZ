@@ -207,6 +207,12 @@ export class TrayManager implements ITrayManager {
     if (fs.existsSync(iconPath)) {
       icon = nativeImage.createFromPath(iconPath);
       this.logManager.addLog('debug', `Loaded tray icon from: ${iconPath}`, 'TrayManager');
+      
+      // macOS 托盘图标需要调整大小为 22x22（或 16x16）
+      // 高 DPI 屏幕会自动使用 @2x 版本
+      if (process.platform === 'darwin') {
+        icon = icon.resize({ width: 18, height: 18 });
+      }
     } else {
       // 图标文件不存在，创建一个简单的默认图标
       this.logManager.addLog('warn', `Tray icon not found: ${iconPath}, using default`, 'TrayManager');

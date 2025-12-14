@@ -6,6 +6,7 @@ import { LogManager } from './services/LogManager';
 import { TrayManager } from './services/TrayManager';
 import { ProxyManager } from './services/ProxyManager';
 import { createSystemProxyManager } from './services/SystemProxyManager';
+import { resourceManager } from './services/ResourceManager';
 import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers } from './ipc/handlers';
 import { ipcEventEmitter } from './ipc/ipc-events';
 
@@ -81,6 +82,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: 'V2rayZ',
+    icon: resourceManager.getAppIconPath(),
     show: false, // 先不显示，等待加载完成
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -222,7 +224,20 @@ export function getTrayManager(): TrayManager | null {
 app.whenReady().then(async () => {
   // 记录应用启动日志
   logManager.addLog('info', 'Application started', 'Main');
-  
+
+  // 设置 macOS Dock 图标
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = resourceManager.getAppIconPath();
+    const fs = require('fs');
+    if (fs.existsSync(iconPath)) {
+      const { nativeImage } = require('electron');
+      const icon = nativeImage.createFromPath(iconPath);
+      // 调整为标准 Dock 图标尺寸
+      const resizedIcon = icon.resize({ width: 128, height: 128 });
+      app.dock.setIcon(resizedIcon);
+    }
+  }
+
   // 加载配置并处理错误
   try {
     const config = await configManager.loadConfig();

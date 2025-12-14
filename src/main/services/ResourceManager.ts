@@ -29,30 +29,21 @@ export class ResourceManager {
   }
 
   /**
-   * 获取应用图标路径
+   * 获取应用图标路径（统一使用 app.png）
    */
   getAppIconPath(): string {
-    const filename = this.platform === 'win32' ? 'app.ico' : 'app.icns';
-    const platformDir = this.getPlatformResourceDir();
-    return path.join(platformDir, filename);
+    if (this.isDev) {
+      return path.join(process.cwd(), 'resources', 'app.png');
+    }
+    // 生产环境：app.png 在 extraResources 根目录
+    return path.join(process.resourcesPath, 'resources', 'app.png');
   }
 
   /**
-   * 获取托盘图标路径
-   * @param _connected 是否为连接状态（暂时未使用，未来可以通过不同图标文件区分状态）
+   * 获取托盘图标路径（统一使用 app.png）
    */
   getTrayIconPath(_connected: boolean = false): string {
-    const platformDir = this.getPlatformResourceDir();
-    
-    if (this.platform === 'darwin') {
-      // macOS 托盘图标需要 PNG 格式
-      // 优先使用 trayTemplate.png（模板图像，系统会自动适配明暗模式）
-      // 如果不存在，返回空字符串，让 TrayManager 使用内置图标
-      return path.join(platformDir, 'trayTemplate.png');
-    } else {
-      // Windows 使用 ico 格式
-      return path.join(platformDir, 'app.ico');
-    }
+    return this.getAppIconPath();
   }
 
   /**
