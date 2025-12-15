@@ -8,6 +8,8 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels';
 import type { UserConfig, ProxyMode } from '../../../shared/types';
 import { registerIpcHandler } from '../ipc-handler';
 import { ConfigManager } from '../../services/ConfigManager';
+import { ipcEventEmitter } from '../ipc-events';
+import { mainEventEmitter, MAIN_EVENTS } from '../main-events';
 
 /**
  * 注册配置管理相关的 IPC 处理器
@@ -26,6 +28,10 @@ export function registerConfigHandlers(configManager: ConfigManager): void {
     IPC_CHANNELS.CONFIG_SAVE,
     async (_event: IpcMainInvokeEvent, config: UserConfig) => {
       await configManager.saveConfig(config);
+      // 广播配置变更事件到渲染进程
+      ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      // 触发主进程内部事件，用于更新托盘菜单等
+      mainEventEmitter.emit(MAIN_EVENTS.CONFIG_CHANGED, config);
     }
   );
 

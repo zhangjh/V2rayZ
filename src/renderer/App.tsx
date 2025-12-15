@@ -8,6 +8,7 @@ import { RulesPage } from './pages/rules-page';
 import { SettingsPage } from './pages/settings-page';
 import { Toaster } from './components/ui/sonner';
 import { ErrorBoundary } from './components/error-boundary';
+import { ipcClient } from './ipc/ipc-client';
 
 function App() {
   const currentView = useAppStore((state) => state.currentView);
@@ -30,6 +31,25 @@ function App() {
     
     return () => clearInterval(statusInterval);
   }, [loadConfig, refreshConnectionStatus]);
+
+  // Listen to navigate events from main process (tray menu)
+  useEffect(() => {
+    const routeMap: Record<string, string> = {
+      '/settings': 'settings',
+      '/home': 'home',
+      '/server': 'server',
+      '/rules': 'rules',
+    };
+
+    const unsubscribe = ipcClient.on<string>('navigate', (route) => {
+      const view = routeMap[route];
+      if (view) {
+        setCurrentView(view);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [setCurrentView]);
 
   return (
     <ErrorBoundary>

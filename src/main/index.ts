@@ -9,6 +9,7 @@ import { createSystemProxyManager } from './services/SystemProxyManager';
 import { resourceManager } from './services/ResourceManager';
 import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers, registerVersionHandlers } from './ipc/handlers';
 import { ipcEventEmitter } from './ipc/ipc-events';
+import { mainEventEmitter, MAIN_EVENTS } from './ipc/main-events';
 
 let mainWindow: BrowserWindow | null = null;
 let trayManager: TrayManager | null = null;
@@ -227,6 +228,29 @@ export function getTrayManager(): TrayManager | null {
   return trayManager;
 }
 
+/**
+ * 更新托盘菜单状态
+ */
+async function updateTrayMenuState(isProxyRunning: boolean): Promise<void> {
+  if (!trayManager) return;
+  
+  try {
+    const config = await configManager.loadConfig();
+    trayManager.updateFullTrayMenu({
+      isProxyRunning,
+      servers: config.servers,
+      selectedServerId: config.selectedServerId,
+      proxyMode: config.proxyMode,
+    });
+    
+    // 同时更新托盘图标状态
+    trayManager.updateTrayIcon(isProxyRunning ? 'connected' : 'idle');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logManager.addLog('error', `Failed to update tray menu state: ${errorMessage}`, 'Main');
+  }
+}
+
 app.whenReady().then(async () => {
   // 记录应用启动日志
   logManager.addLog('info', 'Application started', 'Main');
@@ -296,6 +320,8 @@ app.whenReady().then(async () => {
           }
           
           logManager.addLog('info', 'Proxy started from tray', 'Main');
+          // 更新托盘菜单状态
+          updateTrayMenuState(true);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -310,6 +336,8 @@ app.whenReady().then(async () => {
         if (proxyManager) {
           await proxyManager.stop();
           logManager.addLog('info', 'Proxy stopped from tray', 'Main');
+          // 更新托盘菜单状态
+          updateTrayMenuState(false);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -324,8 +352,84 @@ app.whenReady().then(async () => {
       await cleanupResources();
       app.exit(0);
     },
+    onSelectServer: async (serverId: string) => {
+      try {
+        const config = await configManager.loadConfig();
+        config.selectedServerId = serverId;
+        await configManager.saveConfig(config);
+        logManager.addLog('info', `Server selected from tray: ${serverId}`, 'Main');
+        
+        // 如果代理正在运行，重启以应用新服务器
+        if (proxyManager && proxyManager.getStatus().running) {
+          await proxyManager.stop();
+          await proxyManager.start(config);
+          logManager.addLog('info', 'Proxy restarted with new server', 'Main');
+        }
+        
+        // 更新托盘菜单
+        updateTrayMenuState(proxyManager?.getStatus().running ?? false);
+        
+        // 通知渲染进程配置已更新
+        ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logManager.addLog('error', `Failed to select server: ${errorMessage}`, 'Main');
+      }
+    },
+    onChangeProxyMode: async (mode) => {
+      try {
+        const config = await configManager.loadConfig();
+        config.proxyMode = mode;
+        await configManager.saveConfig(config);
+        logManager.addLog('info', `Proxy mode changed from tray: ${mode}`, 'Main');
+        
+        // 如果代理正在运行，重启以应用新模式
+        if (proxyManager && proxyManager.getStatus().running) {
+          await proxyManager.stop();
+          await proxyManager.start(config);
+          logManager.addLog('info', 'Proxy restarted with new mode', 'Main');
+        }
+        
+        // 更新托盘菜单
+        updateTrayMenuState(proxyManager?.getStatus().running ?? false);
+        
+        // 通知渲染进程配置已更新
+        ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logManager.addLog('error', `Failed to change proxy mode: ${errorMessage}`, 'Main');
+      }
+    },
+    onOpenSettings: () => {
+      showWindow();
+      // 发送导航事件到渲染进程
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('navigate', '/settings');
+      }
+    },
+    onCheckUpdate: () => {
+      // 打开 GitHub releases 页面
+      const { shell } = require('electron');
+      shell.openExternal('https://github.com/your-repo/v2rayz/releases');
+    },
+    onManageServers: () => {
+      showWindow();
+      // 发送导航事件到渲染进程
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('navigate', '/server');
+      }
+    },
   });
   trayManager.createTray();
+
+  // 初始化托盘菜单状态
+  updateTrayMenuState(false);
+
+  // 监听配置变更事件，更新托盘菜单
+  mainEventEmitter.on(MAIN_EVENTS.CONFIG_CHANGED, () => {
+    const isRunning = proxyManager?.getStatus().running ?? false;
+    updateTrayMenuState(isRunning);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

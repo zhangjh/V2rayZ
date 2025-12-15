@@ -1,10 +1,21 @@
-import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron';
+import { Tray, Menu, nativeImage, BrowserWindow, app, MenuItemConstructorOptions, shell } from 'electron';
 import { LogManager } from './LogManager';
+import { ServerConfig, ProxyMode } from '../../shared/types';
 
 /**
  * 托盘图标状态
  */
 export type TrayIconState = 'idle' | 'connected' | 'connecting';
+
+/**
+ * 托盘菜单数据
+ */
+export interface TrayMenuData {
+  isProxyRunning: boolean;
+  servers: ServerConfig[];
+  selectedServerId: string | null;
+  proxyMode: ProxyMode;
+}
 
 /**
  * 托盘管理器接口
@@ -29,6 +40,11 @@ export interface ITrayManager {
    * 更新托盘菜单
    */
   updateTrayMenu(isProxyRunning: boolean): void;
+
+  /**
+   * 更新完整托盘菜单（包含服务器列表和代理模式）
+   */
+  updateFullTrayMenu(data: TrayMenuData): void;
 }
 
 /**
@@ -41,12 +57,20 @@ export class TrayManager implements ITrayManager {
   private logManager: LogManager;
   private currentState: TrayIconState = 'idle';
   private isProxyRunning: boolean = false;
+  private servers: ServerConfig[] = [];
+  private selectedServerId: string | null = null;
+  private proxyMode: ProxyMode = 'smart';
 
   // 回调函数
   private onStartProxy?: () => void;
   private onStopProxy?: () => void;
   private onShowWindow?: () => void;
   private onQuit?: () => void;
+  private onSelectServer?: (serverId: string) => void;
+  private onChangeProxyMode?: (mode: ProxyMode) => void;
+  private onOpenSettings?: () => void;
+  private onCheckUpdate?: () => void;
+  private onManageServers?: () => void;
 
   constructor(
     mainWindow: BrowserWindow | null,
@@ -56,6 +80,11 @@ export class TrayManager implements ITrayManager {
       onStopProxy?: () => void;
       onShowWindow?: () => void;
       onQuit?: () => void;
+      onSelectServer?: (serverId: string) => void;
+      onChangeProxyMode?: (mode: ProxyMode) => void;
+      onOpenSettings?: () => void;
+      onCheckUpdate?: () => void;
+      onManageServers?: () => void;
     }
   ) {
     this.mainWindow = mainWindow;
@@ -64,6 +93,11 @@ export class TrayManager implements ITrayManager {
     this.onStopProxy = callbacks?.onStopProxy;
     this.onShowWindow = callbacks?.onShowWindow;
     this.onQuit = callbacks?.onQuit;
+    this.onSelectServer = callbacks?.onSelectServer;
+    this.onChangeProxyMode = callbacks?.onChangeProxyMode;
+    this.onOpenSettings = callbacks?.onOpenSettings;
+    this.onCheckUpdate = callbacks?.onCheckUpdate;
+    this.onManageServers = callbacks?.onManageServers;
   }
 
   /**
@@ -151,21 +185,95 @@ export class TrayManager implements ITrayManager {
   }
 
   /**
-   * 更新托盘菜单
+   * 更新托盘菜单（简化版，保持向后兼容）
    */
   updateTrayMenu(isProxyRunning: boolean): void {
+    this.updateFullTrayMenu({
+      isProxyRunning,
+      servers: this.servers,
+      selectedServerId: this.selectedServerId,
+      proxyMode: this.proxyMode,
+    });
+  }
+
+  /**
+   * 更新完整托盘菜单（包含服务器列表和代理模式）
+   */
+  updateFullTrayMenu(data: TrayMenuData): void {
     if (!this.tray) {
       this.logManager.addLog('warn', 'Cannot update tray menu: tray not created', 'TrayManager');
       return;
     }
 
-    this.isProxyRunning = isProxyRunning;
+    this.isProxyRunning = data.isProxyRunning;
+    this.servers = data.servers;
+    this.selectedServerId = data.selectedServerId;
+    this.proxyMode = data.proxyMode;
+
+    // 状态显示
+    const statusLabel = data.isProxyRunning ? '● 已连接' : '● 已断开';
+
+    // 构建服务器子菜单
+    const serverSubmenu: MenuItemConstructorOptions[] = [];
+    const maxLabelLength = 25; // 最大显示长度
+    
+    if (data.servers.length > 0) {
+      // 添加服务器列表
+      data.servers.forEach((server) => {
+        const name = server.name || server.address;
+        const protocol = (server.protocol || '').toUpperCase();
+        let label = `${name}（${protocol}）`;
+        
+        // 超长截断
+        if (label.length > maxLabelLength) {
+          label = label.substring(0, maxLabelLength - 3) + '...';
+        }
+        
+        serverSubmenu.push({
+          label,
+          type: 'radio' as const,
+          checked: server.id === data.selectedServerId,
+          click: () => this.handleSelectServer(server.id),
+        });
+      });
+      // 添加分隔线
+      serverSubmenu.push({ type: 'separator' });
+    } else {
+      serverSubmenu.push({ label: '未配置服务器', enabled: false });
+      serverSubmenu.push({ type: 'separator' });
+    }
+    
+    // 添加"管理服务器"选项
+    serverSubmenu.push({
+      label: '管理服务器',
+      click: () => this.handleManageServers(),
+    });
+
+    // 代理模式标签映射
+    const proxyModeLabels: Record<ProxyMode, string> = {
+      global: '全局代理',
+      smart: '智能分流',
+      direct: '直连模式',
+    };
+
+    // 构建代理模式子菜单
+    const proxyModeSubmenu: MenuItemConstructorOptions[] = (['global', 'smart', 'direct'] as ProxyMode[]).map((mode) => ({
+      label: proxyModeLabels[mode],
+      type: 'radio' as const,
+      checked: data.proxyMode === mode,
+      click: () => this.handleChangeProxyMode(mode),
+    }));
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: isProxyRunning ? '停止代理' : '启动代理',
+        label: statusLabel,
+        enabled: false,
+      },
+      { type: 'separator' },
+      {
+        label: data.isProxyRunning ? '禁用代理' : '启用代理',
         click: () => {
-          if (isProxyRunning) {
+          if (data.isProxyRunning) {
             this.handleStopProxy();
           } else {
             this.handleStartProxy();
@@ -174,22 +282,35 @@ export class TrayManager implements ITrayManager {
       },
       { type: 'separator' },
       {
-        label: '显示窗口',
-        click: () => {
-          this.handleShowWindow();
-        },
+        label: '选择服务器',
+        submenu: serverSubmenu,
+      },
+      {
+        label: '代理模式',
+        submenu: proxyModeSubmenu,
+      },
+      { type: 'separator' },
+      {
+        label: '打开主窗口',
+        click: () => this.handleShowWindow(),
+      },
+      {
+        label: '打开设置',
+        click: () => this.handleOpenSettings(),
+      },
+      {
+        label: '检查更新',
+        click: () => this.handleCheckUpdate(),
       },
       { type: 'separator' },
       {
         label: '退出',
-        click: () => {
-          this.handleQuit();
-        },
+        click: () => this.handleQuit(),
       },
     ]);
 
     this.tray.setContextMenu(contextMenu);
-    this.logManager.addLog('info', 'Tray menu updated', 'TrayManager');
+    this.logManager.addLog('debug', 'Tray menu updated', 'TrayManager');
   }
 
   /**
@@ -303,6 +424,71 @@ export class TrayManager implements ITrayManager {
   }
 
   /**
+   * 处理选择服务器
+   */
+  private handleSelectServer(serverId: string): void {
+    this.logManager.addLog('info', `Server selected from tray: ${serverId}`, 'TrayManager');
+    if (this.onSelectServer) {
+      this.onSelectServer(serverId);
+    }
+  }
+
+  /**
+   * 处理切换代理模式
+   */
+  private handleChangeProxyMode(mode: ProxyMode): void {
+    this.logManager.addLog('info', `Proxy mode changed from tray: ${mode}`, 'TrayManager');
+    if (this.onChangeProxyMode) {
+      this.onChangeProxyMode(mode);
+    }
+  }
+
+  /**
+   * 处理打开设置
+   */
+  private handleOpenSettings(): void {
+    this.logManager.addLog('info', 'Open settings clicked from tray', 'TrayManager');
+    if (this.onOpenSettings) {
+      this.onOpenSettings();
+    } else {
+      // 默认行为：显示窗口并导航到设置页面
+      this.handleShowWindow();
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('navigate', '/settings');
+      }
+    }
+  }
+
+  /**
+   * 处理检查更新
+   */
+  private handleCheckUpdate(): void {
+    this.logManager.addLog('info', 'Check update clicked from tray', 'TrayManager');
+    if (this.onCheckUpdate) {
+      this.onCheckUpdate();
+    } else {
+      // 默认行为：打开 GitHub releases 页面
+      shell.openExternal('https://github.com/your-repo/v2rayz/releases');
+    }
+  }
+
+  /**
+   * 处理管理服务器
+   */
+  private handleManageServers(): void {
+    this.logManager.addLog('info', 'Manage servers clicked from tray', 'TrayManager');
+    if (this.onManageServers) {
+      this.onManageServers();
+    } else {
+      // 默认行为：显示窗口并导航到服务器页面
+      this.handleShowWindow();
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('navigate', '/server');
+      }
+    }
+  }
+
+  /**
    * 获取托盘是否已创建（用于测试）
    */
   isTrayCreated(): boolean {
@@ -321,5 +507,19 @@ export class TrayManager implements ITrayManager {
    */
   getCurrentIconState(): TrayIconState {
     return this.currentState;
+  }
+
+  /**
+   * 获取当前选中的服务器ID（用于测试）
+   */
+  getSelectedServerId(): string | null {
+    return this.selectedServerId;
+  }
+
+  /**
+   * 获取当前代理模式（用于测试）
+   */
+  getProxyMode(): ProxyMode {
+    return this.proxyMode;
   }
 }

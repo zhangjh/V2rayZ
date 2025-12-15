@@ -40,10 +40,15 @@ export class ResourceManager {
   }
 
   /**
-   * 获取托盘图标路径（统一使用 app.png）
+   * 获取托盘图标路径
+   * @param connected 是否已连接，true 返回彩色图标，false 返回灰色图标
    */
-  getTrayIconPath(_connected: boolean = false): string {
-    return this.getAppIconPath();
+  getTrayIconPath(connected: boolean = false): string {
+    const filename = connected ? 'app.png' : 'app-gray.png';
+    if (this.isDev) {
+      return path.join(process.cwd(), 'resources', filename);
+    }
+    return path.join(process.resourcesPath, 'resources', filename);
   }
 
   /**
