@@ -92,18 +92,24 @@ function createWindow() {
     icon: resourceManager.getAppIconPath(),
     show: false, // 先不显示，等待加载完成
     backgroundColor: '#ffffff',
+    autoHideMenuBar: true, // 自动隐藏菜单栏
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      devTools: true, // 始终启用开发者工具以便调试
+      devTools: false, // 启用开发者工具以便调试
     },
     // macOS 特定配置
     ...(process.platform === 'darwin' && {
       titleBarStyle: 'hiddenInset',
     }),
   });
+
+  // 移除默认菜单栏（Windows/Linux）
+  if (process.platform !== 'darwin') {
+    mainWindow.setMenu(null);
+  }
 
   // 注册窗口到 IPC 事件发送器，以便接收广播事件
   ipcEventEmitter.registerWindow(mainWindow);
