@@ -1,6 +1,7 @@
 {
   "name": "v2rayz-electron",
-  "version": "1.0.0",
+  "version": "3.0.0",
+  "singboxVersion": "1.12.13",
   "description": "跨平台 V2ray 桌面客户端 - 基于 Electron",
   "main": "dist/main/main/index.js",
   "scripts": {

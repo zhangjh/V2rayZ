@@ -50,6 +50,9 @@ export const IPC_CHANNELS = {
   STATS_GET: 'stats:get',
   STATS_RESET: 'stats:reset',
 
+  // 版本信息
+  VERSION_GET_INFO: 'version:getInfo',
+
   // 事件 (主进程 -> 渲染进程)
   EVENT_PROXY_STARTED: 'event:proxyStarted',
   EVENT_PROXY_STOPPED: 'event:proxyStopped',

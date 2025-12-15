@@ -323,6 +323,30 @@ export const connectionApi = {
 };
 
 /**
+ * 版本信息类型
+ */
+export interface VersionInfo {
+  appVersion: string;
+  appName: string;
+  buildDate: string;
+  singBoxVersion: string;
+  copyright: string;
+  repositoryUrl: string;
+}
+
+/**
+ * 版本信息 API
+ */
+export const versionApi = {
+  /**
+   * 获取版本信息
+   */
+  async getInfo(): Promise<VersionInfo> {
+    return ipcClient.invoke(IPC_CHANNELS.VERSION_GET_INFO);
+  },
+};
+
+/**
  * 统一的 API 客户端
  */
 export const api = {
@@ -335,6 +359,7 @@ export const api = {
   autoStart: autoStartApi,
   stats: statsApi,
   connection: connectionApi,
+  version: versionApi,
 };
 
 /**

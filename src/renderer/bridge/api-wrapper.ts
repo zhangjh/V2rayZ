@@ -202,10 +202,17 @@ export async function clearLogs(): Promise<ApiResponse<void>> {
 /**
  * Version Information APIs
  */
-export async function getVersionInfo(): Promise<ApiResponse<any>> {
+export async function getVersionInfo(): Promise<ApiResponse<{
+  appVersion: string;
+  appName: string;
+  buildDate: string;
+  singBoxVersion: string;
+  copyright: string;
+  repositoryUrl: string;
+}>> {
   try {
-    // TODO: 实现版本信息获取
-    return { success: true, data: { version: '1.0.0' } };
+    const data = await api.version.getInfo();
+    return { success: true, data };
   } catch (error: any) {
     return { success: false, error: error?.message };
   }

@@ -7,7 +7,7 @@ import { TrayManager } from './services/TrayManager';
 import { ProxyManager } from './services/ProxyManager';
 import { createSystemProxyManager } from './services/SystemProxyManager';
 import { resourceManager } from './services/ResourceManager';
-import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers } from './ipc/handlers';
+import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers, registerVersionHandlers } from './ipc/handlers';
 import { ipcEventEmitter } from './ipc/ipc-events';
 
 let mainWindow: BrowserWindow | null = null;
@@ -275,6 +275,7 @@ app.whenReady().then(async () => {
   registerServerHandlers(protocolParser, configManager);
   registerLogHandlers(logManager);
   registerProxyHandlers(proxyManager, systemProxyManager);
+  registerVersionHandlers();
 
   // 创建托盘图标
   trayManager = new TrayManager(mainWindow, logManager, {

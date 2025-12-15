@@ -6,3 +6,4 @@ export * from './config-handlers';
 export * from './server-handlers';
 export * from './log-handlers';
 export * from './proxy-handlers';
+export * from './version-handlers';
