@@ -91,17 +91,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   startProxy: async () => {
     set({ isLoading: true, error: null })
     try {
-      // Check if TUN mode is selected
-      const config = get().config
-      if (config?.proxyModeType === 'tun') {
-        // TODO: 实现管理员权限检查
-        // 暂时跳过权限检查，因为 Electron 应用需要不同的实现方式
-      }
-      
-      // 获取当前配置并传递给后端
+      // 获取当前配置
       const currentConfig = get().config
       if (!currentConfig) {
         throw new Error('配置未加载')
+      }
+
+      // Check if TUN mode is selected and needs admin privileges
+      // 使用小写比较以兼容不同的大小写形式
+      const isTunMode = currentConfig.proxyModeType?.toLowerCase() === 'tun'
+      console.log('[StartProxy] proxyModeType:', currentConfig.proxyModeType, 'isTunMode:', isTunMode)
+
+      if (isTunMode) {
+        console.log('[StartProxy] TUN mode detected, checking admin privileges...')
+        const adminStatus = await api.admin.check()
+        console.log('[StartProxy] Admin status:', adminStatus)
+
+        if (adminStatus.needsElevationForTun) {
+          // 需要管理员权限但当前没有
+          console.log('[StartProxy] Needs elevation, requesting...')
+          set({ isLoading: false })
+
+          // 请求提升权限（会弹出对话框询问用户是否重启）
+          const userAccepted = await api.admin.requestElevation()
+
+          if (userAccepted) {
+            // 用户同意重启，应用将以管理员权限重启
+            // 此时应用会退出，不需要继续执行
+            return
+          } else {
+            // 用户取消了权限提升
+            set({
+              error: 'TUN 模式需要管理员权限。请以管理员身份运行应用，或切换到系统代理模式。',
+            })
+            return
+          }
+        }
+        console.log('[StartProxy] Already has admin privileges or not needed')
       }
       
       await api.proxy.start(currentConfig)

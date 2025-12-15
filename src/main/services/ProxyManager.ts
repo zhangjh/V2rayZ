@@ -430,10 +430,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 生成日志配置
    */
   private generateLogConfig(config: UserConfig): SingBoxLogConfig {
-    // 默认使用 debug 级别以显示连接请求日志
-    // info 级别只显示启动/停止等基本信息，不显示每个连接
+    // 使用 info 级别，只显示启动/停止和关键信息
+    // debug 级别会输出大量连接日志，但 sing-box 不输出路由决策（域名->出站）
+    // warn 级别只显示警告和错误
     const logConfig: SingBoxLogConfig = {
-      level: config.logLevel || 'debug',
+      level: config.logLevel || 'info',
       timestamp: true,
     };
     
@@ -776,11 +777,20 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   }
 
   /**
-   * 检查当前配置是否需要 root 权限（TUN 模式）
+   * 检查当前配置是否需要 root/admin 权限（TUN 模式）
+   * Windows 和 macOS 的 TUN 模式都需要管理员权限
    */
   private needsRootPrivilege(): boolean {
-    // TUN 模式在 macOS 上需要 root 权限
-    return process.platform === 'darwin' && this.currentConfig?.proxyModeType?.toLowerCase() !== 'systemproxy';
+    const isTunMode = this.currentConfig?.proxyModeType?.toLowerCase() !== 'systemproxy';
+    // Windows 和 macOS 的 TUN 模式都需要管理员权限
+    return isTunMode && (process.platform === 'darwin' || process.platform === 'win32');
+  }
+  
+  /**
+   * 检查是否需要使用 osascript 运行（仅 macOS）
+   */
+  private needsOsascript(): boolean {
+    return process.platform === 'darwin' && this.needsRootPrivilege();
   }
 
   /**
@@ -798,12 +808,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           return;
         }
 
-        // 在 macOS 上，TUN 模式需要 root 权限
+        // 在 macOS 上，TUN 模式需要使用 osascript 请求 root 权限
+        // 在 Windows 上，应用应该已经以管理员权限运行（通过 UAC 提升）
         let command: string;
         let args: string[];
         
-        if (this.needsRootPrivilege()) {
-          // 使用 osascript 请求管理员权限运行
+        if (this.needsOsascript()) {
+          // macOS: 使用 osascript 请求管理员权限运行
           // 注意：路径中可能包含空格，需要使用转义引号
           // sing-box 配置中已经设置了 log.output，日志会写入文件
           // 使用 & 让进程在后台运行，并将 PID 写入文件
@@ -816,6 +827,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           ];
           this.logToManager('info', 'TUN 模式需要管理员权限，正在请求...');
         } else {
+          // Windows 或系统代理模式：直接运行
           command = this.singboxPath;
           args = ['run', '-c', this.configPath];
         }
@@ -859,7 +871,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           console.log(`sing-box process exited with code ${code}, signal ${signal}`);
           
           // 对于 macOS TUN 模式，osascript 退出码为 0 表示成功启动了后台进程
-          if (this.needsRootPrivilege()) {
+          if (this.needsOsascript()) {
             if (code === 0) {
               // osascript 成功执行，sing-box 在后台运行
               // 读取 PID 文件获取实际的 sing-box PID
@@ -890,7 +902,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         setTimeout(() => {
           if (this.singboxProcess && this.pid) {
             // 如果使用 osascript 运行（macOS TUN 模式），启动日志文件监控
-            if (this.needsRootPrivilege()) {
+            if (this.needsOsascript()) {
               this.startLogFileWatcher();
             }
             
@@ -1192,19 +1204,83 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       return;
     }
 
+    // 过滤低价值日志（连接建立、DNS 查询等频繁日志）
+    if (this.isLowValueLog(line)) {
+      return;
+    }
+
     // 解析 sing-box 日志格式
     const logInfo = this.parseSingBoxLog(line);
-    
+
     if (logInfo) {
       // 转换为友好的中文提示
       const friendlyMessage = this.translateErrorMessage(logInfo.message);
-      
+
       // 记录到 LogManager
       this.logToManager(logInfo.level, friendlyMessage);
     } else {
       // 无法解析的日志，直接记录
       this.logToManager('info', line);
     }
+  }
+
+  /**
+   * 检查是否为低价值日志（应该被过滤）
+   * 保留：路由决策、错误、启动/停止、outbound 选择等重要日志
+   * 过滤：频繁的连接建立/关闭、握手等日志
+   */
+  private isLowValueLog(line: string): boolean {
+    const lowerLine = line.toLowerCase();
+
+    // 高价值日志模式 - 这些日志应该保留
+    const keepPatterns = [
+      'started',          // 启动完成
+      'stopped',          // 停止
+      'sing-box started', // sing-box 启动
+      'error',            // 错误
+      'fatal',            // 致命错误
+      'warn',             // 警告
+      'failed',           // 失败
+      'updated default interface', // 网络接口变化
+    ];
+
+    // 检查是否包含高价值模式
+    for (const pattern of keepPatterns) {
+      if (lowerLine.includes(pattern)) {
+        return false; // 不过滤，保留这条日志
+      }
+    }
+
+    // 过滤的低价值日志模式（sing-box 的连接日志太频繁）
+    const filterPatterns = [
+      'outbound connection',     // 出站连接（太频繁）
+      'outbound packet',         // 出站数据包（太频繁）
+      'inbound connection',      // 入站连接建立（太频繁）
+      'inbound/tun',             // TUN 入站日志（太频繁）
+      'inbound/http',            // HTTP 入站日志
+      'inbound/socks',           // SOCKS 入站日志
+      'connection to',           // 连接到目标
+      'connection from',         // 来自的连接
+      'dns query',               // DNS 查询
+      'dns response',            // DNS 响应
+      'dns: exchanged',          // DNS 交换
+      'dns: cached',             // DNS 缓存
+      'resolved',                // DNS 解析完成
+      'connection closed',       // 连接关闭
+      'connection established',  // 连接建立
+      'handshake',               // 握手
+      'tls handshake',           // TLS 握手
+      'udp packet',              // UDP 包
+      'tcp connection',          // TCP 连接
+    ];
+
+    for (const pattern of filterPatterns) {
+      if (lowerLine.includes(pattern)) {
+        return true; // 过滤掉
+      }
+    }
+
+    return false; // 默认保留
   }
 
   /**

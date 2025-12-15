@@ -33,6 +33,7 @@
     ],
     "icon": "resources/win/app.ico",
     "artifactName": "${productName}-${version}-win-${arch}.${ext}",
+    "signAndEditExecutable": false,
     "extraResources": [
       {
         "from": "resources/win",

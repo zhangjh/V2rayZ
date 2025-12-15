@@ -11,6 +11,20 @@ import { ProxyManager } from '../../services/ProxyManager';
 import { ISystemProxyManager } from '../../services/SystemProxyManager';
 
 /**
+ * 托盘状态更新回调
+ */
+export type TrayStateUpdateCallback = (isRunning: boolean) => void;
+
+let trayStateCallback: TrayStateUpdateCallback | null = null;
+
+/**
+ * 设置托盘状态更新回调
+ */
+export function setTrayStateCallback(callback: TrayStateUpdateCallback): void {
+  trayStateCallback = callback;
+}
+
+/**
  * 注册代理管理相关的 IPC 处理器
  */
 export function registerProxyHandlers(
@@ -31,7 +45,7 @@ export function registerProxyHandlers(
       
       // 启动 sing-box 进程
       await proxyManager.start(config);
-      
+
       // 系统代理模式：设置系统代理
       const modeType = (config.proxyModeType || 'tun').toLowerCase();
       if (modeType === 'systemproxy' && systemProxyManager) {
@@ -42,6 +56,11 @@ export function registerProxyHandlers(
           config.socksPort || 65534
         );
         console.log('[Proxy Handlers] System proxy enabled');
+      }
+
+      // 更新托盘状态
+      if (trayStateCallback) {
+        trayStateCallback(true);
       }
     }
   );
@@ -60,9 +79,14 @@ export function registerProxyHandlers(
           console.error('[Proxy Handlers] Failed to disable system proxy:', error);
         }
       }
-      
+
       // 停止 sing-box 进程
       await proxyManager.stop();
+
+      // 更新托盘状态
+      if (trayStateCallback) {
+        trayStateCallback(false);
+      }
     }
   );
 

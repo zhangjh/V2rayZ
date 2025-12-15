@@ -347,6 +347,35 @@ export const versionApi = {
 };
 
 /**
+ * 管理员权限检查结果
+ */
+export interface AdminCheckResult {
+  isAdmin: boolean;
+  platform: NodeJS.Platform;
+  needsElevationForTun: boolean;
+}
+
+/**
+ * 管理员权限 API
+ */
+export const adminApi = {
+  /**
+   * 检查管理员权限状态
+   */
+  async check(): Promise<AdminCheckResult> {
+    return ipcClient.invoke(IPC_CHANNELS.ADMIN_CHECK);
+  },
+
+  /**
+   * 请求提升权限（会重启应用）
+   * @returns 如果用户同意重启返回 true，否则返回 false
+   */
+  async requestElevation(): Promise<boolean> {
+    return ipcClient.invoke(IPC_CHANNELS.ADMIN_REQUEST_ELEVATION);
+  },
+};
+
+/**
  * 统一的 API 客户端
  */
 export const api = {
@@ -360,6 +389,7 @@ export const api = {
   stats: statsApi,
   connection: connectionApi,
   version: versionApi,
+  admin: adminApi,
 };
 
 /**

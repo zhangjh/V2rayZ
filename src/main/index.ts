@@ -7,7 +7,7 @@ import { TrayManager } from './services/TrayManager';
 import { ProxyManager } from './services/ProxyManager';
 import { createSystemProxyManager } from './services/SystemProxyManager';
 import { resourceManager } from './services/ResourceManager';
-import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers, registerVersionHandlers } from './ipc/handlers';
+import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers, registerVersionHandlers, registerAdminHandlers, setTrayStateCallback } from './ipc/handlers';
 import { ipcEventEmitter } from './ipc/ipc-events';
 import { mainEventEmitter, MAIN_EVENTS } from './ipc/main-events';
 
@@ -306,6 +306,12 @@ app.whenReady().then(async () => {
   registerLogHandlers(logManager);
   registerProxyHandlers(proxyManager, systemProxyManager);
   registerVersionHandlers();
+  registerAdminHandlers();
+
+  // 设置托盘状态更新回调
+  setTrayStateCallback((isRunning: boolean) => {
+    updateTrayMenuState(isRunning);
+  });
 
   // 创建托盘图标
   trayManager = new TrayManager(mainWindow, logManager, {
