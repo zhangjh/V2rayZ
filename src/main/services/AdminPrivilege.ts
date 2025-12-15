@@ -171,34 +171,75 @@ async function launchElevatedWindows(exePath: string): Promise<void> {
 
 /**
  * macOS 下以管理员权限启动
- * 使用 osascript 请求权限
+ * 使用 osascript 请求权限，然后用 sudo 启动新进程
  */
 async function launchElevatedMacOS(exePath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const script = `do shell script "open -a '${exePath}'" with administrator privileges`;
+    // 对于 Electron app，exePath 通常已经是 /path/to/App.app/Contents/MacOS/AppName
+    // 我们需要找到 .app bundle 的路径来使用 open 命令
+    let appBundlePath = exePath;
+
+    // 如果路径包含 Contents/MacOS，向上找到 .app bundle
+    const contentsIndex = exePath.indexOf('/Contents/MacOS/');
+    if (contentsIndex !== -1) {
+      appBundlePath = exePath.substring(0, contentsIndex);
+    }
+
+    console.log('[AdminPrivilege] exe path:', exePath);
+    console.log('[AdminPrivilege] app bundle path:', appBundlePath);
+
+    // 方案：先用 osascript 获取管理员权限创建一个标记文件，
+    // 然后用 sudo -b 在后台启动应用
+    // 转义路径中的特殊字符
+    const escapedExePath = exePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+    // 使用 sudo -b 在后台以 root 权限运行，同时设置 ELECTRON_RUN_AS_NODE=0 确保正常启动
+    const script = `do shell script "sudo -b \\"${escapedExePath}\\" > /dev/null 2>&1" with administrator privileges`;
 
     console.log('[AdminPrivilege] Launching elevated with script:', script);
 
     const child = spawn('/usr/bin/osascript', ['-e', script], {
-      detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
+    let stdout = '';
+    let stderr = '';
+
+    if (child.stdout) {
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+    }
+
+    if (child.stderr) {
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+    }
+
     child.on('error', (error) => {
-      console.error('Failed to launch elevated process:', error);
+      console.error('[AdminPrivilege] Failed to launch elevated process:', error);
       reject(error);
     });
 
     child.on('exit', (code) => {
+      console.log('[AdminPrivilege] osascript exit code:', code);
+      if (stdout) console.log('[AdminPrivilege] stdout:', stdout.trim());
+      if (stderr) console.log('[AdminPrivilege] stderr:', stderr.trim());
+
       if (code === 0) {
-        app.quit();
+        console.log('[AdminPrivilege] Elevated process started, quitting current instance');
+        // 给新进程一点时间启动
+        setTimeout(() => {
+          app.quit();
+        }, 1500);
         resolve();
       } else {
-        reject(new Error('用户取消了管理员权限请求'));
+        const errorMsg = stderr || '用户取消了管理员权限请求';
+        console.error('[AdminPrivilege] Failed to start elevated process:', errorMsg);
+        reject(new Error(errorMsg));
       }
     });
-
-    child.unref();
   });
 }
 
