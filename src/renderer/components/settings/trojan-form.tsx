@@ -64,13 +64,25 @@ export function TrojanForm({
 
   useEffect(() => {
     console.log('[TrojanForm] Server config changed:', serverConfig);
-    if (serverConfig && serverConfig.protocol === 'trojan') {
+    if (serverConfig && serverConfig.protocol?.toLowerCase() === 'trojan') {
+      // 标准化 network 和 security 值（首字母大写）
+      const normalizeNetwork = (n: string | undefined): 'Tcp' | 'Ws' | 'H2' => {
+        const lower = (n || 'tcp').toLowerCase();
+        if (lower === 'ws' || lower === 'websocket') return 'Ws';
+        if (lower === 'h2' || lower === 'http2') return 'H2';
+        return 'Tcp';
+      };
+      const normalizeSecurity = (s: string | undefined): 'None' | 'Tls' => {
+        const lower = (s || 'tls').toLowerCase();
+        return lower === 'none' ? 'None' : 'Tls';
+      };
+
       const formData = {
         address: serverConfig.address || '',
         port: serverConfig.port || 443,
         password: serverConfig.password || '',
-        network: (serverConfig.network || 'tcp') as 'Tcp' | 'Ws' | 'H2',
-        security: (serverConfig.security || 'tls') as 'None' | 'Tls',
+        network: normalizeNetwork(serverConfig.network),
+        security: normalizeSecurity(serverConfig.security),
         tlsServerName: serverConfig.tlsSettings?.serverName || '',
         tlsAllowInsecure: serverConfig.tlsSettings?.allowInsecure || false,
       };

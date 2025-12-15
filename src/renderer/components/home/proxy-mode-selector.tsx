@@ -36,10 +36,11 @@ export function ProxyModeSelector() {
     if (!selectedServer.address || selectedServer.address.trim() === '') return false;
     if (!selectedServer.port || selectedServer.port <= 0) return false;
 
-    // Protocol-specific checks
-    if (selectedServer.protocol === 'vless') {
+    // Protocol-specific checks (case-insensitive)
+    const protocol = selectedServer.protocol?.toLowerCase();
+    if (protocol === 'vless') {
       return !!(selectedServer.uuid && selectedServer.uuid.trim() !== '');
-    } else if (selectedServer.protocol === 'trojan') {
+    } else if (protocol === 'trojan') {
       return !!(selectedServer.password && selectedServer.password.trim() !== '');
     }
 

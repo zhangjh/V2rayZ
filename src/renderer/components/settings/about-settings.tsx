@@ -42,15 +42,44 @@ export function AboutSettings() {
   const handleCheckUpdate = async () => {
     try {
       setCheckingUpdate(true);
+      toast.info('正在检查更新...');
+      
       const response = await checkForUpdates();
-      if (response && response.success) {
-        toast.success('正在检查更新...');
+      
+      if (!response || !response.success) {
+        toast.error('检查更新失败', {
+          description: response?.error || '无法连接到更新服务器',
+        });
+        return;
+      }
+
+      const data = response.data;
+      if (!data) {
+        toast.error('检查更新失败', {
+          description: '返回数据格式错误',
+        });
+        return;
+      }
+
+      if (data.hasUpdate && data.updateInfo) {
+        toast.success(`发现新版本 ${data.updateInfo.version}`, {
+          description: '请前往 GitHub 下载最新版本',
+          action: {
+            label: '查看',
+            onClick: () => {
+              window.open(data.updateInfo?.downloadUrl || versionInfo?.repositoryUrl, '_blank');
+            },
+          },
+          duration: 10000,
+        });
       } else {
-        toast.error('检查更新失败');
+        toast.success('当前已是最新版本');
       }
     } catch (error) {
       console.error('Failed to check for updates:', error);
-      toast.error('检查更新失败');
+      toast.error('检查更新失败', {
+        description: error instanceof Error ? error.message : '网络错误或服务器不可用',
+      });
     } finally {
       setCheckingUpdate(false);
     }

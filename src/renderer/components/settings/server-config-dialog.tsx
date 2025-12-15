@@ -47,14 +47,18 @@ export function ServerConfigDialog({
   const isEditing = !!server;
 
   useEffect(() => {
-    if (server) {
-      setServerName(server.name);
-      setSelectedProtocol(server.protocol);
-      setCurrentServerConfig(server);
-    } else {
-      setServerName('');
-      setSelectedProtocol('vless');
-      setCurrentServerConfig(null);
+    if (open) {
+      if (server) {
+        setServerName(server.name);
+        // 统一转换为小写以匹配 Select 的值
+        const normalizedProtocol = server.protocol.toLowerCase() as ProtocolType;
+        setSelectedProtocol(normalizedProtocol);
+        setCurrentServerConfig(server);
+      } else {
+        setServerName('');
+        setSelectedProtocol('vless');
+        setCurrentServerConfig(null);
+      }
     }
   }, [server, open]);
 
@@ -113,8 +117,8 @@ export function ServerConfigDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Vless">VLESS</SelectItem>
-                <SelectItem value="Trojan">Trojan</SelectItem>
+                <SelectItem value="vless">VLESS</SelectItem>
+                <SelectItem value="trojan">Trojan</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">选择您的代理服务器协议类型</p>
@@ -125,7 +129,9 @@ export function ServerConfigDialog({
             {selectedProtocol === 'vless' && (
               <VlessForm
                 serverConfig={
-                  currentServerConfig?.protocol === 'vless' ? currentServerConfig : undefined
+                  currentServerConfig?.protocol?.toLowerCase() === 'vless'
+                    ? currentServerConfig
+                    : undefined
                 }
                 onSubmit={handleSave}
                 onTestConnection={onTestConnection}
@@ -135,7 +141,9 @@ export function ServerConfigDialog({
             {selectedProtocol === 'trojan' && (
               <TrojanForm
                 serverConfig={
-                  currentServerConfig?.protocol === 'trojan' ? currentServerConfig : undefined
+                  currentServerConfig?.protocol?.toLowerCase() === 'trojan'
+                    ? currentServerConfig
+                    : undefined
                 }
                 onSubmit={handleSave}
                 onTestConnection={onTestConnection}

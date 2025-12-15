@@ -15,6 +15,7 @@ import {
   registerVersionHandlers,
   registerAdminHandlers,
   registerUpdateHandlers,
+  registerRulesHandlers,
   setUpdateService,
   setTrayStateCallback,
 } from './ipc/handlers';
@@ -320,6 +321,7 @@ app.whenReady().then(async () => {
   registerProxyHandlers(proxyManager, systemProxyManager);
   registerVersionHandlers();
   registerAdminHandlers();
+  registerRulesHandlers(configManager);
 
   // 注册更新处理器
   setUpdateService(updateService);
