@@ -9,6 +9,7 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
  * 暴露给渲染进程的 Electron API
  */
 const electronAPI = {
+  platform: process.platform,
   ipcRenderer: {
     /**
      * 调用主进程方法
