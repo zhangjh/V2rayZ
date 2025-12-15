@@ -287,8 +287,8 @@ export class ConfigManager implements IConfigManager {
     return {
       servers: [],
       selectedServerId: null,
-      proxyMode: 'smart',
-      proxyModeType: 'systemProxy',
+      proxyMode: 'global',
+      proxyModeType: 'tun',
       tunConfig: {
         mtu: 9000,
         stack: 'system',
