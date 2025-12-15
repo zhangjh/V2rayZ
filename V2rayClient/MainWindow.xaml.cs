@@ -105,6 +105,12 @@ public partial class MainWindow : Window
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true; // Enable for debugging
             webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            
+            // Set WebView2 to follow system color scheme (important for prefers-color-scheme media query)
+            webView.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto;
+            
+            // Clear cache to ensure latest files are loaded
+            await webView.CoreWebView2.Profile.ClearBrowsingDataAsync();
 
             webView.CoreWebView2.NavigationCompleted += (s, e) =>
             {
@@ -181,6 +187,24 @@ public partial class MainWindow : Window
         // Add initialization script
         webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(@"
             (function() {
+                // Fix theme: ensure light theme is applied correctly
+                // Remove any stored dark theme preference that might be corrupted
+                var storedTheme = localStorage.getItem('v2ray-ui-theme');
+                if (!storedTheme || storedTheme === 'dark') {
+                    // If no theme or dark theme, check system preference
+                    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    if (!prefersDark) {
+                        localStorage.setItem('v2ray-ui-theme', 'light');
+                    }
+                }
+                // Apply theme immediately to prevent flash
+                var theme = localStorage.getItem('v2ray-ui-theme') || 'system';
+                if (theme === 'system') {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.classList.remove('light', 'dark');
+                document.documentElement.classList.add(theme);
+
                 // Create a promise-based wrapper for the native API
                 window.nativeApi = {
                     startProxy: () => chrome.webview.hostObjects.nativeApi.StartProxy(),

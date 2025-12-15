@@ -49,8 +49,14 @@ process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
 // 开发环境启用热重载
 if (isDevelopment) {
   try {
+    // __dirname 在打包后是 dist/main/main/，需要往上3层到项目根目录
+    const projectRoot = path.join(__dirname, '../../..');
+    const electronPath = process.platform === 'win32'
+      ? path.join(projectRoot, 'node_modules/.bin/electron.cmd')
+      : path.join(projectRoot, 'node_modules/.bin/electron');
+    
     require('electron-reload')(__dirname, {
-      electron: path.join(__dirname, '../../node_modules/.bin/electron'),
+      electron: electronPath,
       hardResetMethod: 'exit',
     });
   } catch (err) {

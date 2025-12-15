@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { ThemeProvider } from '@/components/theme-provider';
 
 // 全局错误处理 - 渲染进程
 window.addEventListener('error', (event: ErrorEvent) => {
@@ -30,6 +31,8 @@ window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider defaultTheme="system" storageKey="v2ray-ui-theme">
+      <App />
+    </ThemeProvider>
   </React.StrictMode>
 );

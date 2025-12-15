@@ -36,7 +36,6 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.18",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.0.1",
     "@types/react": "^19.2.7",
@@ -58,7 +57,7 @@
     "nodemon": "^3.1.11",
     "postcss": "^8.5.6",
     "prettier": "^3.7.4",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^3.4.15",
     "tailwindcss-animate": "^1.0.7",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3",
