@@ -27,7 +27,9 @@ export function ConnectionStatusCard() {
   const getStatusInfo = () => {
     // Use proxyModeType from connectionStatus if available, otherwise fall back to config
     const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy';
-    const modeText = proxyModeType === 'tun' ? 'TUN模式' : '系统代理模式';
+    // 统一转换为小写进行比较
+    const isTunMode = proxyModeType?.toLowerCase() === 'tun';
+    const modeText = isTunMode ? 'TUN模式' : '系统代理模式';
 
     // Show error from store if present
     if (error) {
@@ -74,7 +76,7 @@ export function ConnectionStatusCard() {
     }
 
     // TUN模式下，只需要检查代理核心是否运行
-    if (proxyModeType === 'tun') {
+    if (isTunMode) {
       if (proxyCore.running) {
         const uptime = proxyCore.uptime
           ? `运行时间: ${Math.floor(proxyCore.uptime / 60)} 分钟`

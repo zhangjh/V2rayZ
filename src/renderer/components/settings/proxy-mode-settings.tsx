@@ -78,7 +78,7 @@ export function ProxyModeSettings() {
               onValueChange={(value) => handleModeTypeChange(value as ProxyModeType)}
             >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="SystemProxy" id="system-proxy" />
+                <RadioGroupItem value="systemProxy" id="system-proxy" />
                 <Label htmlFor="system-proxy" className="cursor-pointer font-normal">
                   <div>
                     <div className="font-medium">系统代理模式</div>
@@ -89,7 +89,7 @@ export function ProxyModeSettings() {
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Tun" id="tun-mode" />
+                <RadioGroupItem value="tun" id="tun-mode" />
                 <Label htmlFor="tun-mode" className="cursor-pointer font-normal">
                   <div>
                     <div className="font-medium">TUN模式</div>
@@ -120,11 +120,12 @@ export function ProxyModeSettings() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认切换代理模式</AlertDialogTitle>
             <AlertDialogDescription>
-              当前代理正在运行中。切换代理模式将断开当前连接，您需要手动重新连接。
+              切换代理模式将断开当前连接，您需要手动重新连接。
               <br />
               <br />
-              确定要切换到 <strong>
-                {pendingModeType === 'tun' ? 'TUN模式' : '系统代理模式'}
+              确定要切换到{' '}
+              <strong>
+                {pendingModeType?.toLowerCase() === 'tun' ? 'TUN模式' : '系统代理模式'}
               </strong>{' '}
               吗？
             </AlertDialogDescription>

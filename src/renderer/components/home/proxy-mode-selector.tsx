@@ -18,10 +18,11 @@ export function ProxyModeSelector() {
 
   // Check connection status based on proxy mode type
   const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy';
-  const isConnected =
-    proxyModeType === 'tun'
-      ? connectionStatus?.proxyCore?.running === true // TUN mode: only check proxy core
-      : connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled; // System proxy: check both
+  // 统一转换为小写进行比较
+  const isTunMode = proxyModeType?.toLowerCase() === 'tun';
+  const isConnected = isTunMode
+    ? connectionStatus?.proxyCore?.running === true // TUN mode: only check proxy core
+    : connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled; // System proxy: check both
 
   const hasError = connectionStatus?.proxyCore?.error;
 
