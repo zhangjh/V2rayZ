@@ -53,7 +53,9 @@ export class WindowsAutoStart extends AutoStartBase {
       if (enabled) {
         // 添加注册表项
         // 使用引号包裹路径以处理包含空格的路径
-        await execAsync(`reg add "${this.regKey}" /v "${this.appName}" /t REG_SZ /d "\\"${exePath}\\"" /f`);
+        await execAsync(
+          `reg add "${this.regKey}" /v "${this.appName}" /t REG_SZ /d "\\"${exePath}\\"" /f`
+        );
       } else {
         // 删除注册表项
         try {
@@ -72,7 +74,9 @@ export class WindowsAutoStart extends AutoStartBase {
 
       return true;
     } catch (error) {
-      throw new Error(`设置 Windows 自启动失败: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `设置 Windows 自启动失败: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -84,7 +88,7 @@ export class WindowsAutoStart extends AutoStartBase {
       const { stdout } = await execAsync(`reg query "${this.regKey}" /v "${this.appName}"`);
       // 检查输出是否包含应用名称
       return stdout.includes(this.appName);
-    } catch (error) {
+    } catch {
       // 查询失败通常意味着注册表项不存在，即未启用自启动
       return false;
     }
@@ -109,7 +113,9 @@ export class MacOSAutoStart extends AutoStartBase {
 
       return true;
     } catch (error) {
-      throw new Error(`设置 macOS 自启动失败: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `设置 macOS 自启动失败: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -121,7 +127,9 @@ export class MacOSAutoStart extends AutoStartBase {
       const settings = app.getLoginItemSettings();
       return settings.openAtLogin;
     } catch (error) {
-      throw new Error(`查询 macOS 自启动状态失败: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `查询 macOS 自启动状态失败: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 }

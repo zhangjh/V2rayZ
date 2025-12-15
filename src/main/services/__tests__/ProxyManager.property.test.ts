@@ -60,29 +60,31 @@ const serverConfigArbitrary = (): fc.Arbitrary<ServerConfig> => {
  * 生成有效的用户配置（带有选中的服务器）
  */
 const validUserConfigWithServerArbitrary = (): fc.Arbitrary<UserConfig> => {
-  return fc.record({
-    servers: fc.array(serverConfigArbitrary(), { minLength: 1, maxLength: 5 }),
-    selectedServerId: fc.constant(null as string | null),
-    proxyMode: fc.constantFrom('global', 'smart', 'direct'),
-    proxyModeType: fc.constantFrom('systemProxy', 'tun'),
-    tunConfig: fc.record({
-      mtu: fc.integer({ min: 1280, max: 9000 }),
-      stack: fc.constantFrom('system', 'gvisor', 'mixed'),
-      autoRoute: fc.boolean(),
-      strictRoute: fc.boolean(),
-    }),
-    customRules: fc.constant([]) as fc.Arbitrary<any[]>,
-    autoStart: fc.boolean(),
-    autoConnect: fc.boolean(),
-    minimizeToTray: fc.boolean(),
-    socksPort: fc.integer({ min: 1024, max: 65535 }),
-    httpPort: fc.integer({ min: 1024, max: 65535 }),
-    logLevel: fc.constantFrom('info', 'warn', 'error'),
-  }).map(config => {
-    // 选择第一个服务器
-    (config as any).selectedServerId = config.servers[0].id;
-    return config;
-  });
+  return fc
+    .record({
+      servers: fc.array(serverConfigArbitrary(), { minLength: 1, maxLength: 5 }),
+      selectedServerId: fc.constant(null as string | null),
+      proxyMode: fc.constantFrom('global', 'smart', 'direct'),
+      proxyModeType: fc.constantFrom('systemProxy', 'tun'),
+      tunConfig: fc.record({
+        mtu: fc.integer({ min: 1280, max: 9000 }),
+        stack: fc.constantFrom('system', 'gvisor', 'mixed'),
+        autoRoute: fc.boolean(),
+        strictRoute: fc.boolean(),
+      }),
+      customRules: fc.constant([]) as fc.Arbitrary<any[]>,
+      autoStart: fc.boolean(),
+      autoConnect: fc.boolean(),
+      minimizeToTray: fc.boolean(),
+      socksPort: fc.integer({ min: 1024, max: 65535 }),
+      httpPort: fc.integer({ min: 1024, max: 65535 }),
+      logLevel: fc.constantFrom('info', 'warn', 'error'),
+    })
+    .map((config) => {
+      // 选择第一个服务器
+      (config as any).selectedServerId = config.servers[0].id;
+      return config;
+    });
 };
 
 // ============================================================================
@@ -139,7 +141,7 @@ describe('ProxyManager Property Tests', () => {
    * 属性 15: 代理配置生成和进程启动
    * 对于任何有效的用户配置，启动代理时应该生成有效的 sing-box JSON 配置，
    * 并且 sing-box 进程应该成功启动（不立即退出）。
-   * 
+   *
    * Feature: electron-cross-platform, Property 15: 代理配置生成和进程启动
    * Validates: Requirements 5.1
    */
@@ -170,16 +172,16 @@ describe('ProxyManager Property Tests', () => {
 
             if (config.proxyModeType === 'systemProxy') {
               // 系统代理模式应该有 HTTP 和 SOCKS inbound
-              const httpInbound = singboxConfig.inbounds.find(i => i.type === 'http');
-              const socksInbound = singboxConfig.inbounds.find(i => i.type === 'socks');
-              
+              const httpInbound = singboxConfig.inbounds.find((i) => i.type === 'http');
+              const socksInbound = singboxConfig.inbounds.find((i) => i.type === 'socks');
+
               expect(httpInbound).toBeDefined();
               expect(socksInbound).toBeDefined();
               expect(httpInbound?.listen_port).toBe(config.httpPort);
               expect(socksInbound?.listen_port).toBe(config.socksPort);
             } else if (config.proxyModeType === 'tun') {
               // TUN 模式应该有 TUN inbound
-              const tunInbound = singboxConfig.inbounds.find(i => i.type === 'tun');
+              const tunInbound = singboxConfig.inbounds.find((i) => i.type === 'tun');
               expect(tunInbound).toBeDefined();
               expect(tunInbound?.mtu).toBe(config.tunConfig.mtu);
               expect(tunInbound?.stack).toBe(config.tunConfig.stack);
@@ -189,16 +191,16 @@ describe('ProxyManager Property Tests', () => {
             expect(Array.isArray(singboxConfig.outbounds)).toBe(true);
             expect(singboxConfig.outbounds.length).toBeGreaterThanOrEqual(3); // proxy, direct, block
 
-            const proxyOutbound = singboxConfig.outbounds.find(o => o.tag === 'proxy');
-            const directOutbound = singboxConfig.outbounds.find(o => o.tag === 'direct');
-            const blockOutbound = singboxConfig.outbounds.find(o => o.tag === 'block');
+            const proxyOutbound = singboxConfig.outbounds.find((o) => o.tag === 'proxy');
+            const directOutbound = singboxConfig.outbounds.find((o) => o.tag === 'direct');
+            const blockOutbound = singboxConfig.outbounds.find((o) => o.tag === 'block');
 
             expect(proxyOutbound).toBeDefined();
             expect(directOutbound).toBeDefined();
             expect(blockOutbound).toBeDefined();
 
             // 验证代理 outbound 配置
-            const selectedServer = config.servers.find(s => s.id === config.selectedServerId);
+            const selectedServer = config.servers.find((s) => s.id === config.selectedServerId);
             expect(proxyOutbound?.type).toBe(selectedServer?.protocol);
             expect(proxyOutbound?.server).toBe(selectedServer?.address);
             expect(proxyOutbound?.server_port).toBe(selectedServer?.port);
@@ -244,7 +246,7 @@ describe('ProxyManager Property Tests', () => {
 
           // 验证智能分流模式有 DNS 配置
           expect(smartSingboxConfig.dns).toBeDefined();
-          
+
           // 验证直连模式的 final 出站
           expect(directSingboxConfig.route?.final).toBe('direct');
         }),
@@ -266,8 +268,8 @@ describe('ProxyManager Property Tests', () => {
           const tunSingboxConfig = proxyManager.generateSingBoxConfig(tunConfig);
 
           // 验证 inbounds 不同
-          const systemProxyInboundTypes = systemProxySingboxConfig.inbounds.map(i => i.type);
-          const tunInboundTypes = tunSingboxConfig.inbounds.map(i => i.type);
+          const systemProxyInboundTypes = systemProxySingboxConfig.inbounds.map((i) => i.type);
+          const tunInboundTypes = tunSingboxConfig.inbounds.map((i) => i.type);
 
           expect(systemProxyInboundTypes).toContain('http');
           expect(systemProxyInboundTypes).toContain('socks');
@@ -305,7 +307,7 @@ describe('ProxyManager Property Tests', () => {
             };
 
             const singboxConfig = proxyManager.generateSingBoxConfig(config);
-            const proxyOutbound = singboxConfig.outbounds.find(o => o.tag === 'proxy');
+            const proxyOutbound = singboxConfig.outbounds.find((o) => o.tag === 'proxy');
 
             expect(proxyOutbound).toBeDefined();
             expect(proxyOutbound?.type).toBe(server.protocol);
@@ -339,7 +341,8 @@ describe('ProxyManager Property Tests', () => {
               network,
               wsSettings: network === 'ws' ? { path: '/ws' } : undefined,
               grpcSettings: network === 'grpc' ? { serviceName: 'GrpcService' } : undefined,
-              httpSettings: network === 'http' ? { host: ['example.com'], path: '/http' } : undefined,
+              httpSettings:
+                network === 'http' ? { host: ['example.com'], path: '/http' } : undefined,
             };
 
             const config: UserConfig = {
@@ -363,7 +366,7 @@ describe('ProxyManager Property Tests', () => {
             };
 
             const singboxConfig = proxyManager.generateSingBoxConfig(config);
-            const proxyOutbound = singboxConfig.outbounds.find(o => o.tag === 'proxy');
+            const proxyOutbound = singboxConfig.outbounds.find((o) => o.tag === 'proxy');
 
             expect(proxyOutbound?.transport).toBeDefined();
             expect(proxyOutbound?.transport?.type).toBe(network);
@@ -410,7 +413,7 @@ describe('ProxyManager Property Tests', () => {
           };
 
           const singboxConfig = proxyManager.generateSingBoxConfig(config);
-          const proxyOutbound = singboxConfig.outbounds.find(o => o.tag === 'proxy');
+          const proxyOutbound = singboxConfig.outbounds.find((o) => o.tag === 'proxy');
 
           expect(proxyOutbound?.tls).toBeDefined();
           expect(proxyOutbound?.tls?.enabled).toBe(true);
@@ -425,7 +428,7 @@ describe('ProxyManager Property Tests', () => {
    * 属性 16: 进程状态监控
    * 对于任何正在运行的 sing-box 进程，系统应该能够查询进程状态（PID、运行时间），
    * 并且状态应该反映实际的进程状态。
-   * 
+   *
    * Feature: electron-cross-platform, Property 16: 进程状态监控
    * Validates: Requirements 5.2
    */
@@ -458,7 +461,7 @@ describe('ProxyManager Property Tests', () => {
    * 属性 18: 进程优雅终止
    * 对于任何正在运行的 sing-box 进程，停止请求应该先尝试优雅终止（SIGTERM），
    * 如果超时则强制终止（SIGKILL）。
-   * 
+   *
    * Feature: electron-cross-platform, Property 18: 进程优雅终止
    * Validates: Requirements 5.4
    */

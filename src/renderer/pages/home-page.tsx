@@ -1,9 +1,8 @@
-import { ConnectionStatusCard } from '@/components/home/connection-status-card'
-import { ProxyModeSelector } from '@/components/home/proxy-mode-selector'
-import { RealTimeLogs } from '@/components/home/real-time-logs'
+import { ConnectionStatusCard } from '@/components/home/connection-status-card';
+import { ProxyModeSelector } from '@/components/home/proxy-mode-selector';
+import { RealTimeLogs } from '@/components/home/real-time-logs';
 
 export function HomePage() {
-
   return (
     <div className="space-y-6">
       <div>
@@ -18,5 +17,5 @@ export function HomePage() {
 
       <RealTimeLogs />
     </div>
-  )
+  );
 }

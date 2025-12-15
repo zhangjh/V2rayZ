@@ -1,68 +1,68 @@
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-import { toast } from 'sonner'
-import { ExternalLink, Loader2 } from 'lucide-react'
-import { getVersionInfo, checkForUpdates } from '@/bridge/api-wrapper'
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+import { ExternalLink, Loader2 } from 'lucide-react';
+import { getVersionInfo, checkForUpdates } from '@/bridge/api-wrapper';
 
 interface VersionInfo {
-  appVersion: string
-  appName: string
-  buildDate: string
-  singBoxVersion: string
-  copyright: string
-  repositoryUrl: string
+  appVersion: string;
+  appName: string;
+  buildDate: string;
+  singBoxVersion: string;
+  copyright: string;
+  repositoryUrl: string;
 }
 
 export function AboutSettings() {
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   useEffect(() => {
-    loadVersionInfo()
-  }, [])
+    loadVersionInfo();
+  }, []);
 
   const loadVersionInfo = async () => {
     try {
-      setLoading(true)
-      const response = await getVersionInfo()
+      setLoading(true);
+      const response = await getVersionInfo();
       if (response && response.success && response.data) {
-        setVersionInfo(response.data)
+        setVersionInfo(response.data);
       }
     } catch (error) {
-      console.error('Failed to load version info:', error)
-      toast.error('无法加载版本信息')
+      console.error('Failed to load version info:', error);
+      toast.error('无法加载版本信息');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleCheckUpdate = async () => {
     try {
-      setCheckingUpdate(true)
-      const response = await checkForUpdates()
+      setCheckingUpdate(true);
+      const response = await checkForUpdates();
       if (response && response.success) {
-        toast.success('正在检查更新...')
+        toast.success('正在检查更新...');
       } else {
-        toast.error('检查更新失败')
+        toast.error('检查更新失败');
       }
     } catch (error) {
-      console.error('Failed to check for updates:', error)
-      toast.error('检查更新失败')
+      console.error('Failed to check for updates:', error);
+      toast.error('检查更新失败');
     } finally {
-      setCheckingUpdate(false)
+      setCheckingUpdate(false);
     }
-  }
+  };
 
   const handleOpenGitHub = () => {
     if (versionInfo?.repositoryUrl) {
-      window.open(versionInfo.repositoryUrl, '_blank')
+      window.open(versionInfo.repositoryUrl, '_blank');
     } else {
-      toast.info('GitHub 链接: https://github.com/zhangjh/V2rayZ')
+      toast.info('GitHub 链接: https://github.com/zhangjh/V2rayZ');
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -75,7 +75,7 @@ export function AboutSettings() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -103,8 +103,8 @@ export function AboutSettings() {
           <Separator />
 
           <div className="space-y-2">
-            <Button 
-              onClick={handleCheckUpdate} 
+            <Button
+              onClick={handleCheckUpdate}
               disabled={checkingUpdate}
               className="w-full sm:w-auto"
             >
@@ -117,11 +117,7 @@ export function AboutSettings() {
 
           <div className="space-y-2">
             <h4 className="text-sm font-medium text-muted-foreground">开源项目</h4>
-            <Button
-              variant="outline"
-              onClick={handleOpenGitHub}
-              className="w-full sm:w-auto"
-            >
+            <Button variant="outline" onClick={handleOpenGitHub} className="w-full sm:w-auto">
               <ExternalLink className="mr-2 h-4 w-4" />
               GitHub
             </Button>
@@ -136,5 +132,5 @@ export function AboutSettings() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

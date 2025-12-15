@@ -352,21 +352,18 @@ describe('TrayManager Property Tests', () => {
 
     it('托盘创建-销毁循环应该保持稳定', async () => {
       await fc.assert(
-        fc.asyncProperty(
-          fc.integer({ min: 1, max: 5 }),
-          async (cycles) => {
-            const trayManager = new TrayManager(mockWindow, logManager);
+        fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async (cycles) => {
+          const trayManager = new TrayManager(mockWindow, logManager);
 
-            // 执行多次创建-销毁循环
-            for (let i = 0; i < cycles; i++) {
-              trayManager.createTray();
-              expect(trayManager.isTrayCreated()).toBe(true);
+          // 执行多次创建-销毁循环
+          for (let i = 0; i < cycles; i++) {
+            trayManager.createTray();
+            expect(trayManager.isTrayCreated()).toBe(true);
 
-              trayManager.destroyTray();
-              expect(trayManager.isTrayCreated()).toBe(false);
-            }
+            trayManager.destroyTray();
+            expect(trayManager.isTrayCreated()).toBe(false);
           }
-        ),
+        }),
         { numRuns: 50 }
       );
     });

@@ -32,16 +32,7 @@ const logMessageArbitrary = (): fc.Arbitrary<string> => {
  * 生成有效的日志来源
  */
 const logSourceArbitrary = (): fc.Arbitrary<string> => {
-  return fc.constantFrom(
-    'main',
-    'proxy',
-    'config',
-    'system',
-    'network',
-    'ui',
-    'ipc',
-    'service'
-  );
+  return fc.constantFrom('main', 'proxy', 'config', 'system', 'network', 'ui', 'ipc', 'service');
 };
 
 /**
@@ -49,7 +40,9 @@ const logSourceArbitrary = (): fc.Arbitrary<string> => {
  */
 const stackTraceArbitrary = (): fc.Arbitrary<string | undefined> => {
   return fc.option(
-    fc.string({ minLength: 10, maxLength: 1000 }).map(s => `Error: ${s}\n    at function1\n    at function2`),
+    fc
+      .string({ minLength: 10, maxLength: 1000 })
+      .map((s) => `Error: ${s}\n    at function1\n    at function2`),
     { nil: undefined }
   );
 };
@@ -81,7 +74,7 @@ async function cleanupTempDir(dir: string): Promise<void> {
  * 等待一段时间（用于异步操作）
  */
 function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ============================================================================
@@ -93,7 +86,7 @@ describe('LogManager Property Tests', () => {
    * Feature: electron-cross-platform, Property 21: 日志写入和转发
    * 对于任何日志记录请求，日志应该同时写入日志文件和通过 IPC 发送到前端，
    * 并且两者的内容应该一致。
-   * 
+   *
    * Validates: Requirements 7.1
    */
   describe('Property 21: Log write and forward', () => {
@@ -276,7 +269,7 @@ describe('LogManager Property Tests', () => {
    * Feature: electron-cross-platform, Property 22: 日志查询返回最近条目
    * 对于任何日志查询请求，返回的日志条目应该按时间倒序排列，
    * 并且数量不超过请求的限制。
-   * 
+   *
    * Validates: Requirements 7.3
    */
   describe('Property 22: Log query returns recent entries', () => {
@@ -407,34 +400,31 @@ describe('LogManager Property Tests', () => {
 
     it('should handle zero and negative limits gracefully', async () => {
       await fc.assert(
-        fc.asyncProperty(
-          fc.integer({ min: 5, max: 20 }),
-          async (totalLogs) => {
-            const tempDir = await createTempLogDir();
-            const logManager = new LogManager(tempDir);
+        fc.asyncProperty(fc.integer({ min: 5, max: 20 }), async (totalLogs) => {
+          const tempDir = await createTempLogDir();
+          const logManager = new LogManager(tempDir);
 
-            try {
-              // 添加日志
-              for (let i = 0; i < totalLogs; i++) {
-                logManager.addLog('info', `Message ${i}`, 'test');
-              }
-
-              // 测试 limit = 0
-              const logsWithZero = logManager.getLogs(0);
-              expect(logsWithZero.length).toBe(totalLogs);
-
-              // 测试 limit = -1
-              const logsWithNegative = logManager.getLogs(-1);
-              expect(logsWithNegative.length).toBe(totalLogs);
-
-              // 测试 undefined
-              const logsWithUndefined = logManager.getLogs();
-              expect(logsWithUndefined.length).toBe(totalLogs);
-            } finally {
-              await cleanupTempDir(tempDir);
+          try {
+            // 添加日志
+            for (let i = 0; i < totalLogs; i++) {
+              logManager.addLog('info', `Message ${i}`, 'test');
             }
+
+            // 测试 limit = 0
+            const logsWithZero = logManager.getLogs(0);
+            expect(logsWithZero.length).toBe(totalLogs);
+
+            // 测试 limit = -1
+            const logsWithNegative = logManager.getLogs(-1);
+            expect(logsWithNegative.length).toBe(totalLogs);
+
+            // 测试 undefined
+            const logsWithUndefined = logManager.getLogs();
+            expect(logsWithUndefined.length).toBe(totalLogs);
+          } finally {
+            await cleanupTempDir(tempDir);
           }
-        ),
+        }),
         { numRuns: 30 }
       );
     });
@@ -443,7 +433,7 @@ describe('LogManager Property Tests', () => {
   /**
    * Feature: electron-cross-platform, Property 23: 错误日志包含堆栈信息
    * 对于任何错误级别的日志，日志内容应该包含错误消息和完整的堆栈跟踪信息。
-   * 
+   *
    * Validates: Requirements 7.4
    */
   describe('Property 23: Error logs contain stack information', () => {
@@ -597,7 +587,7 @@ describe('LogManager Property Tests', () => {
    * Feature: electron-cross-platform, Property 24: 日志级别动态调整
    * 对于任何日志级别更改，后续的日志输出应该只包含大于等于新级别的日志
    * （例如设置为 WARN 后不应输出 INFO 日志）。
-   * 
+   *
    * Validates: Requirements 7.5
    */
   describe('Property 24: Log level dynamic adjustment', () => {
@@ -650,7 +640,7 @@ describe('LogManager Property Tests', () => {
 
               // 计算应该被记录的日志数量
               const expectedCount = logEntries.filter(
-                entry => levelPriority[entry.level] >= filterPriority
+                (entry) => levelPriority[entry.level] >= filterPriority
               ).length;
 
               expect(logs.length).toBe(expectedCount);
@@ -715,9 +705,7 @@ describe('LogManager Property Tests', () => {
 
               // 验证第二批日志符合新级别
               for (const log of logsAfterSecond) {
-                expect(levelPriority[log.level]).toBeGreaterThanOrEqual(
-                  levelPriority[newLevel]
-                );
+                expect(levelPriority[log.level]).toBeGreaterThanOrEqual(levelPriority[newLevel]);
               }
             } finally {
               await cleanupTempDir(tempDir);

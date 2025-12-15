@@ -1,89 +1,89 @@
-import { useEffect, useRef, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { useAppStore } from '@/store/app-store'
-import { Trash2 } from 'lucide-react'
-import { getLogs, clearLogs, addEventListener, removeEventListener } from '@/bridge/api-wrapper'
-import type { LogEntry } from '@/bridge/types'
+import { useEffect, useRef, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/store/app-store';
+import { Trash2 } from 'lucide-react';
+import { getLogs, clearLogs, addEventListener, removeEventListener } from '@/bridge/api-wrapper';
+import type { LogEntry } from '@/bridge/types';
 
 export function RealTimeLogs() {
-  const [logs, setLogs] = useState<LogEntry[]>([])
-  const [isAutoScroll, setIsAutoScroll] = useState(true)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
-  const connectionStatus = useAppStore((state) => state.connectionStatus)
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const connectionStatus = useAppStore((state) => state.connectionStatus);
 
   // Load initial logs and set up real-time updates
   useEffect(() => {
     const loadInitialLogs = async () => {
       try {
-        const response = await getLogs(50)
+        const response = await getLogs(50);
         if (response && response.success && response.data) {
-          setLogs(response.data)
+          setLogs(response.data);
         }
       } catch (error) {
-        console.error('Failed to load initial logs:', error)
+        console.error('Failed to load initial logs:', error);
       }
-    }
+    };
 
     // Load initial logs
-    loadInitialLogs()
+    loadInitialLogs();
 
     // Set up real-time log listener
     const handleLogReceived = (logEntry: LogEntry) => {
-      setLogs(prev => {
-        const updated = [...prev, logEntry]
+      setLogs((prev) => {
+        const updated = [...prev, logEntry];
         // Keep only last 100 logs
-        return updated.slice(-100)
-      })
-    }
+        return updated.slice(-100);
+      });
+    };
 
-    addEventListener('logReceived', handleLogReceived)
+    addEventListener('logReceived', handleLogReceived);
 
     return () => {
-      removeEventListener('logReceived', handleLogReceived)
-    }
-  }, [])
+      removeEventListener('logReceived', handleLogReceived);
+    };
+  }, []);
 
   // Auto scroll to bottom when new logs arrive
   useEffect(() => {
     if (isAutoScroll && scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+      const scrollElement = scrollAreaRef.current.querySelector(
+        '[data-radix-scroll-area-viewport]'
+      );
       if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight
+        scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [logs, isAutoScroll])
+  }, [logs, isAutoScroll]);
 
   const handleClearLogs = async () => {
     try {
-      const success = await clearLogs()
+      const success = await clearLogs();
       if (success) {
-        setLogs([])
+        setLogs([]);
       }
     } catch (error) {
-      console.error('Failed to clear logs:', error)
+      console.error('Failed to clear logs:', error);
       // Clear local logs anyway
-      setLogs([])
+      setLogs([]);
     }
-  }
-
-
+  };
 
   const getLevelColor = (level: LogEntry['level']) => {
     switch (level) {
       case 'error':
-        return 'text-red-500'
-      case 'warning':
-        return 'text-yellow-500'
+        return 'text-red-500';
+      case 'warn':
+        return 'text-yellow-500';
       case 'info':
-        return 'text-blue-500'
+        return 'text-blue-500';
       case 'debug':
-        return 'text-gray-500'
+        return 'text-gray-500';
       default:
-        return 'text-foreground'
+        return 'text-foreground';
     }
-  }
+  };
 
   return (
     <Card>
@@ -102,13 +102,13 @@ export function RealTimeLogs() {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea 
+        <ScrollArea
           ref={scrollAreaRef}
           className="h-64 w-full rounded border bg-muted/30 p-3"
           onScroll={(e) => {
-            const target = e.target as HTMLElement
-            const isAtBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 10
-            setIsAutoScroll(isAtBottom)
+            const target = e.target as HTMLElement;
+            const isAtBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 10;
+            setIsAutoScroll(isAtBottom);
           }}
         >
           {logs.length === 0 ? (
@@ -119,7 +119,7 @@ export function RealTimeLogs() {
             <div className="space-y-1">
               {logs.map((log, index) => {
                 const timestamp = new Date(log.timestamp).toLocaleTimeString('zh-CN');
-                
+
                 return (
                   <div key={index} className="text-xs font-mono">
                     <span className="text-muted-foreground">[{timestamp}]</span>
@@ -133,18 +133,20 @@ export function RealTimeLogs() {
             </div>
           )}
         </ScrollArea>
-        
+
         {!isAutoScroll && (
           <div className="mt-2 text-center">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
-                setIsAutoScroll(true)
+                setIsAutoScroll(true);
                 if (scrollAreaRef.current) {
-                  const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+                  const scrollElement = scrollAreaRef.current.querySelector(
+                    '[data-radix-scroll-area-viewport]'
+                  );
                   if (scrollElement) {
-                    scrollElement.scrollTop = scrollElement.scrollHeight
+                    scrollElement.scrollTop = scrollElement.scrollHeight;
                   }
                 }
               }}
@@ -156,5 +158,5 @@ export function RealTimeLogs() {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

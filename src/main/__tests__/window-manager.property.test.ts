@@ -1,7 +1,7 @@
 /**
  * Window Manager 属性测试
  * 使用 fast-check 进行基于属性的测试
- * 
+ *
  * Feature: electron-cross-platform, Property 3: 窗口关闭行为遵循配置
  * Validates: Requirements 1.5
  */
@@ -164,7 +164,7 @@ describe('Window Manager Property Tests', () => {
    * 属性 3: 窗口关闭行为遵循配置
    * 对于任何窗口关闭事件，如果 minimizeToTray 配置为 true，则窗口应该隐藏而不是退出；
    * 如果为 false，则应用应该完全退出。
-   * 
+   *
    * Validates: Requirements 1.5
    */
   describe('Property 3: Window close behavior follows configuration', () => {

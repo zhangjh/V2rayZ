@@ -116,10 +116,14 @@ async function launchElevatedWindows(exePath: string): Promise<void> {
     console.log('[AdminPrivilege] Launching elevated process:', exePath);
     console.log('[AdminPrivilege] Working directory:', workingDir);
 
-    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
+    const child = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      }
+    );
 
     let stdout = '';
     let stderr = '';

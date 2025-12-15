@@ -162,50 +162,47 @@ describe('Build Artifacts Property Tests', () => {
 
     it('should verify platform-specific binary files exist in resources', async () => {
       await fc.assert(
-        fc.asyncProperty(
-          fc.constantFrom('win', 'mac-x64', 'mac-arm64'),
-          async (platformArch) => {
-            // 检查源资源目录中的平台特定文件
-            const resourcesBaseDir = path.join(__dirname, '../../resources');
+        fc.asyncProperty(fc.constantFrom('win', 'mac-x64', 'mac-arm64'), async (platformArch) => {
+          // 检查源资源目录中的平台特定文件
+          const resourcesBaseDir = path.join(__dirname, '../../resources');
 
-            if (platformArch === 'win') {
-              const winDir = path.join(resourcesBaseDir, 'win');
-              const singBoxPath = path.join(winDir, 'sing-box.exe');
+          if (platformArch === 'win') {
+            const winDir = path.join(resourcesBaseDir, 'win');
+            const singBoxPath = path.join(winDir, 'sing-box.exe');
 
-              if (!fs.existsSync(singBoxPath)) {
-                console.error(`缺少 Windows sing-box: ${singBoxPath}`);
-                return false;
-              }
-
-              // 检查文件大小（应该大于 1MB）
-              const stats = fs.statSync(singBoxPath);
-              return stats.size > 1024 * 1024;
-            } else if (platformArch === 'mac-x64') {
-              const macDir = path.join(resourcesBaseDir, 'mac-x64');
-              const singBoxPath = path.join(macDir, 'sing-box');
-
-              if (!fs.existsSync(singBoxPath)) {
-                console.error(`缺少 macOS x64 sing-box: ${singBoxPath}`);
-                return false;
-              }
-
-              const stats = fs.statSync(singBoxPath);
-              return stats.size > 1024 * 1024;
-            } else {
-              // mac-arm64
-              const macDir = path.join(resourcesBaseDir, 'mac-arm64');
-              const singBoxPath = path.join(macDir, 'sing-box');
-
-              if (!fs.existsSync(singBoxPath)) {
-                console.error(`缺少 macOS arm64 sing-box: ${singBoxPath}`);
-                return false;
-              }
-
-              const stats = fs.statSync(singBoxPath);
-              return stats.size > 1024 * 1024;
+            if (!fs.existsSync(singBoxPath)) {
+              console.error(`缺少 Windows sing-box: ${singBoxPath}`);
+              return false;
             }
+
+            // 检查文件大小（应该大于 1MB）
+            const stats = fs.statSync(singBoxPath);
+            return stats.size > 1024 * 1024;
+          } else if (platformArch === 'mac-x64') {
+            const macDir = path.join(resourcesBaseDir, 'mac-x64');
+            const singBoxPath = path.join(macDir, 'sing-box');
+
+            if (!fs.existsSync(singBoxPath)) {
+              console.error(`缺少 macOS x64 sing-box: ${singBoxPath}`);
+              return false;
+            }
+
+            const stats = fs.statSync(singBoxPath);
+            return stats.size > 1024 * 1024;
+          } else {
+            // mac-arm64
+            const macDir = path.join(resourcesBaseDir, 'mac-arm64');
+            const singBoxPath = path.join(macDir, 'sing-box');
+
+            if (!fs.existsSync(singBoxPath)) {
+              console.error(`缺少 macOS arm64 sing-box: ${singBoxPath}`);
+              return false;
+            }
+
+            const stats = fs.statSync(singBoxPath);
+            return stats.size > 1024 * 1024;
           }
-        ),
+        }),
         { numRuns: 3 }
       );
     });

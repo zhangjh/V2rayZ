@@ -72,7 +72,7 @@ describe('Log Event Forwarding Integration', () => {
 
       // 验证所有事件都被广播
       expect(broadcastEvent).toHaveBeenCalledTimes(3);
-      
+
       const calls = (broadcastEvent as jest.Mock).mock.calls;
       expect(calls[0][0]).toBe(IPC_CHANNELS.EVENT_LOG_RECEIVED);
       expect(calls[0][1]).toMatchObject({
@@ -80,14 +80,14 @@ describe('Log Event Forwarding Integration', () => {
         message: 'Message 1',
         source: 'Source1',
       });
-      
+
       expect(calls[1][0]).toBe(IPC_CHANNELS.EVENT_LOG_RECEIVED);
       expect(calls[1][1]).toMatchObject({
         level: 'warn',
         message: 'Message 2',
         source: 'Source2',
       });
-      
+
       expect(calls[2][0]).toBe(IPC_CHANNELS.EVENT_LOG_RECEIVED);
       expect(calls[2][1]).toMatchObject({
         level: 'error',
@@ -98,7 +98,7 @@ describe('Log Event Forwarding Integration', () => {
 
     it('should include stack trace in error logs', () => {
       const stackTrace = 'Error: Test error\n    at test.js:10:5';
-      
+
       // 添加带堆栈的错误日志
       logManager.addLog('error', 'Error occurred', 'ErrorSource', stackTrace);
 
@@ -126,7 +126,7 @@ describe('Log Event Forwarding Integration', () => {
 
       // 只有 warn 和 error 级别的日志应该被广播
       expect(broadcastEvent).toHaveBeenCalledTimes(2);
-      
+
       const calls = (broadcastEvent as jest.Mock).mock.calls;
       expect(calls[0][1].level).toBe('warn');
       expect(calls[1][1].level).toBe('error');
@@ -134,9 +134,9 @@ describe('Log Event Forwarding Integration', () => {
 
     it('should include timestamp in log events', () => {
       const beforeTime = new Date();
-      
+
       logManager.addLog('info', 'Test message', 'Source');
-      
+
       const afterTime = new Date();
 
       expect(broadcastEvent).toHaveBeenCalledWith(
@@ -155,15 +155,15 @@ describe('Log Event Forwarding Integration', () => {
     it('should handle all log levels', () => {
       // 设置日志级别为 debug 以确保所有级别都被记录
       logManager.setLogLevel('debug');
-      
+
       const levels: LogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal'];
-      
+
       levels.forEach((level) => {
         logManager.addLog(level, `${level} message`, 'Source');
       });
 
       expect(broadcastEvent).toHaveBeenCalledTimes(levels.length);
-      
+
       const calls = (broadcastEvent as jest.Mock).mock.calls;
       levels.forEach((level, index) => {
         expect(calls[index][1].level).toBe(level);

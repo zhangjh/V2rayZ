@@ -1,31 +1,34 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import { useAppStore } from '@/store/app-store'
-import { toast } from 'sonner'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { useAppStore } from '@/store/app-store';
+import { toast } from 'sonner';
 
 export function GeneralSettings() {
-  const config = useAppStore((state) => state.config)
-  const saveConfig = useAppStore((state) => state.saveConfig)
+  const config = useAppStore((state) => state.config);
+  const saveConfig = useAppStore((state) => state.saveConfig);
 
-  const handleToggle = async (field: 'autoStart' | 'autoConnect' | 'minimizeToTray', value: boolean) => {
-    if (!config) return
+  const handleToggle = async (
+    field: 'autoStart' | 'autoConnect' | 'minimizeToTray',
+    value: boolean
+  ) => {
+    if (!config) return;
 
     const updatedConfig = {
       ...config,
       [field]: value,
-    }
+    };
 
     try {
-      await saveConfig(updatedConfig)
-      toast.success('设置已保存')
-    } catch (error) {
-      toast.error('保存设置失败')
+      await saveConfig(updatedConfig);
+      toast.success('设置已保存');
+    } catch {
+      toast.error('保存设置失败');
     }
-  }
+  };
 
   if (!config) {
-    return null
+    return null;
   }
 
   return (
@@ -78,5 +81,5 @@ export function GeneralSettings() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

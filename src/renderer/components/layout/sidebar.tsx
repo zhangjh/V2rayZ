@@ -1,9 +1,9 @@
-import { Home, Server, ListFilter, Settings } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Home, Server, ListFilter, Settings } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SidebarProps {
-  currentView: string
-  onViewChange: (view: string) => void
+  currentView: string;
+  onViewChange: (view: string) => void;
 }
 
 const navItems = [
@@ -11,7 +11,7 @@ const navItems = [
   { id: 'server', label: '服务器', icon: Server },
   { id: 'rules', label: '规则', icon: ListFilter },
   { id: 'settings', label: '设置', icon: Settings },
-]
+];
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
@@ -21,7 +21,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
       </div>
       <nav className="flex-1 p-2">
         {navItems.map((item) => {
-          const Icon = item.icon
+          const Icon = item.icon;
           return (
             <button
               key={item.id}
@@ -36,9 +36,9 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
               <Icon className="h-4 w-4" />
               <span>{item.label}</span>
             </button>
-          )
+          );
         })}
       </nav>
     </div>
-  )
+  );
 }

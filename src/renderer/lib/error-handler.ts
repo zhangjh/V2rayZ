@@ -87,23 +87,19 @@ export class ErrorHandler {
    * Check if error is Trojan-specific
    */
   private static isTrojanError(message: string): boolean {
-    const trojanKeywords = [
-      'trojan',
-      'Trojan',
-      '认证失败',
-      '密码错误',
-      'TLS 握手失败',
-    ];
-    return trojanKeywords.some(keyword => message.includes(keyword));
+    const trojanKeywords = ['trojan', 'Trojan', '认证失败', '密码错误', 'TLS 握手失败'];
+    return trojanKeywords.some((keyword) => message.includes(keyword));
   }
 
   /**
    * Check if error is protocol-related
    */
   private static isProtocolError(message: string): boolean {
-    return message.includes('不支持的协议') || 
-           message.includes('Protocol') || 
-           message.includes('暂不支持');
+    return (
+      message.includes('不支持的协议') ||
+      message.includes('Protocol') ||
+      message.includes('暂不支持')
+    );
   }
 
   /**
@@ -111,20 +107,24 @@ export class ErrorHandler {
    */
   private static isTrojanErrorRetryable(message: string): boolean {
     // Authentication and config errors are not retryable
-    if (message.includes('认证失败') || 
-        message.includes('密码错误') ||
-        message.includes('配置错误') ||
-        message.includes('UUID 错误')) {
+    if (
+      message.includes('认证失败') ||
+      message.includes('密码错误') ||
+      message.includes('配置错误') ||
+      message.includes('UUID 错误')
+    ) {
       return false;
     }
-    
+
     // Connection and timeout errors are retryable
-    if (message.includes('连接超时') || 
-        message.includes('连接被拒绝') ||
-        message.includes('网络不可达')) {
+    if (
+      message.includes('连接超时') ||
+      message.includes('连接被拒绝') ||
+      message.includes('网络不可达')
+    ) {
       return true;
     }
-    
+
     // Default to retryable for other errors
     return true;
   }

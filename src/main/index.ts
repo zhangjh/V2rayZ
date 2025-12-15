@@ -7,7 +7,18 @@ import { TrayManager } from './services/TrayManager';
 import { ProxyManager } from './services/ProxyManager';
 import { createSystemProxyManager } from './services/SystemProxyManager';
 import { resourceManager } from './services/ResourceManager';
-import { registerConfigHandlers, registerServerHandlers, registerLogHandlers, registerProxyHandlers, registerVersionHandlers, registerAdminHandlers, setTrayStateCallback } from './ipc/handlers';
+import {
+  registerConfigHandlers,
+  registerServerHandlers,
+  registerLogHandlers,
+  registerProxyHandlers,
+  registerVersionHandlers,
+  registerAdminHandlers,
+  registerUpdateHandlers,
+  setUpdateService,
+  setTrayStateCallback,
+} from './ipc/handlers';
+import { UpdateService } from './services/UpdateService';
 import { ipcEventEmitter } from './ipc/ipc-events';
 import { mainEventEmitter, MAIN_EVENTS } from './ipc/main-events';
 
@@ -21,17 +32,18 @@ const protocolParser = new ProtocolParser();
 const logManager = new LogManager();
 let proxyManager: ProxyManager | null = null;
 const systemProxyManager = createSystemProxyManager();
+const updateService = new UpdateService(logManager);
 
 // 全局异常捕获 - 主进程
 process.on('uncaughtException', (error: Error) => {
   console.error('Uncaught Exception:', error);
   logManager.addLog('fatal', `未捕获的异常: ${error.message}\n${error.stack}`, 'Main');
-  
+
   // 在开发环境显示错误对话框
   if (isDevelopment) {
     dialog.showErrorBox('未捕获的异常', `${error.message}\n\n${error.stack}`);
   }
-  
+
   // 不退出应用，尝试继续运行
 });
 
@@ -40,7 +52,7 @@ process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
   const errorMessage = reason instanceof Error ? reason.message : String(reason);
   const errorStack = reason instanceof Error ? reason.stack : '';
   logManager.addLog('error', `未处理的 Promise 拒绝: ${errorMessage}\n${errorStack}`, 'Main');
-  
+
   // 在开发环境显示错误对话框
   if (isDevelopment && reason instanceof Error) {
     dialog.showErrorBox('未处理的 Promise 拒绝', `${errorMessage}\n\n${errorStack}`);
@@ -52,10 +64,11 @@ if (isDevelopment) {
   try {
     // __dirname 在打包后是 dist/main/main/，需要往上3层到项目根目录
     const projectRoot = path.join(__dirname, '../../..');
-    const electronPath = process.platform === 'win32'
-      ? path.join(projectRoot, 'node_modules/.bin/electron.cmd')
-      : path.join(projectRoot, 'node_modules/.bin/electron');
-    
+    const electronPath =
+      process.platform === 'win32'
+        ? path.join(projectRoot, 'node_modules/.bin/electron.cmd')
+        : path.join(projectRoot, 'node_modules/.bin/electron');
+
     require('electron-reload')(__dirname, {
       electron: electronPath,
       hardResetMethod: 'exit',
@@ -134,7 +147,7 @@ function createWindow() {
   } else {
     // 生产环境加载打包后的文件
     let indexPath: string;
-    
+
     if (__dirname.includes('app.asar')) {
       // 在 asar 包中，使用 app.asar.unpacked 路径
       const asarPath = __dirname.replace('app.asar', 'app.asar.unpacked');
@@ -143,7 +156,7 @@ function createWindow() {
       // 不在 asar 包中
       indexPath = path.join(__dirname, '../../renderer/index.html');
     }
-    
+
     mainWindow.loadFile(indexPath).catch((err) => {
       logManager.addLog('error', `Failed to load index.html: ${err.message}`, 'Main');
     });
@@ -162,10 +175,10 @@ function createWindow() {
 
     // 获取用户配置
     const config = await configManager.loadConfig();
-    
+
     // 再次检查窗口是否仍然有效
     if (window.isDestroyed()) return;
-    
+
     // 如果配置为最小化到托盘，则阻止窗口关闭，改为隐藏
     if (config.minimizeToTray) {
       event.preventDefault();
@@ -239,7 +252,7 @@ export function getTrayManager(): TrayManager | null {
  */
 async function updateTrayMenuState(isProxyRunning: boolean): Promise<void> {
   if (!trayManager) return;
-  
+
   try {
     const config = await configManager.loadConfig();
     trayManager.updateFullTrayMenu({
@@ -248,7 +261,7 @@ async function updateTrayMenuState(isProxyRunning: boolean): Promise<void> {
       selectedServerId: config.selectedServerId,
       proxyMode: config.proxyMode,
     });
-    
+
     // 同时更新托盘图标状态
     trayManager.updateTrayIcon(isProxyRunning ? 'connected' : 'idle');
   } catch (error) {
@@ -278,7 +291,7 @@ app.whenReady().then(async () => {
   try {
     const config = await configManager.loadConfig();
     logManager.addLog('info', 'Configuration loaded successfully', 'Main');
-    
+
     // 检查配置是否为默认配置（可能是因为加载失败）
     if (config.servers.length === 0 && config.selectedServerId === null) {
       // 这可能是首次启动或配置文件损坏
@@ -287,14 +300,14 @@ app.whenReady().then(async () => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logManager.addLog('error', `Failed to load configuration: ${errorMessage}`, 'Main');
-    
+
     // 显示错误对话框通知用户
     dialog.showErrorBox(
       '配置加载失败',
       `无法加载配置文件，将使用默认配置。\n\n错误信息: ${errorMessage}`
     );
   }
-  
+
   createWindow();
 
   // 初始化 ProxyManager（需要在窗口创建后）
@@ -308,6 +321,11 @@ app.whenReady().then(async () => {
   registerVersionHandlers();
   registerAdminHandlers();
 
+  // 注册更新处理器
+  setUpdateService(updateService);
+  updateService.setMainWindow(mainWindow);
+  registerUpdateHandlers();
+
   // 设置托盘状态更新回调
   setTrayStateCallback((isRunning: boolean) => {
     updateTrayMenuState(isRunning);
@@ -320,7 +338,7 @@ app.whenReady().then(async () => {
         const config = await configManager.loadConfig();
         if (proxyManager) {
           await proxyManager.start(config);
-          
+
           // 系统代理模式：设置系统代理
           const modeType = (config.proxyModeType || 'tun').toLowerCase();
           if (modeType === 'systemproxy') {
@@ -330,7 +348,7 @@ app.whenReady().then(async () => {
               config.socksPort || 65534
             );
           }
-          
+
           logManager.addLog('info', 'Proxy started from tray', 'Main');
           // 更新托盘菜单状态
           updateTrayMenuState(true);
@@ -344,7 +362,7 @@ app.whenReady().then(async () => {
       try {
         // 先禁用系统代理（不管当前状态如何，都尝试禁用）
         await systemProxyManager.disableProxy();
-        
+
         if (proxyManager) {
           await proxyManager.stop();
           logManager.addLog('info', 'Proxy stopped from tray', 'Main');
@@ -370,17 +388,17 @@ app.whenReady().then(async () => {
         config.selectedServerId = serverId;
         await configManager.saveConfig(config);
         logManager.addLog('info', `Server selected from tray: ${serverId}`, 'Main');
-        
+
         // 如果代理正在运行，重启以应用新服务器
         if (proxyManager && proxyManager.getStatus().running) {
           await proxyManager.stop();
           await proxyManager.start(config);
           logManager.addLog('info', 'Proxy restarted with new server', 'Main');
         }
-        
+
         // 更新托盘菜单
         updateTrayMenuState(proxyManager?.getStatus().running ?? false);
-        
+
         // 通知渲染进程配置已更新
         ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
       } catch (error) {
@@ -394,17 +412,17 @@ app.whenReady().then(async () => {
         config.proxyMode = mode;
         await configManager.saveConfig(config);
         logManager.addLog('info', `Proxy mode changed from tray: ${mode}`, 'Main');
-        
+
         // 如果代理正在运行，重启以应用新模式
         if (proxyManager && proxyManager.getStatus().running) {
           await proxyManager.stop();
           await proxyManager.start(config);
           logManager.addLog('info', 'Proxy restarted with new mode', 'Main');
         }
-        
+
         // 更新托盘菜单
         updateTrayMenuState(proxyManager?.getStatus().running ?? false);
-        
+
         // 通知渲染进程配置已更新
         ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
       } catch (error) {
@@ -419,10 +437,31 @@ app.whenReady().then(async () => {
         mainWindow.webContents.send('navigate', '/settings');
       }
     },
-    onCheckUpdate: () => {
-      // 打开 GitHub releases 页面
-      const { shell } = require('electron');
-      shell.openExternal('https://github.com/your-repo/v2rayz/releases');
+    onCheckUpdate: async () => {
+      // 检查更新并显示对话框
+      const result = await updateService.checkForUpdate();
+      if (result.hasUpdate && result.updateInfo) {
+        const action = await updateService.showUpdateDialog(result.updateInfo);
+        if (action === 'update') {
+          const filePath = await updateService.downloadUpdate(result.updateInfo);
+          if (filePath) {
+            await updateService.installUpdate(filePath);
+          }
+        } else if (action === 'skip') {
+          updateService.skipVersion(result.updateInfo.version);
+        }
+      } else if (!result.error) {
+        // 没有更新，显示提示
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          const { dialog } = require('electron');
+          dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: '检查更新',
+            message: '当前已是最新版本',
+            buttons: ['确定'],
+          });
+        }
+      }
     },
     onManageServers: () => {
       showWindow();

@@ -1,7 +1,7 @@
 /**
  * ConfigManager 属性测试
  * 使用 fast-check 进行基于属性的测试
- * 
+ *
  * Feature: electron-cross-platform, Property 12: 配置验证和保存
  * Validates: Requirements 4.2
  */
@@ -31,7 +31,9 @@ const serverConfigArbitrary = (): fc.Arbitrary<ServerConfig> => {
       port: fc.integer({ min: 1, max: 65535 }),
       uuid: fc.uuid(),
       encryption: fc.option(fc.constantFrom('none', 'auto', 'aes-128-gcm'), { nil: undefined }),
-      flow: fc.option(fc.constantFrom('xtls-rprx-vision', 'xtls-rprx-vision-udp443'), { nil: undefined }),
+      flow: fc.option(fc.constantFrom('xtls-rprx-vision', 'xtls-rprx-vision-udp443'), {
+        nil: undefined,
+      }),
       network: fc.option(fc.constantFrom('tcp', 'ws', 'grpc', 'http'), { nil: undefined }),
       security: fc.option(fc.constantFrom('none', 'tls', 'reality'), { nil: undefined }),
     }),
@@ -65,38 +67,40 @@ const domainRuleArbitrary = (): fc.Arbitrary<DomainRule> => {
  * 生成有效的用户配置
  */
 const validUserConfigArbitrary = (): fc.Arbitrary<UserConfig> => {
-  return fc.record({
-    servers: fc.array(serverConfigArbitrary(), { maxLength: 10 }),
-    selectedServerId: fc.constant(null as string | null), // 先设置为 null，后面会修正
-    proxyMode: fc.constantFrom('global', 'smart', 'direct'),
-    proxyModeType: fc.constantFrom('systemProxy', 'tun'),
-    tunConfig: fc.record({
-      mtu: fc.integer({ min: 1280, max: 65535 }),
-      stack: fc.constantFrom('system', 'gvisor', 'mixed'),
-      autoRoute: fc.boolean(),
-      strictRoute: fc.boolean(),
-      interfaceName: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
-      inet4Address: fc.option(fc.ipV4(), { nil: undefined }),
-      inet6Address: fc.option(fc.ipV6(), { nil: undefined }),
-    }),
-    customRules: fc.array(domainRuleArbitrary(), { maxLength: 20 }),
-    autoStart: fc.boolean(),
-    autoConnect: fc.boolean(),
-    minimizeToTray: fc.boolean(),
-    socksPort: fc.integer({ min: 1, max: 65535 }),
-    httpPort: fc.integer({ min: 1, max: 65535 }),
-    logLevel: fc.constantFrom('debug', 'info', 'warn', 'error', 'fatal'),
-  }).map(config => {
-    // 修正 selectedServerId：如果有服务器，随机选择一个或 null
-    if (config.servers.length > 0) {
-      const shouldSelect = Math.random() > 0.5;
-      if (shouldSelect) {
-        const randomIndex = Math.floor(Math.random() * config.servers.length);
-        (config as any).selectedServerId = config.servers[randomIndex].id;
+  return fc
+    .record({
+      servers: fc.array(serverConfigArbitrary(), { maxLength: 10 }),
+      selectedServerId: fc.constant(null as string | null), // 先设置为 null，后面会修正
+      proxyMode: fc.constantFrom('global', 'smart', 'direct'),
+      proxyModeType: fc.constantFrom('systemProxy', 'tun'),
+      tunConfig: fc.record({
+        mtu: fc.integer({ min: 1280, max: 65535 }),
+        stack: fc.constantFrom('system', 'gvisor', 'mixed'),
+        autoRoute: fc.boolean(),
+        strictRoute: fc.boolean(),
+        interfaceName: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
+        inet4Address: fc.option(fc.ipV4(), { nil: undefined }),
+        inet6Address: fc.option(fc.ipV6(), { nil: undefined }),
+      }),
+      customRules: fc.array(domainRuleArbitrary(), { maxLength: 20 }),
+      autoStart: fc.boolean(),
+      autoConnect: fc.boolean(),
+      minimizeToTray: fc.boolean(),
+      socksPort: fc.integer({ min: 1, max: 65535 }),
+      httpPort: fc.integer({ min: 1, max: 65535 }),
+      logLevel: fc.constantFrom('debug', 'info', 'warn', 'error', 'fatal'),
+    })
+    .map((config) => {
+      // 修正 selectedServerId：如果有服务器，随机选择一个或 null
+      if (config.servers.length > 0) {
+        const shouldSelect = Math.random() > 0.5;
+        if (shouldSelect) {
+          const randomIndex = Math.floor(Math.random() * config.servers.length);
+          (config as any).selectedServerId = config.servers[randomIndex].id;
+        }
       }
-    }
-    return config;
-  });
+      return config;
+    });
 };
 
 // ============================================================================
@@ -131,7 +135,7 @@ describe('ConfigManager Property Tests', () => {
    * 属性 12: 配置验证和保存
    * 对于任何配置修改请求，系统应该先验证配置的有效性（必填字段、类型检查、范围检查），
    * 只有验证通过才保存到文件。
-   * 
+   *
    * Validates: Requirements 4.2
    */
   describe('Property 12: Configuration validation and save', () => {
@@ -147,7 +151,10 @@ describe('ConfigManager Property Tests', () => {
             await manager.saveConfig(config);
 
             // 验证文件已创建
-            const fileExists = await fs.access(configPath).then(() => true).catch(() => false);
+            const fileExists = await fs
+              .access(configPath)
+              .then(() => true)
+              .catch(() => false);
             expect(fileExists).toBe(true);
 
             // 验证文件内容
@@ -321,7 +328,7 @@ describe('ConfigManager Property Tests', () => {
   /**
    * 属性 13: 配置往返一致性
    * 对于任何有效的用户配置，保存到文件后重新加载，应该得到等价的配置对象（所有字段值相同）。
-   * 
+   *
    * Validates: Requirements 4.3
    */
   describe('Property 13: Configuration round-trip consistency', () => {
@@ -508,7 +515,7 @@ describe('ConfigManager Property Tests', () => {
   /**
    * 属性 14: 配置文件权限保护
    * 对于任何保存的配置文件，文件权限应该设置为仅当前用户可读写（Unix: 0600，Windows: 仅所有者访问）。
-   * 
+   *
    * Validates: Requirements 4.5
    */
   describe('Property 14: Configuration file permission protection', () => {
@@ -631,7 +638,10 @@ describe('ConfigManager Property Tests', () => {
             await expect(manager.saveConfig(config)).resolves.not.toThrow();
 
             // 验证文件已创建
-            const fileExists = await fs.access(configPath).then(() => true).catch(() => false);
+            const fileExists = await fs
+              .access(configPath)
+              .then(() => true)
+              .catch(() => false);
             expect(fileExists).toBe(true);
           } finally {
             await cleanupTempDir(tempDir);

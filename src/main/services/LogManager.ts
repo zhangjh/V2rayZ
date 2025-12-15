@@ -74,9 +74,7 @@ export class LogManager extends EventEmitter implements ILogManager {
    * 检查日志级别是否应该被记录
    */
   private shouldLog(level: LogLevel): boolean {
-    return (
-      this.logLevelPriority[level] >= this.logLevelPriority[this.currentLogLevel]
-    );
+    return this.logLevelPriority[level] >= this.logLevelPriority[this.currentLogLevel];
   }
 
   /**
@@ -110,7 +108,7 @@ export class LogManager extends EventEmitter implements ILogManager {
       .finally(() => {
         this.pendingWrites.delete(writePromise);
       });
-    
+
     this.pendingWrites.add(writePromise);
 
     // 触发事件

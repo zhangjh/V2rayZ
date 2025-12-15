@@ -23,12 +23,9 @@ export function registerLogHandlers(logManager: LogManager): void {
   );
 
   // 清空日志
-  registerIpcHandler<void, void>(
-    IPC_CHANNELS.LOGS_CLEAR,
-    async (_event: IpcMainInvokeEvent) => {
-      logManager.clearLogs();
-    }
-  );
+  registerIpcHandler<void, void>(IPC_CHANNELS.LOGS_CLEAR, async (_event: IpcMainInvokeEvent) => {
+    logManager.clearLogs();
+  });
 
   // 设置日志级别
   registerIpcHandler<{ level: LogLevel }, void>(

@@ -1,4 +1,10 @@
-import { GeneralSettings, AppearanceSettings, AdvancedSettings, AboutSettings, ProxyModeSettings } from '@/components/settings'
+import {
+  GeneralSettings,
+  AppearanceSettings,
+  AdvancedSettings,
+  AboutSettings,
+  ProxyModeSettings,
+} from '@/components/settings';
 
 export function SettingsPage() {
   return (
@@ -16,5 +22,5 @@ export function SettingsPage() {
         <AboutSettings />
       </div>
     </div>
-  )
+  );
 }

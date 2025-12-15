@@ -3,26 +3,35 @@
  * 提供类型安全的 IPC 调用封装
  */
 
-import { IpcRenderer } from 'electron';
 import { ApiResponse } from '../../shared/types';
+
+interface ElectronIpcRenderer {
+  invoke: <T = any>(channel: string, args?: any) => Promise<T>;
+  on: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
+  once: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
+  off: (channel: string, listener: (...args: any[]) => void) => void;
+  removeAllListeners: (channel: string) => void;
+}
 
 /**
  * 获取 IPC Renderer 实例
  */
-function getIpcRenderer(): IpcRenderer {
+function getIpcRenderer(): ElectronIpcRenderer {
   if (!window.electron?.ipcRenderer) {
     throw new Error('IPC Renderer is not available. Make sure preload script is loaded.');
   }
-  return window.electron.ipcRenderer;
+  return window.electron.ipcRenderer as ElectronIpcRenderer;
 }
 
 /**
  * IPC 客户端类
  * 提供类型安全的 IPC 调用和事件监听
  */
+type EventListener = (...args: any[]) => void;
+
 export class IpcClient {
-  private ipcRenderer: IpcRenderer;
-  private eventListeners: Map<string, Set<Function>> = new Map();
+  private ipcRenderer: ElectronIpcRenderer;
+  private eventListeners: Map<string, Set<EventListener>> = new Map();
 
   constructor() {
     this.ipcRenderer = getIpcRenderer();
@@ -34,21 +43,18 @@ export class IpcClient {
    * @param args 参数
    * @returns 响应数据
    */
-  async invoke<TArgs = any, TResult = any>(
-    channel: string,
-    args?: TArgs
-  ): Promise<TResult> {
+  async invoke<TArgs = any, TResult = any>(channel: string, args?: TArgs): Promise<TResult> {
     try {
       console.log(`[IPC Client] Invoking: ${channel}`, args);
-      
-      const response = await this.ipcRenderer.invoke(channel, args) as ApiResponse<TResult>;
-      
+
+      const response = (await this.ipcRenderer.invoke(channel, args)) as ApiResponse<TResult>;
+
       if (!response.success) {
         const error = new Error(response.error || 'Unknown error');
         (error as any).code = response.code;
         throw error;
       }
-      
+
       console.log(`[IPC Client] Success: ${channel}`, response.data);
       return response.data as TResult;
     } catch (error) {
@@ -65,7 +71,7 @@ export class IpcClient {
    */
   on<T = any>(channel: string, listener: (data: T) => void): () => void {
     console.log(`[IPC Client] Registering listener for: ${channel}`);
-    
+
     // 包装监听器以提取数据
     const wrappedListener = (_event: any, data: T) => {
       console.log(`[IPC Client] Received event: ${channel}`, data);
@@ -94,7 +100,7 @@ export class IpcClient {
    */
   once<T = any>(channel: string, listener: (data: T) => void): void {
     console.log(`[IPC Client] Registering one-time listener for: ${channel}`);
-    
+
     const wrappedListener = (_event: any, data: T) => {
       console.log(`[IPC Client] Received one-time event: ${channel}`, data);
       listener(data);
@@ -108,10 +114,10 @@ export class IpcClient {
    * @param channel 事件通道名称
    * @param listener 事件监听器（可选，不提供则移除所有监听器）
    */
-  off(channel: string, listener?: Function): void {
+  off(channel: string, listener?: EventListener): void {
     if (listener) {
       this.ipcRenderer.off(channel, listener as any);
-      
+
       const listeners = this.eventListeners.get(channel);
       if (listeners) {
         listeners.delete(listener);
@@ -119,7 +125,7 @@ export class IpcClient {
           this.eventListeners.delete(channel);
         }
       }
-      
+
       console.log(`[IPC Client] Removed listener for: ${channel}`);
     } else {
       this.ipcRenderer.removeAllListeners(channel);
@@ -186,6 +192,6 @@ export function once<T = any>(channel: string, listener: (data: T) => void): voi
 /**
  * 便捷函数：取消监听主进程事件
  */
-export function off(channel: string, listener?: Function): void {
+export function off(channel: string, listener?: EventListener): void {
   ipcClient.off(channel, listener);
 }

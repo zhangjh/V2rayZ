@@ -1,16 +1,22 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useTheme } from '@/components/theme-provider'
-import { toast } from 'sonner'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useTheme } from '@/components/theme-provider';
+import { toast } from 'sonner';
 
 export function AppearanceSettings() {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme();
 
   const handleThemeChange = (value: string) => {
-    setTheme(value as 'light' | 'dark' | 'system')
-    toast.success('主题已更新')
-  }
+    setTheme(value as 'light' | 'dark' | 'system');
+    toast.success('主题已更新');
+  };
 
   return (
     <Card>
@@ -48,5 +54,5 @@ export function AppearanceSettings() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

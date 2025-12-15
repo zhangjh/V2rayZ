@@ -1,12 +1,12 @@
 /**
  * 属性测试：UI 交互触发正确操作
- * 
+ *
  * 属性 2: UI 交互触发正确的后端操作
  * 对于任何 UI 交互事件（如按钮点击、表单提交），系统应该触发对应的 IPC 调用，
  * 并且调用的通道名称和参数应该与交互类型匹配。
- * 
+ *
  * 验证: 需求 1.4
- * 
+ *
  * Feature: electron-cross-platform, Property 2: UI 交互触发正确的后端操作
  */
 
@@ -40,10 +40,11 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
     (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
     // 执行代理启动操作
-    await api.proxy.start();
+    const mockConfig = {} as any;
+    await api.proxy.start(mockConfig);
 
     // 验证调用了正确的通道
-    expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.PROXY_START);
+    expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.PROXY_START, mockConfig);
     expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
   });
 
@@ -102,10 +103,7 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
           await api.config.save(config as UserConfig);
 
           // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.CONFIG_SAVE,
-            config
-          );
+          expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.CONFIG_SAVE, config);
           expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
         }
       ),
@@ -119,23 +117,17 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
    */
   test('属性 2.4: 代理模式切换交互触发正确的 IPC 调用', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.constantFrom('global', 'smart', 'direct'),
-        async (mode) => {
-          jest.clearAllMocks();
-          (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
+      fc.asyncProperty(fc.constantFrom('global', 'smart', 'direct'), async (mode) => {
+        jest.clearAllMocks();
+        (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
-          // 执行代理模式切换操作
-          await api.config.updateMode(mode);
+        // 执行代理模式切换操作
+        await api.config.updateMode(mode);
 
-          // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.CONFIG_UPDATE_MODE,
-            { mode }
-          );
-          expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
-        }
-      ),
+        // 验证调用了正确的通道和参数
+        expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.CONFIG_UPDATE_MODE, { mode });
+        expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
+      }),
       { numRuns: 20 }
     );
   });
@@ -146,23 +138,17 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
    */
   test('属性 2.5: 服务器切换交互触发正确的 IPC 调用', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.uuid(),
-        async (serverId) => {
-          jest.clearAllMocks();
-          (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
+      fc.asyncProperty(fc.uuid(), async (serverId) => {
+        jest.clearAllMocks();
+        (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
-          // 执行服务器切换操作
-          await api.server.switch(serverId);
+        // 执行服务器切换操作
+        await api.server.switch(serverId);
 
-          // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.SERVER_SWITCH,
-            { serverId }
-          );
-          expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
-        }
-      ),
+        // 验证调用了正确的通道和参数
+        expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SERVER_SWITCH, { serverId });
+        expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
+      }),
       { numRuns: 50 }
     );
   });
@@ -195,10 +181,7 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
           const result = await api.server.add(server as Omit<ServerConfig, 'id'>);
 
           // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.SERVER_ADD,
-            server
-          );
+          expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SERVER_ADD, server);
           expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
 
           // 验证返回值包含生成的 ID
@@ -215,23 +198,17 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
    */
   test('属性 2.7: 服务器删除交互触发正确的 IPC 调用', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.uuid(),
-        async (serverId) => {
-          jest.clearAllMocks();
-          (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
+      fc.asyncProperty(fc.uuid(), async (serverId) => {
+        jest.clearAllMocks();
+        (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
-          // 执行服务器删除操作
-          await api.server.delete(serverId);
+        // 执行服务器删除操作
+        await api.server.delete(serverId);
 
-          // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.SERVER_DELETE,
-            { serverId }
-          );
-          expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
-        }
-      ),
+        // 验证调用了正确的通道和参数
+        expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SERVER_DELETE, { serverId });
+        expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
+      }),
       { numRuns: 50 }
     );
   });
@@ -244,8 +221,8 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
     await fc.assert(
       fc.asyncProperty(
         fc.oneof(
-          fc.string().map(s => `vless://${s}`),
-          fc.string().map(s => `trojan://${s}`)
+          fc.string().map((s) => `vless://${s}`),
+          fc.string().map((s) => `trojan://${s}`)
         ),
         async (url) => {
           jest.clearAllMocks();
@@ -262,10 +239,7 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
           await api.server.parseUrl(url);
 
           // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.SERVER_PARSE_URL,
-            { url }
-          );
+          expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SERVER_PARSE_URL, { url });
           expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
         }
       ),
@@ -298,10 +272,7 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
           await api.rules.add(rule as Omit<DomainRule, 'id'>);
 
           // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.RULES_ADD,
-            rule
-          );
+          expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.RULES_ADD, rule);
           expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
         }
       ),
@@ -315,23 +286,17 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
    */
   test('属性 2.10: 路由规则删除交互触发正确的 IPC 调用', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.uuid(),
-        async (ruleId) => {
-          jest.clearAllMocks();
-          (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
+      fc.asyncProperty(fc.uuid(), async (ruleId) => {
+        jest.clearAllMocks();
+        (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
-          // 执行规则删除操作
-          await api.rules.delete(ruleId);
+        // 执行规则删除操作
+        await api.rules.delete(ruleId);
 
-          // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.RULES_DELETE,
-            { ruleId }
-          );
-          expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
-        }
-      ),
+        // 验证调用了正确的通道和参数
+        expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.RULES_DELETE, { ruleId });
+        expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
+      }),
       { numRuns: 50 }
     );
   });
@@ -353,10 +318,10 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
           await api.systemProxy.enable(address, port);
 
           // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.SYSTEM_PROXY_ENABLE,
-            { address, port }
-          );
+          expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SYSTEM_PROXY_ENABLE, {
+            address,
+            port,
+          });
           expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
         }
       ),
@@ -370,23 +335,17 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
    */
   test('属性 2.12: 自启动设置交互触发正确的 IPC 调用', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.boolean(),
-        async (enabled) => {
-          jest.clearAllMocks();
-          (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
+      fc.asyncProperty(fc.boolean(), async (enabled) => {
+        jest.clearAllMocks();
+        (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
-          // 执行自启动设置操作
-          await api.autoStart.set(enabled);
+        // 执行自启动设置操作
+        await api.autoStart.set(enabled);
 
-          // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.AUTO_START_SET,
-            { enabled }
-          );
-          expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
-        }
-      ),
+        // 验证调用了正确的通道和参数
+        expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.AUTO_START_SET, { enabled });
+        expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
+      }),
       { numRuns: 20 }
     );
   });
@@ -397,23 +356,17 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
    */
   test('属性 2.13: 日志级别设置交互触发正确的 IPC 调用', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.constantFrom('debug', 'info', 'warn', 'error'),
-        async (level) => {
-          jest.clearAllMocks();
-          (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
+      fc.asyncProperty(fc.constantFrom('debug', 'info', 'warn', 'error'), async (level) => {
+        jest.clearAllMocks();
+        (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
-          // 执行日志级别设置操作
-          await api.logs.setLevel(level);
+        // 执行日志级别设置操作
+        await api.logs.setLevel(level);
 
-          // 验证调用了正确的通道和参数
-          expect(ipcClient.invoke).toHaveBeenCalledWith(
-            IPC_CHANNELS.LOGS_SET_LEVEL,
-            { level }
-          );
-          expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
-        }
-      ),
+        // 验证调用了正确的通道和参数
+        expect(ipcClient.invoke).toHaveBeenCalledWith(IPC_CHANNELS.LOGS_SET_LEVEL, { level });
+        expect(ipcClient.invoke).toHaveBeenCalledTimes(1);
+      }),
       { numRuns: 20 }
     );
   });
@@ -441,17 +394,16 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
     (ipcClient.invoke as jest.Mock).mockResolvedValue(undefined);
 
     // 执行一系列操作
-    await api.proxy.start();
+    const mockConfig = {} as any;
+    await api.proxy.start(mockConfig);
     await api.config.updateMode('global');
     await api.proxy.stop();
 
     // 验证调用顺序和通道
-    expect(ipcClient.invoke).toHaveBeenNthCalledWith(1, IPC_CHANNELS.PROXY_START);
-    expect(ipcClient.invoke).toHaveBeenNthCalledWith(
-      2,
-      IPC_CHANNELS.CONFIG_UPDATE_MODE,
-      { mode: 'global' }
-    );
+    expect(ipcClient.invoke).toHaveBeenNthCalledWith(1, IPC_CHANNELS.PROXY_START, mockConfig);
+    expect(ipcClient.invoke).toHaveBeenNthCalledWith(2, IPC_CHANNELS.CONFIG_UPDATE_MODE, {
+      mode: 'global',
+    });
     expect(ipcClient.invoke).toHaveBeenNthCalledWith(3, IPC_CHANNELS.PROXY_STOP);
     expect(ipcClient.invoke).toHaveBeenCalledTimes(3);
   });
@@ -465,17 +417,11 @@ describe('属性测试: UI 交互触发正确的后端操作', () => {
 
     // 注册代理启动事件监听器
     const unsubscribe1 = api.proxy.onStarted(mockListener);
-    expect(ipcClient.on).toHaveBeenCalledWith(
-      IPC_CHANNELS.EVENT_PROXY_STARTED,
-      mockListener
-    );
+    expect(ipcClient.on).toHaveBeenCalledWith(IPC_CHANNELS.EVENT_PROXY_STARTED, mockListener);
 
     // 注册配置变化事件监听器
     const unsubscribe2 = api.config.onChanged(mockListener);
-    expect(ipcClient.on).toHaveBeenCalledWith(
-      IPC_CHANNELS.EVENT_CONFIG_CHANGED,
-      mockListener
-    );
+    expect(ipcClient.on).toHaveBeenCalledWith(IPC_CHANNELS.EVENT_CONFIG_CHANGED, mockListener);
 
     // 验证返回了取消订阅函数
     expect(typeof unsubscribe1).toBe('function');

@@ -114,7 +114,9 @@ export const configApi = {
   /**
    * 监听配置变化事件
    */
-  onChanged(listener: (data: { key?: string; oldValue?: any; newValue?: any }) => void): () => void {
+  onChanged(
+    listener: (data: { key?: string; oldValue?: any; newValue?: any }) => void
+  ): () => void {
     return ipcClient.on(IPC_CHANNELS.EVENT_CONFIG_CHANGED, listener);
   },
 };
@@ -376,6 +378,95 @@ export const adminApi = {
 };
 
 /**
+ * 更新检查结果
+ */
+export interface UpdateCheckResult {
+  hasUpdate: boolean;
+  updateInfo?: UpdateInfo;
+  error?: string;
+}
+
+/**
+ * 更新信息
+ */
+export interface UpdateInfo {
+  version: string;
+  title: string;
+  releaseNotes: string;
+  downloadUrl: string;
+  fileSize: number;
+  publishedAt: string;
+  isPrerelease: boolean;
+  fileName: string;
+}
+
+/**
+ * 更新进度
+ */
+export interface UpdateProgress {
+  status:
+    | 'idle'
+    | 'checking'
+    | 'no-update'
+    | 'update-available'
+    | 'downloading'
+    | 'downloaded'
+    | 'error';
+  percentage: number;
+  message: string;
+  error?: string;
+}
+
+/**
+ * 更新管理 API
+ */
+export const updateApi = {
+  /**
+   * 检查更新
+   */
+  async check(includePrerelease = false): Promise<UpdateCheckResult> {
+    return ipcClient.invoke(IPC_CHANNELS.UPDATE_CHECK, { includePrerelease });
+  },
+
+  /**
+   * 下载更新
+   */
+  async download(
+    updateInfo: UpdateInfo
+  ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+    return ipcClient.invoke(IPC_CHANNELS.UPDATE_DOWNLOAD, { updateInfo });
+  },
+
+  /**
+   * 安装更新
+   */
+  async install(filePath: string): Promise<{ success: boolean; error?: string }> {
+    return ipcClient.invoke(IPC_CHANNELS.UPDATE_INSTALL, { filePath });
+  },
+
+  /**
+   * 跳过版本
+   */
+  async skip(version: string): Promise<{ success: boolean }> {
+    return ipcClient.invoke(IPC_CHANNELS.UPDATE_SKIP, { version });
+  },
+
+  /**
+   * 打开 Releases 页面
+   */
+  async openReleases(): Promise<{ success: boolean }> {
+    return ipcClient.invoke(IPC_CHANNELS.UPDATE_OPEN_RELEASES);
+  },
+
+  /**
+   * 监听更新进度事件
+   */
+  onProgress(listener: (progress: UpdateProgress) => void): () => void {
+    return ipcClient.on(IPC_CHANNELS.EVENT_UPDATE_PROGRESS, listener);
+  },
+};
+
+/**
  * 统一的 API 客户端
  */
 export const api = {
@@ -390,6 +481,7 @@ export const api = {
   connection: connectionApi,
   version: versionApi,
   admin: adminApi,
+  update: updateApi,
 };
 
 /**

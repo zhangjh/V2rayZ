@@ -59,12 +59,12 @@ function defaultShouldRetry(error: Error): boolean {
   }
 
   // 检查错误消息
-  return temporaryErrors.some(pattern => message.includes(pattern));
+  return temporaryErrors.some((pattern) => message.includes(pattern));
 }
 
 /**
  * 执行带重试的异步操作
- * 
+ *
  * @param fn 要执行的异步函数
  * @param options 重试选项
  * @returns 函数执行结果
@@ -101,9 +101,7 @@ export async function retry<T>(
       }
 
       // 计算延迟时间
-      const currentDelay = exponentialBackoff
-        ? delay * Math.pow(2, attempt)
-        : delay;
+      const currentDelay = exponentialBackoff ? delay * Math.pow(2, attempt) : delay;
 
       // 调用重试回调
       if (onRetry) {
@@ -128,12 +126,12 @@ export async function retry<T>(
  * 睡眠函数
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * 创建带重试的函数包装器
- * 
+ *
  * @param fn 要包装的函数
  * @param options 重试选项
  * @returns 包装后的函数

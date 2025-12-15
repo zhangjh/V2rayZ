@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -8,95 +8,95 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, Link, Server } from 'lucide-react'
-import { parseProtocolUrl, addServerFromUrl } from '@/bridge/api-wrapper'
-import type { ServerConfig } from '@/bridge/types'
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Link, Server } from 'lucide-react';
+import { parseProtocolUrl, addServerFromUrl } from '@/bridge/api-wrapper';
+import type { ServerConfig } from '@/bridge/types';
 
 interface ImportUrlDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onImportSuccess?: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onImportSuccess?: () => void;
 }
 
 export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportUrlDialogProps) {
-  const [url, setUrl] = useState('')
-  const [name, setName] = useState('')
-  const [parsedConfig, setParsedConfig] = useState<ServerConfig | null>(null)
-  const [isParsing, setIsParsing] = useState(false)
-  const [isImporting, setIsImporting] = useState(false)
+  const [url, setUrl] = useState('');
+  const [name, setName] = useState('');
+  const [parsedConfig, setParsedConfig] = useState<ServerConfig | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleParseUrl = async () => {
     if (!url.trim()) {
-      toast.error('请输入协议URL')
-      return
+      toast.error('请输入协议URL');
+      return;
     }
 
-    setIsParsing(true)
+    setIsParsing(true);
     try {
-      const response = await parseProtocolUrl(url.trim())
+      const response = await parseProtocolUrl(url.trim());
       if (response && response.success && response.data) {
-        setParsedConfig(response.data as any)
-        
+        setParsedConfig(response.data as any);
+
         // 自动生成服务器名称
         if (!name.trim()) {
-          const protocol = response.data.protocol.toUpperCase()
-          const address = response.data.address
-          setName(`${protocol} - ${address}`)
+          const protocol = response.data.protocol.toUpperCase();
+          const address = response.data.address;
+          setName(`${protocol} - ${address}`);
         }
-        
-        toast.success('URL解析成功')
+
+        toast.success('URL解析成功');
       } else {
-        toast.error(response?.error || 'URL解析失败')
-        setParsedConfig(null)
+        toast.error(response?.error || 'URL解析失败');
+        setParsedConfig(null);
       }
     } catch (error) {
-      console.error('Parse URL error:', error)
-      toast.error('URL解析失败')
-      setParsedConfig(null)
+      console.error('Parse URL error:', error);
+      toast.error('URL解析失败');
+      setParsedConfig(null);
     } finally {
-      setIsParsing(false)
+      setIsParsing(false);
     }
-  }
+  };
 
   const handleImport = async () => {
     if (!parsedConfig || !name.trim()) {
-      toast.error('请先解析URL并输入服务器名称')
-      return
+      toast.error('请先解析URL并输入服务器名称');
+      return;
     }
 
-    setIsImporting(true)
+    setIsImporting(true);
     try {
-      const response = await addServerFromUrl(url.trim(), name.trim())
+      const response = await addServerFromUrl(url.trim(), name.trim());
       if (response && response.success) {
-        onImportSuccess?.()
-        handleClose()
+        onImportSuccess?.();
+        handleClose();
       } else {
-        toast.error(response?.error || '导入服务器失败')
+        toast.error(response?.error || '导入服务器失败');
       }
     } catch (error) {
-      console.error('Import server error:', error)
-      toast.error('导入服务器失败')
+      console.error('Import server error:', error);
+      toast.error('导入服务器失败');
     } finally {
-      setIsImporting(false)
+      setIsImporting(false);
     }
-  }
+  };
 
   const handleClose = () => {
-    setUrl('')
-    setName('')
-    setParsedConfig(null)
-    onOpenChange(false)
-  }
+    setUrl('');
+    setName('');
+    setParsedConfig(null);
+    onOpenChange(false);
+  };
 
   const isValidUrl = (url: string) => {
-    return url.startsWith('vless://') || url.startsWith('trojan://')
-  }
+    return url.startsWith('vless://') || url.startsWith('trojan://');
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,9 +106,7 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
             <Link className="h-5 w-5" />
             从URL导入服务器
           </DialogTitle>
-          <DialogDescription>
-            支持导入 vless:// 和 trojan:// 协议链接
-          </DialogDescription>
+          <DialogDescription>支持导入 vless:// 和 trojan:// 协议链接</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -130,11 +128,7 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
                 disabled={!url.trim() || !isValidUrl(url.trim()) || isParsing}
                 className="shrink-0"
               >
-                {isParsing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  '解析'
-                )}
+                {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : '解析'}
               </Button>
             </div>
             {url.trim() && !isValidUrl(url.trim()) && (
@@ -152,9 +146,7 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
                   <Server className="h-4 w-4" />
                   解析结果
                 </CardTitle>
-                <CardDescription>
-                  URL解析成功，请确认配置信息
-                </CardDescription>
+                <CardDescription>URL解析成功，请确认配置信息</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -166,7 +158,9 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
                   </div>
                   <div>
                     <span className="text-muted-foreground">地址:</span>
-                    <span className="ml-2 font-mono">{parsedConfig.address}:{parsedConfig.port}</span>
+                    <span className="ml-2 font-mono">
+                      {parsedConfig.address}:{parsedConfig.port}
+                    </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">传输:</span>
@@ -176,13 +170,13 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
                     <span className="text-muted-foreground">加密:</span>
                     <span className="ml-2">{parsedConfig.security}</span>
                   </div>
-                  {parsedConfig.protocol === 'Vless' && parsedConfig.uuid && (
+                  {parsedConfig.protocol === 'vless' && parsedConfig.uuid && (
                     <div className="col-span-2">
                       <span className="text-muted-foreground">UUID:</span>
                       <span className="ml-2 font-mono text-xs">{parsedConfig.uuid}</span>
                     </div>
                   )}
-                  {parsedConfig.protocol === 'Trojan' && (
+                  {parsedConfig.protocol === 'trojan' && (
                     <div className="col-span-2">
                       <span className="text-muted-foreground">密码:</span>
                       <span className="ml-2">••••••••</span>
@@ -223,10 +217,7 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
           <Button variant="outline" onClick={handleClose}>
             取消
           </Button>
-          <Button
-            onClick={handleImport}
-            disabled={!parsedConfig || !name.trim() || isImporting}
-          >
+          <Button onClick={handleImport} disabled={!parsedConfig || !name.trim() || isImporting}>
             {isImporting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -239,5 +230,5 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // 记录错误信息
     console.error('Error caught by ErrorBoundary:', error, errorInfo);
-    
+
     this.setState({
       error,
       errorInfo,
@@ -83,7 +83,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   </pre>
                 </div>
               )}
-              
+
               {this.state.errorInfo && (
                 <details className="space-y-2">
                   <summary className="text-sm font-medium cursor-pointer hover:underline">
@@ -96,9 +96,7 @@ export class ErrorBoundary extends Component<Props, State> {
               )}
 
               <div className="flex gap-2">
-                <Button onClick={this.handleReset}>
-                  重试
-                </Button>
+                <Button onClick={this.handleReset}>重试</Button>
                 <Button variant="outline" onClick={() => window.location.reload()}>
                   刷新页面
                 </Button>

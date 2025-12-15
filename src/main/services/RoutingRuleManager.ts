@@ -14,21 +14,21 @@ export interface SingBoxRouteRule {
   domain_suffix?: string[];
   domain_keyword?: string[];
   domain_regex?: string[];
-  
+
   // GeoIP/GeoSite 匹配
   geosite?: string[];
   geoip?: string[];
-  
+
   // IP 匹配
   ip_cidr?: string[];
-  
+
   // 端口匹配
   port?: number[];
   port_range?: string[];
-  
+
   // 协议匹配
   protocol?: string[];
-  
+
   // 出站标签
   outbound: string;
 }
@@ -54,22 +54,22 @@ export interface IRoutingRuleManager {
    * 生成路由配置
    */
   generateRouteConfig(config: UserConfig): SingBoxRouteConfig;
-  
+
   /**
    * 生成全局代理模式规则
    */
   generateGlobalProxyRules(): SingBoxRouteRule[];
-  
+
   /**
    * 生成智能分流模式规则
    */
   generateSmartRoutingRules(): SingBoxRouteRule[];
-  
+
   /**
    * 生成直连模式规则
    */
   generateDirectRules(): SingBoxRouteRule[];
-  
+
   /**
    * 集成自定义域名规则
    */
@@ -82,11 +82,11 @@ export class RoutingRuleManager implements IRoutingRuleManager {
    */
   generateRouteConfig(config: UserConfig): SingBoxRouteConfig {
     const rules: SingBoxRouteRule[] = [];
-    
+
     // 1. 首先添加自定义规则（优先级最高）
     const customRules = this.integrateCustomRules(config.customRules);
     rules.push(...customRules);
-    
+
     // 2. 根据代理模式添加相应规则
     let modeRules: SingBoxRouteRule[] = [];
     switch (config.proxyMode) {
@@ -101,23 +101,23 @@ export class RoutingRuleManager implements IRoutingRuleManager {
         break;
     }
     rules.push(...modeRules);
-    
+
     // 3. 构建完整的路由配置
     const routeConfig: SingBoxRouteConfig = {
       rules,
       auto_detect_interface: true,
     };
-    
+
     // 4. 设置默认出站
     if (config.proxyMode === 'direct') {
       routeConfig.final = 'direct';
     } else {
       routeConfig.final = 'proxy';
     }
-    
+
     return routeConfig;
   }
-  
+
   /**
    * 生成全局代理模式规则
    * 所有流量都通过代理，除了本地地址
@@ -145,7 +145,7 @@ export class RoutingRuleManager implements IRoutingRuleManager {
       },
     ];
   }
-  
+
   /**
    * 生成智能分流模式规则
    * 使用 GeoIP 和 GeoSite 进行智能分流
@@ -188,7 +188,7 @@ export class RoutingRuleManager implements IRoutingRuleManager {
       },
     ];
   }
-  
+
   /**
    * 生成直连模式规则
    * 所有流量都直连
@@ -197,7 +197,7 @@ export class RoutingRuleManager implements IRoutingRuleManager {
     // 直连模式不需要特殊规则，所有流量都走 direct
     return [];
   }
-  
+
   /**
    * 集成自定义域名规则
    * 将用户自定义的域名规则转换为 sing-box 规则格式
@@ -205,29 +205,29 @@ export class RoutingRuleManager implements IRoutingRuleManager {
   integrateCustomRules(customRules: DomainRule[]): SingBoxRouteRule[] {
     // 按 action 分组规则
     const rulesByAction = new Map<string, string[]>();
-    
+
     for (const rule of customRules) {
       // 只处理启用的规则
       if (!rule.enabled) {
         continue;
       }
-      
+
       const action = rule.action;
       if (!rulesByAction.has(action)) {
         rulesByAction.set(action, []);
       }
-      
+
       rulesByAction.get(action)!.push(rule.domain);
     }
-    
+
     // 转换为 sing-box 规则
     const singboxRules: SingBoxRouteRule[] = [];
-    
+
     for (const [action, domains] of rulesByAction.entries()) {
       if (domains.length === 0) {
         continue;
       }
-      
+
       // 确定出站标签
       let outbound: string;
       if (action === 'proxy') {
@@ -240,12 +240,12 @@ export class RoutingRuleManager implements IRoutingRuleManager {
         // 未知 action，跳过
         continue;
       }
-      
+
       // 分类域名规则
       const exactDomains: string[] = [];
       const suffixDomains: string[] = [];
       const keywordDomains: string[] = [];
-      
+
       for (const domain of domains) {
         if (domain.startsWith('*.')) {
           // 通配符域名，转换为 domain_suffix
@@ -258,12 +258,12 @@ export class RoutingRuleManager implements IRoutingRuleManager {
           exactDomains.push(domain);
         }
       }
-      
+
       // 创建规则
       const rule: SingBoxRouteRule = {
         outbound,
       };
-      
+
       if (exactDomains.length > 0) {
         rule.domain = exactDomains;
       }
@@ -273,10 +273,10 @@ export class RoutingRuleManager implements IRoutingRuleManager {
       if (keywordDomains.length > 0) {
         rule.domain_keyword = keywordDomains;
       }
-      
+
       singboxRules.push(rule);
     }
-    
+
     return singboxRules;
   }
 }

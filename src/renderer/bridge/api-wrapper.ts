@@ -13,7 +13,7 @@ import type { ApiResponse, UserConfig, ServerConfig, DomainRule } from './types'
 async function wrapApiCall<T>(
   apiCall: () => Promise<T>,
   context: string,
-  errorCategory: ErrorCategory = ErrorCategory.System
+  _errorCategory: ErrorCategory = ErrorCategory.System
 ): Promise<T | null> {
   try {
     const result = await apiCall();
@@ -24,39 +24,48 @@ async function wrapApiCall<T>(
   }
 }
 
+// 导出以避免未使用警告（保留用于未来扩展）
+export { wrapApiCall };
+
 /**
  * Proxy Control APIs with error handling
  */
-export async function startProxy(): Promise<ApiResponse<void>> {
+export async function startProxy(config?: any): Promise<ApiResponse<void>> {
   try {
-    await api.proxy.start();
+    // 如果没有传入配置，先获取当前配置
+    const currentConfig = config || (await api.config.get());
+    await api.proxy.start(currentConfig);
     ErrorHandler.showSuccess('代理已启动');
     return { success: true };
   } catch (error: any) {
     const errorMessage = error?.message || '启动代理失败';
-    
+
     // Determine error category based on error message
     let category = ErrorCategory.Connection;
     let canRetry = true;
-    
+
     if (errorMessage.includes('不支持的协议') || errorMessage.includes('Protocol')) {
       category = ErrorCategory.Config;
       canRetry = false;
-    } else if (errorMessage.includes('认证失败') || errorMessage.includes('密码错误') || errorMessage.includes('UUID 错误')) {
+    } else if (
+      errorMessage.includes('认证失败') ||
+      errorMessage.includes('密码错误') ||
+      errorMessage.includes('UUID 错误')
+    ) {
       category = ErrorCategory.Config;
       canRetry = false;
     } else if (errorMessage.includes('配置错误') || errorMessage.includes('配置格式')) {
       category = ErrorCategory.Config;
       canRetry = false;
     }
-    
+
     ErrorHandler.handle({
       category,
       userMessage: errorMessage,
       technicalMessage: errorMessage,
       canRetry,
     });
-    
+
     return { success: false, error: errorMessage };
   }
 }
@@ -143,7 +152,9 @@ export async function resetStatistics(): Promise<ApiResponse<void>> {
 /**
  * Custom Rules APIs
  */
-export async function addCustomRule(rule: Omit<DomainRule, 'id'>): Promise<ApiResponse<DomainRule>> {
+export async function addCustomRule(
+  rule: Omit<DomainRule, 'id'>
+): Promise<ApiResponse<DomainRule>> {
   try {
     const newRule = await api.rules.add(rule);
     ErrorHandler.showSuccess('规则已添加');
@@ -202,14 +213,16 @@ export async function clearLogs(): Promise<ApiResponse<void>> {
 /**
  * Version Information APIs
  */
-export async function getVersionInfo(): Promise<ApiResponse<{
-  appVersion: string;
-  appName: string;
-  buildDate: string;
-  singBoxVersion: string;
-  copyright: string;
-  repositoryUrl: string;
-}>> {
+export async function getVersionInfo(): Promise<
+  ApiResponse<{
+    appVersion: string;
+    appName: string;
+    buildDate: string;
+    singBoxVersion: string;
+    copyright: string;
+    repositoryUrl: string;
+  }>
+> {
   try {
     const data = await api.version.getInfo();
     return { success: true, data };
@@ -221,7 +234,9 @@ export async function getVersionInfo(): Promise<ApiResponse<{
 /**
  * Protocol URL Parsing APIs
  */
-export async function parseProtocolUrl(url: string): Promise<ApiResponse<Omit<ServerConfig, 'id'>>> {
+export async function parseProtocolUrl(
+  url: string
+): Promise<ApiResponse<Omit<ServerConfig, 'id'>>> {
   try {
     const server = await api.server.parseUrl(url);
     return { success: true, data: server };
@@ -231,7 +246,10 @@ export async function parseProtocolUrl(url: string): Promise<ApiResponse<Omit<Se
   }
 }
 
-export async function addServerFromUrl(url: string, name: string): Promise<ApiResponse<ServerConfig>> {
+export async function addServerFromUrl(
+  url: string,
+  name: string
+): Promise<ApiResponse<ServerConfig>> {
   try {
     const server = await api.server.addFromUrl(url, name);
     ErrorHandler.showSuccess('服务器已添加');
@@ -245,10 +263,66 @@ export async function addServerFromUrl(url: string, name: string): Promise<ApiRe
 /**
  * Update Management APIs
  */
-export async function checkForUpdates(): Promise<ApiResponse<boolean>> {
+export async function checkForUpdates(): Promise<
+  ApiResponse<{
+    hasUpdate: boolean;
+    updateInfo?: {
+      version: string;
+      title: string;
+      releaseNotes: string;
+      downloadUrl: string;
+      fileSize: number;
+      publishedAt: string;
+      isPrerelease: boolean;
+      fileName: string;
+    };
+  }>
+> {
   try {
-    // TODO: 实现更新检查
-    return { success: true, data: false };
+    const result = await api.update.check();
+    return { success: true, data: result };
+  } catch (error: any) {
+    return { success: false, error: error?.message };
+  }
+}
+
+export async function downloadUpdate(updateInfo: any): Promise<ApiResponse<string>> {
+  try {
+    const result = await api.update.download(updateInfo);
+    if (result.success && result.filePath) {
+      return { success: true, data: result.filePath };
+    }
+    return { success: false, error: result.error || '下载失败' };
+  } catch (error: any) {
+    return { success: false, error: error?.message };
+  }
+}
+
+export async function installUpdate(filePath: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await api.update.install(filePath);
+    if (result.success) {
+      return { success: true };
+    }
+    return { success: false, error: result.error || '安装失败' };
+  } catch (error: any) {
+    return { success: false, error: error?.message };
+  }
+}
+
+export async function skipUpdateVersion(version: string): Promise<ApiResponse<void>> {
+  try {
+    await api.update.skip(version);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error?.message };
+  }
+}
+
+export async function openReleasesPage(): Promise<ApiResponse<void>> {
+  try {
+    await api.update.openReleases();
+    return { success: true };
   } catch (error: any) {
     return { success: false, error: error?.message };
   }
@@ -284,7 +358,7 @@ export function addEventListener(event: string, listener: (...args: any[]) => vo
   }
 }
 
-export function removeEventListener(event: string, listener: (...args: any[]) => void): void {
+export function removeEventListener(_event: string, _listener: (...args: any[]) => void): void {
   // Electron IPC 的 removeListener 由返回的清理函数处理
   // 这里保留接口兼容性
 }

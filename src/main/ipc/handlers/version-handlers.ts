@@ -8,7 +8,6 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels';
 import { registerIpcHandler } from '../ipc-handler';
 
 // 从 package.json 读取 sing-box 版本
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const packageJson = require('../../../../../package.json');
 const SINGBOX_VERSION = packageJson.singboxVersion || 'Unknown';
 

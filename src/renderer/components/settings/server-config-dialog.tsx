@@ -1,31 +1,35 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { VlessForm } from './vless-form'
-import { TrojanForm } from './trojan-form'
-import type { ServerConfigWithId, ProtocolType } from '@/bridge/types'
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { VlessForm } from './vless-form';
+import { TrojanForm } from './trojan-form';
+import type { ServerConfig, ProtocolType } from '@/bridge/types';
+
+type ServerConfigWithId = ServerConfig;
 
 interface ServerConfigDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  server?: ServerConfigWithId
-  onSave: (serverConfig: Omit<ServerConfigWithId, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  onTestConnection: () => Promise<void>
-  isTestingConnection: boolean
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  server?: ServerConfigWithId;
+  onSave: (
+    serverConfig: Omit<ServerConfigWithId, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<void>;
+  onTestConnection: () => Promise<void>;
+  isTestingConnection: boolean;
 }
 
 export function ServerConfigDialog({
@@ -36,58 +40,55 @@ export function ServerConfigDialog({
   onTestConnection,
   isTestingConnection,
 }: ServerConfigDialogProps) {
-  const [serverName, setServerName] = useState('')
-  const [selectedProtocol, setSelectedProtocol] = useState<ProtocolType>('Vless')
-  const [currentServerConfig, setCurrentServerConfig] = useState<any>(null)
+  const [serverName, setServerName] = useState('');
+  const [selectedProtocol, setSelectedProtocol] = useState<ProtocolType>('vless');
+  const [currentServerConfig, setCurrentServerConfig] = useState<any>(null);
 
-  const isEditing = !!server
+  const isEditing = !!server;
 
   useEffect(() => {
     if (server) {
-      setServerName(server.name)
-      setSelectedProtocol(server.protocol)
-      setCurrentServerConfig(server)
+      setServerName(server.name);
+      setSelectedProtocol(server.protocol);
+      setCurrentServerConfig(server);
     } else {
-      setServerName('')
-      setSelectedProtocol('Vless')
-      setCurrentServerConfig(null)
+      setServerName('');
+      setSelectedProtocol('vless');
+      setCurrentServerConfig(null);
     }
-  }, [server, open])
+  }, [server, open]);
 
   const handleSave = async (protocolConfig: any) => {
     if (!serverName.trim()) {
-      throw new Error('服务器名称不能为空')
+      throw new Error('服务器名称不能为空');
     }
 
     const serverConfig = {
       name: serverName.trim(),
       ...protocolConfig,
-    }
+    };
 
-    await onSave(serverConfig)
-    onOpenChange(false)
-  }
+    await onSave(serverConfig);
+    onOpenChange(false);
+  };
 
   const handleProtocolChange = (protocol: ProtocolType) => {
-    setSelectedProtocol(protocol)
+    setSelectedProtocol(protocol);
     // Clear current config when switching protocols
     if (protocol !== currentServerConfig?.protocol) {
-      setCurrentServerConfig(null)
+      setCurrentServerConfig(null);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {isEditing ? '编辑服务器配置' : '添加服务器配置'}
-          </DialogTitle>
+          <DialogTitle>{isEditing ? '编辑服务器配置' : '添加服务器配置'}</DialogTitle>
           <DialogDescription>
-            {isEditing 
+            {isEditing
               ? '修改服务器配置信息。保存后不会自动重启代理服务。'
-              : '添加新的代理服务器配置。支持 VLESS 和 Trojan 协议。'
-            }
+              : '添加新的代理服务器配置。支持 VLESS 和 Trojan 协议。'}
           </DialogDescription>
         </DialogHeader>
 
@@ -101,18 +102,13 @@ export function ServerConfigDialog({
               value={serverName}
               onChange={(e) => setServerName(e.target.value)}
             />
-            <p className="text-sm text-muted-foreground">
-              为此服务器配置设置一个便于识别的名称
-            </p>
+            <p className="text-sm text-muted-foreground">为此服务器配置设置一个便于识别的名称</p>
           </div>
 
           {/* Protocol Selection */}
           <div className="space-y-2">
             <Label>协议类型</Label>
-            <Select
-              value={selectedProtocol}
-              onValueChange={handleProtocolChange}
-            >
+            <Select value={selectedProtocol} onValueChange={handleProtocolChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -121,27 +117,25 @@ export function ServerConfigDialog({
                 <SelectItem value="Trojan">Trojan</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground">
-              选择您的代理服务器协议类型
-            </p>
+            <p className="text-sm text-muted-foreground">选择您的代理服务器协议类型</p>
           </div>
 
           {/* Protocol Form */}
           <div className="border-t pt-6">
-            {selectedProtocol === 'Vless' && (
+            {selectedProtocol === 'vless' && (
               <VlessForm
                 serverConfig={
-                  currentServerConfig?.protocol === 'Vless' ? currentServerConfig : undefined
+                  currentServerConfig?.protocol === 'vless' ? currentServerConfig : undefined
                 }
                 onSubmit={handleSave}
                 onTestConnection={onTestConnection}
                 isTestingConnection={isTestingConnection}
               />
             )}
-            {selectedProtocol === 'Trojan' && (
+            {selectedProtocol === 'trojan' && (
               <TrojanForm
                 serverConfig={
-                  currentServerConfig?.protocol === 'Trojan' ? currentServerConfig : undefined
+                  currentServerConfig?.protocol === 'trojan' ? currentServerConfig : undefined
                 }
                 onSubmit={handleSave}
                 onTestConnection={onTestConnection}
@@ -152,5 +146,5 @@ export function ServerConfigDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

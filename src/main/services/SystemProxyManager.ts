@@ -55,14 +55,15 @@ export abstract class SystemProxyBase implements ISystemProxyManager {
  * 使用注册表修改 Internet Settings
  */
 export class WindowsSystemProxy extends SystemProxyBase {
-  private readonly regPath = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings';
+  private readonly regPath =
+    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings';
 
   /**
    * 启用系统代理
    */
   async enableProxy(address: string, httpPort: number, socksPort: number): Promise<void> {
     console.log(`正在设置 Windows 系统代理: ${address}:${httpPort}`);
-    
+
     // 保存原始设置
     try {
       this.originalSettings = await this.getProxyStatus();
@@ -78,14 +79,19 @@ export class WindowsSystemProxy extends SystemProxyBase {
         async () => {
           // 设置代理服务器地址
           const proxyServer = `http=${address}:${httpPort};https=${address}:${httpPort};socks=${address}:${socksPort}`;
-          await execAsync(`reg add "${this.regPath}" /v ProxyServer /t REG_SZ /d "${proxyServer}" /f`);
+          await execAsync(
+            `reg add "${this.regPath}" /v ProxyServer /t REG_SZ /d "${proxyServer}" /f`
+          );
 
           // 启用代理
           await execAsync(`reg add "${this.regPath}" /v ProxyEnable /t REG_DWORD /d 1 /f`);
 
           // 设置代理覆盖（本地地址不走代理）
-          const proxyOverride = 'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;<local>';
-          await execAsync(`reg add "${this.regPath}" /v ProxyOverride /t REG_SZ /d "${proxyOverride}" /f`);
+          const proxyOverride =
+            'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;<local>';
+          await execAsync(
+            `reg add "${this.regPath}" /v ProxyOverride /t REG_SZ /d "${proxyOverride}" /f`
+          );
 
           // 通知系统代理设置已更改
           await this.notifyProxyChange();
@@ -106,11 +112,11 @@ export class WindowsSystemProxy extends SystemProxyBase {
           },
         }
       );
-      
+
       console.log('Windows 系统代理设置成功');
     } catch (error) {
       console.error('设置 Windows 系统代理失败:', error);
-      
+
       // 如果设置失败，尝试恢复原始设置
       if (this.originalSettings) {
         console.log('正在回滚到原始代理设置...');
@@ -122,9 +128,11 @@ export class WindowsSystemProxy extends SystemProxyBase {
           // 即使回滚失败，也要抛出原始错误
         }
       }
-      
+
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`设置 Windows 系统代理失败: ${errorMessage}\n\n可能的原因:\n1. 权限不足，请以管理员身份运行\n2. 注册表访问被阻止\n3. 系统策略限制`);
+      throw new Error(
+        `设置 Windows 系统代理失败: ${errorMessage}\n\n可能的原因:\n1. 权限不足，请以管理员身份运行\n2. 注册表访问被阻止\n3. 系统策略限制`
+      );
     }
   }
 
@@ -133,7 +141,7 @@ export class WindowsSystemProxy extends SystemProxyBase {
    */
   async disableProxy(): Promise<void> {
     console.log('正在禁用 Windows 系统代理...');
-    
+
     try {
       if (this.originalSettings) {
         // 恢复原始设置
@@ -192,7 +200,7 @@ export class WindowsSystemProxy extends SystemProxyBase {
       }
 
       return status;
-    } catch (error) {
+    } catch {
       // 查询失败，返回禁用状态
       return { enabled: false };
     }
@@ -211,7 +219,9 @@ export class WindowsSystemProxy extends SystemProxyBase {
 
       if (parts.length > 0) {
         const proxyServer = parts.join(';');
-        await execAsync(`reg add "${this.regPath}" /v ProxyServer /t REG_SZ /d "${proxyServer}" /f`);
+        await execAsync(
+          `reg add "${this.regPath}" /v ProxyServer /t REG_SZ /d "${proxyServer}" /f`
+        );
       }
 
       // 启用代理
@@ -265,7 +275,7 @@ export class MacOSSystemProxy extends SystemProxyBase {
    */
   async enableProxy(address: string, httpPort: number, socksPort: number): Promise<void> {
     console.log(`正在设置 macOS 系统代理: ${address}:${httpPort}`);
-    
+
     // 保存原始设置
     try {
       this.originalSettings = await this.getProxyStatus();
@@ -286,7 +296,7 @@ export class MacOSSystemProxy extends SystemProxyBase {
           // 为每个网络服务设置代理
           for (const service of services) {
             console.log(`正在为网络服务 "${service}" 设置代理...`);
-            
+
             // 设置 HTTP 代理
             await execAsync(`networksetup -setwebproxy "${service}" ${address} ${httpPort}`);
             await execAsync(`networksetup -setwebproxystate "${service}" on`);
@@ -296,7 +306,9 @@ export class MacOSSystemProxy extends SystemProxyBase {
             await execAsync(`networksetup -setsecurewebproxystate "${service}" on`);
 
             // 设置 SOCKS 代理
-            await execAsync(`networksetup -setsocksfirewallproxy "${service}" ${address} ${socksPort}`);
+            await execAsync(
+              `networksetup -setsocksfirewallproxy "${service}" ${address} ${socksPort}`
+            );
             await execAsync(`networksetup -setsocksfirewallproxystate "${service}" on`);
 
             // 设置代理绕过列表（本地地址不走代理）
@@ -309,8 +321,10 @@ export class MacOSSystemProxy extends SystemProxyBase {
               '172.16.0.0/12',
               '192.168.0.0/16',
             ];
-            await execAsync(`networksetup -setproxybypassdomains "${service}" ${bypassDomains.join(' ')}`);
-            
+            await execAsync(
+              `networksetup -setproxybypassdomains "${service}" ${bypassDomains.join(' ')}`
+            );
+
             console.log(`网络服务 "${service}" 代理设置完成`);
           }
         },
@@ -330,11 +344,11 @@ export class MacOSSystemProxy extends SystemProxyBase {
           },
         }
       );
-      
+
       console.log('macOS 系统代理设置成功');
     } catch (error) {
       console.error('设置 macOS 系统代理失败:', error);
-      
+
       // 如果设置失败，尝试恢复原始设置
       if (this.originalSettings) {
         console.log('正在回滚到原始代理设置...');
@@ -346,9 +360,11 @@ export class MacOSSystemProxy extends SystemProxyBase {
           // 即使回滚失败，也要抛出原始错误
         }
       }
-      
+
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`设置 macOS 系统代理失败: ${errorMessage}\n\n可能的原因:\n1. 权限不足，请授予应用网络设置权限\n2. networksetup 命令不可用\n3. 网络服务配置异常`);
+      throw new Error(
+        `设置 macOS 系统代理失败: ${errorMessage}\n\n可能的原因:\n1. 权限不足，请授予应用网络设置权限\n2. networksetup 命令不可用\n3. 网络服务配置异常`
+      );
     }
   }
 
@@ -357,7 +373,7 @@ export class MacOSSystemProxy extends SystemProxyBase {
    */
   async disableProxy(): Promise<void> {
     console.log('正在禁用 macOS 系统代理...');
-    
+
     try {
       if (this.originalSettings) {
         // 恢复原始设置
@@ -434,7 +450,7 @@ export class MacOSSystemProxy extends SystemProxyBase {
       }
 
       return status;
-    } catch (error) {
+    } catch {
       // 查询失败，返回禁用状态
       return { enabled: false };
     }
@@ -452,10 +468,12 @@ export class MacOSSystemProxy extends SystemProxyBase {
       // 过滤掉空行和以 * 开头的禁用服务
       return lines
         .slice(1)
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('*'));
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('*'));
     } catch (error) {
-      throw new Error(`获取网络服务列表失败: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `获取网络服务列表失败: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 

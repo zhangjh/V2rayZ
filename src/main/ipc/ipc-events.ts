@@ -16,7 +16,7 @@ export class IpcEventEmitter {
    */
   registerWindow(window: BrowserWindow): void {
     this.windows.add(window);
-    
+
     // 当窗口关闭时自动注销
     window.on('closed', () => {
       this.windows.delete(window);
@@ -35,7 +35,7 @@ export class IpcEventEmitter {
    */
   sendToAll<T = any>(channel: string, data: T): void {
     console.log(`[IPC Event] Broadcasting to ${this.windows.size} windows: ${channel}`, data);
-    
+
     for (const window of this.windows) {
       if (!window.isDestroyed() && window.webContents) {
         window.webContents.send(channel, data);
@@ -93,10 +93,6 @@ export function broadcastEvent<T = any>(channel: string, data: T): void {
 /**
  * 便捷函数：向特定窗口发送事件
  */
-export function sendEventToWindow<T = any>(
-  window: BrowserWindow,
-  channel: string,
-  data: T
-): void {
+export function sendEventToWindow<T = any>(window: BrowserWindow, channel: string, data: T): void {
   ipcEventEmitter.sendToWindow(window, channel, data);
 }

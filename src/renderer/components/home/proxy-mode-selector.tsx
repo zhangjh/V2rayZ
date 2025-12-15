@@ -1,61 +1,62 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Button } from '@/components/ui/button'
-import { useAppStore } from '@/store/app-store'
-import { Loader2, Play, Square } from 'lucide-react'
-import type { ProxyMode } from '@/bridge/types'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Button } from '@/components/ui/button';
+import { useAppStore } from '@/store/app-store';
+import { Loader2, Play, Square } from 'lucide-react';
+import type { ProxyMode } from '@/bridge/types';
 
 export function ProxyModeSelector() {
-  const config = useAppStore((state) => state.config)
-  const connectionStatus = useAppStore((state) => state.connectionStatus)
-  const updateProxyMode = useAppStore((state) => state.updateProxyMode)
-  const isLoading = useAppStore((state) => state.isLoading)
-  const startProxy = useAppStore((state) => state.startProxy)
-  const stopProxy = useAppStore((state) => state.stopProxy)
+  const config = useAppStore((state) => state.config);
+  const connectionStatus = useAppStore((state) => state.connectionStatus);
+  const updateProxyMode = useAppStore((state) => state.updateProxyMode);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const startProxy = useAppStore((state) => state.startProxy);
+  const stopProxy = useAppStore((state) => state.stopProxy);
 
-  const currentMode = config?.proxyMode || 'Smart'
-  
+  const currentMode = config?.proxyMode || 'Smart';
+
   // Check connection status based on proxy mode type
-  const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy'
-  const isConnected = proxyModeType === 'Tun'
-    ? connectionStatus?.proxyCore?.running === true  // TUN mode: only check proxy core
-    : connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled  // System proxy: check both
-  
-  const hasError = connectionStatus?.proxyCore?.error
+  const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy';
+  const isConnected =
+    proxyModeType === 'tun'
+      ? connectionStatus?.proxyCore?.running === true // TUN mode: only check proxy core
+      : connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled; // System proxy: check both
+
+  const hasError = connectionStatus?.proxyCore?.error;
 
   // Check if server is configured and selected
   const isServerConfigured = (() => {
-    if (!config?.selectedServerId) return false
-    
-    const selectedServer = config.servers?.find(s => s.id === config.selectedServerId)
-    if (!selectedServer) return false
-    
+    if (!config?.selectedServerId) return false;
+
+    const selectedServer = config.servers?.find((s) => s.id === config.selectedServerId);
+    if (!selectedServer) return false;
+
     // Basic checks
-    if (!selectedServer.address || selectedServer.address.trim() === '') return false
-    if (!selectedServer.port || selectedServer.port <= 0) return false
-    
+    if (!selectedServer.address || selectedServer.address.trim() === '') return false;
+    if (!selectedServer.port || selectedServer.port <= 0) return false;
+
     // Protocol-specific checks
-    if (selectedServer.protocol === 'Vless') {
-      return !!(selectedServer.uuid && selectedServer.uuid.trim() !== '')
-    } else if (selectedServer.protocol === 'Trojan') {
-      return !!(selectedServer.password && selectedServer.password.trim() !== '')
+    if (selectedServer.protocol === 'vless') {
+      return !!(selectedServer.uuid && selectedServer.uuid.trim() !== '');
+    } else if (selectedServer.protocol === 'trojan') {
+      return !!(selectedServer.password && selectedServer.password.trim() !== '');
     }
-    
-    return false
-  })()
+
+    return false;
+  })();
 
   const handleModeChange = async (value: string) => {
-    await updateProxyMode(value as ProxyMode)
-  }
+    await updateProxyMode(value as ProxyMode);
+  };
 
   const handleToggleProxy = async () => {
     if (isConnected) {
-      await stopProxy()
+      await stopProxy();
     } else {
-      await startProxy()
+      await startProxy();
     }
-  }
+  };
 
   return (
     <Card>
@@ -74,9 +75,7 @@ export function ProxyModeSelector() {
             <Label htmlFor="mode-global" className="cursor-pointer">
               <div>
                 <div className="font-medium">全局代理</div>
-                <div className="text-xs text-muted-foreground">
-                  所有流量通过代理服务器
-                </div>
+                <div className="text-xs text-muted-foreground">所有流量通过代理服务器</div>
               </div>
             </Label>
           </div>
@@ -86,9 +85,7 @@ export function ProxyModeSelector() {
             <Label htmlFor="mode-smart" className="cursor-pointer">
               <div>
                 <div className="font-medium">智能分流</div>
-                <div className="text-xs text-muted-foreground">
-                  国内直连，国外走代理
-                </div>
+                <div className="text-xs text-muted-foreground">国内直连，国外走代理</div>
               </div>
             </Label>
           </div>
@@ -98,22 +95,19 @@ export function ProxyModeSelector() {
             <Label htmlFor="mode-direct" className="cursor-pointer">
               <div>
                 <div className="font-medium">直接连接</div>
-                <div className="text-xs text-muted-foreground">
-                  所有流量直接连接，不使用代理
-                </div>
+                <div className="text-xs text-muted-foreground">所有流量直接连接，不使用代理</div>
               </div>
             </Label>
           </div>
         </RadioGroup>
 
-        <div className="pt-2 border-t"> 
-          
+        <div className="pt-2 border-t">
           <Button
             onClick={handleToggleProxy}
             disabled={isLoading || !isServerConfigured}
             className="w-full"
             size="lg"
-            variant={isConnected ? "outline" : "default"}
+            variant={isConnected ? 'outline' : 'default'}
             title={!isServerConfigured ? '请先配置服务器' : hasError ? hasError : ''}
           >
             {isLoading ? (
@@ -136,5 +130,5 @@ export function ProxyModeSelector() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

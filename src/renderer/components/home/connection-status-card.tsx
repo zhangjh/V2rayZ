@@ -1,33 +1,33 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { useAppStore } from '@/store/app-store'
-import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
+} from '@/components/ui/select';
+import { useAppStore } from '@/store/app-store';
+import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function ConnectionStatusCard() {
-  const connectionStatus = useAppStore((state) => state.connectionStatus)
-  const config = useAppStore((state) => state.config)
-  const error = useAppStore((state) => state.error)
-  const isLoading = useAppStore((state) => state.isLoading)
-  const saveConfig = useAppStore((state) => state.saveConfig)
-  const setCurrentView = useAppStore((state) => state.setCurrentView)
+  const connectionStatus = useAppStore((state) => state.connectionStatus);
+  const config = useAppStore((state) => state.config);
+  const error = useAppStore((state) => state.error);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const saveConfig = useAppStore((state) => state.saveConfig);
+  const setCurrentView = useAppStore((state) => state.setCurrentView);
 
-  const servers = config?.servers || []
-  const selectedServerId = config?.selectedServerId
-  const selectedServer = servers.find(s => s.id === selectedServerId)
+  const servers = config?.servers || [];
+  const selectedServerId = config?.selectedServerId;
+  const selectedServer = servers.find((s) => s.id === selectedServerId);
 
   const getStatusInfo = () => {
     // Use proxyModeType from connectionStatus if available, otherwise fall back to config
-    const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy'
-    const modeText = proxyModeType === 'Tun' ? 'TUN模式' : '系统代理模式'
+    const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy';
+    const modeText = proxyModeType === 'tun' ? 'TUN模式' : '系统代理模式';
 
     // Show error from store if present
     if (error) {
@@ -36,7 +36,7 @@ export function ConnectionStatusCard() {
         variant: 'destructive' as const,
         description: error,
         mode: modeText,
-      }
+      };
     }
 
     if (!connectionStatus) {
@@ -45,44 +45,46 @@ export function ConnectionStatusCard() {
         variant: 'secondary' as const,
         description: '正在获取状态...',
         mode: modeText,
-      }
+      };
     }
 
-    const { proxyCore, proxy } = connectionStatus
+    const { proxyCore, proxy } = connectionStatus;
 
     // Handle proxy core errors with more specific messages
     if (proxyCore.error) {
       // Parse TUN mode specific errors
-      let errorDescription = proxyCore.error
-      
+      let errorDescription = proxyCore.error;
+
       if (proxyCore.error.includes('权限不足') || proxyCore.error.includes('管理员权限')) {
-        errorDescription = 'TUN模式需要管理员权限，请以管理员身份运行应用'
+        errorDescription = 'TUN模式需要管理员权限，请以管理员身份运行应用';
       } else if (proxyCore.error.includes('wintun') || proxyCore.error.includes('驱动')) {
-        errorDescription = 'TUN驱动加载失败，请检查wintun.dll是否存在'
+        errorDescription = 'TUN驱动加载失败，请检查wintun.dll是否存在';
       } else if (proxyCore.error.includes('接口创建失败')) {
-        errorDescription = 'TUN接口创建失败，请检查系统网络设置'
+        errorDescription = 'TUN接口创建失败，请检查系统网络设置';
       } else if (proxyCore.error.includes('sing-box.exe')) {
-        errorDescription = 'sing-box核心文件缺失或无法启动'
+        errorDescription = 'sing-box核心文件缺失或无法启动';
       }
-      
+
       return {
         label: '错误',
         variant: 'destructive' as const,
         description: errorDescription,
         mode: modeText,
-      }
+      };
     }
 
     // TUN模式下，只需要检查代理核心是否运行
-    if (proxyModeType === 'Tun') {
+    if (proxyModeType === 'tun') {
       if (proxyCore.running) {
-        const uptime = proxyCore.uptime ? `运行时间: ${Math.floor(proxyCore.uptime / 60)} 分钟` : ''
+        const uptime = proxyCore.uptime
+          ? `运行时间: ${Math.floor(proxyCore.uptime / 60)} 分钟`
+          : '';
         return {
           label: '已连接',
           variant: 'default' as const,
           description: `TUN模式已连接${uptime ? ' - ' + uptime : ''}`,
           mode: modeText,
-        }
+        };
       }
 
       if (isLoading) {
@@ -91,7 +93,7 @@ export function ConnectionStatusCard() {
           variant: 'secondary' as const,
           description: '正在启动 TUN 模式...',
           mode: modeText,
-        }
+        };
       }
 
       return {
@@ -99,18 +101,18 @@ export function ConnectionStatusCard() {
         variant: 'outline' as const,
         description: 'TUN模式未启用',
         mode: modeText,
-      }
+      };
     }
 
     // 系统代理模式下，需要检查代理核心和系统代理
     if (proxyCore.running && proxy.enabled) {
-      const uptime = proxyCore.uptime ? `运行时间: ${Math.floor(proxyCore.uptime / 60)} 分钟` : ''
+      const uptime = proxyCore.uptime ? `运行时间: ${Math.floor(proxyCore.uptime / 60)} 分钟` : '';
       return {
         label: '已连接',
         variant: 'default' as const,
         description: `系统代理已连接${uptime ? ' - ' + uptime : ''}`,
         mode: modeText,
-      }
+      };
     }
 
     if (proxyCore.running && !proxy.enabled) {
@@ -119,7 +121,7 @@ export function ConnectionStatusCard() {
         variant: 'secondary' as const,
         description: 'sing-box 运行中，正在启用系统代理...',
         mode: modeText,
-      }
+      };
     }
 
     if (isLoading) {
@@ -128,7 +130,7 @@ export function ConnectionStatusCard() {
         variant: 'secondary' as const,
         description: '正在启动 sing-box 进程...',
         mode: modeText,
-      }
+      };
     }
 
     return {
@@ -136,32 +138,32 @@ export function ConnectionStatusCard() {
       variant: 'outline' as const,
       description: '代理未启用',
       mode: modeText,
-    }
-  }
+    };
+  };
 
   const handleServerChange = async (serverId: string) => {
-    if (!config) return
-    
+    if (!config) return;
+
     try {
       const updatedConfig = {
         ...config,
         selectedServerId: serverId,
-      }
+      };
 
-      await saveConfig(updatedConfig)
-      toast.success('服务器已切换')
+      await saveConfig(updatedConfig);
+      toast.success('服务器已切换');
     } catch (error) {
       toast.error('切换失败', {
         description: error instanceof Error ? error.message : '切换服务器时发生错误',
-      })
+      });
     }
-  }
+  };
 
   const handleGoToServers = () => {
-    setCurrentView('server')
-  }
+    setCurrentView('server');
+  };
 
-  const statusInfo = getStatusInfo()
+  const statusInfo = getStatusInfo();
 
   return (
     <Card>
@@ -183,9 +185,7 @@ export function ConnectionStatusCard() {
         {servers.length === 0 ? (
           <div className="space-y-3">
             <div className="p-4 border border-dashed border-muted-foreground/25 rounded-lg text-center">
-              <p className="text-sm text-muted-foreground mb-3">
-                暂无服务器配置
-              </p>
+              <p className="text-sm text-muted-foreground mb-3">暂无服务器配置</p>
               <div className="flex justify-center">
                 <Button
                   variant="outline"
@@ -225,7 +225,7 @@ export function ConnectionStatusCard() {
             <div className="space-y-2">
               <div className="space-y-2">
                 <span className="text-sm text-muted-foreground">当前服务器</span>
-                <Select value={selectedServerId} onValueChange={handleServerChange}>
+                <Select value={selectedServerId ?? undefined} onValueChange={handleServerChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="选择服务器" />
                   </SelectTrigger>
@@ -248,14 +248,17 @@ export function ConnectionStatusCard() {
                   {selectedServer.protocol}
                 </Badge>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">地址</span>
-                <span className="text-sm font-medium truncate max-w-[150px]" title={selectedServer.address}>
+                <span
+                  className="text-sm font-medium truncate max-w-[150px]"
+                  title={selectedServer.address}
+                >
                   {selectedServer.address}
                 </span>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">端口</span>
                 <span className="text-sm font-medium">{selectedServer.port}</span>
@@ -269,5 +272,5 @@ export function ConnectionStatusCard() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

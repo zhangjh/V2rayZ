@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useAppStore } from '@/store/app-store'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState } from 'react';
+import { useAppStore } from '@/store/app-store';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -9,37 +9,37 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
-import { RuleDialog } from '@/components/rules/rule-dialog'
-import { DeleteRuleDialog } from '@/components/rules/delete-rule-dialog'
-import type { DomainRule } from '@/bridge/types'
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { RuleDialog } from '@/components/rules/rule-dialog';
+import { DeleteRuleDialog } from '@/components/rules/delete-rule-dialog';
+import type { DomainRule } from '@/bridge/types';
 
 export function RulesPage() {
-  const config = useAppStore((state) => state.config)
-  const updateCustomRule = useAppStore((state) => state.updateCustomRule)
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingRule, setEditingRule] = useState<DomainRule | null>(null)
-  const [deletingRule, setDeletingRule] = useState<DomainRule | null>(null)
+  const config = useAppStore((state) => state.config);
+  const updateCustomRule = useAppStore((state) => state.updateCustomRule);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<DomainRule | null>(null);
+  const [deletingRule, setDeletingRule] = useState<DomainRule | null>(null);
 
-  const customRules = config?.customRules || []
+  const customRules = config?.customRules || [];
 
   const handleToggleRule = async (rule: DomainRule) => {
     await updateCustomRule({
       ...rule,
       enabled: !rule.enabled,
-    })
-  }
+    });
+  };
 
   const handleEditRule = (rule: DomainRule) => {
-    setEditingRule(rule)
-  }
+    setEditingRule(rule);
+  };
 
   const handleDeleteRule = (rule: DomainRule) => {
-    setDeletingRule(rule)
-  }
+    setDeletingRule(rule);
+  };
 
   return (
     <div className="space-y-6">
@@ -57,16 +57,12 @@ export function RulesPage() {
       <Card>
         <CardHeader>
           <CardTitle>域名规则列表</CardTitle>
-          <CardDescription>
-            自定义规则优先级最高，将覆盖全局代理模式和智能分流规则
-          </CardDescription>
+          <CardDescription>自定义规则优先级最高，将覆盖全局代理模式和智能分流规则</CardDescription>
         </CardHeader>
         <CardContent>
           {customRules.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">
-                暂无自定义规则
-              </p>
+              <p className="text-muted-foreground mb-4">暂无自定义规则</p>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 添加第一条规则
@@ -91,32 +87,22 @@ export function RulesPage() {
                         onCheckedChange={() => handleToggleRule(rule)}
                       />
                     </TableCell>
-                    <TableCell className="font-mono">
-                      {rule.domains.length === 1 
-                        ? rule.domains[0] 
-                        : `${rule.domains[0]} 等 ${rule.domains.length} 个域名`}
-                    </TableCell>
+                    <TableCell className="font-mono">{rule.domain}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={rule.strategy === 'Proxy' ? 'default' : 'secondary'}
-                      >
-                        {rule.strategy === 'Proxy' ? '代理' : '直连'}
+                      <Badge variant={rule.action === 'proxy' ? 'default' : 'secondary'}>
+                        {rule.action === 'proxy'
+                          ? '代理'
+                          : rule.action === 'direct'
+                            ? '直连'
+                            : '阻止'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditRule(rule)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => handleEditRule(rule)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteRule(rule)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteRule(rule)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -143,11 +129,7 @@ export function RulesPage() {
       </Card>
 
       {/* Add Rule Dialog */}
-      <RuleDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        mode="add"
-      />
+      <RuleDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} mode="add" />
 
       {/* Edit Rule Dialog */}
       {editingRule && (
@@ -168,5 +150,5 @@ export function RulesPage() {
         />
       )}
     </div>
-  )
+  );
 }

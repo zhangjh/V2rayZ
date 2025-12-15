@@ -23,12 +23,12 @@ function App() {
   useEffect(() => {
     loadConfig();
     refreshConnectionStatus();
-    
+
     // Poll connection status every 2 seconds
     const statusInterval = setInterval(() => {
       refreshConnectionStatus();
     }, 2000);
-    
+
     return () => clearInterval(statusInterval);
   }, [loadConfig, refreshConnectionStatus]);
 
@@ -55,11 +55,11 @@ function App() {
     <ErrorBoundary>
       <MainLayout currentView={currentView} onViewChange={setCurrentView}>
         {currentView === 'home' && <HomePage />}
-        
+
         {currentView === 'server' && <ServerPage />}
-        
+
         {currentView === 'rules' && <RulesPage />}
-        
+
         {currentView === 'settings' && <SettingsPage />}
       </MainLayout>
       <Toaster position="top-right" closeButton />

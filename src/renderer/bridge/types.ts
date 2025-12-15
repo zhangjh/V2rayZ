@@ -12,12 +12,12 @@ export type {
   LogEntry,
   ApiResponse,
 } from '../../shared/types';
-
-// 兼容旧的类型名称
-export type { UserConfig as UserConfig } from '../../shared/types';
 export type ProxyMode = 'global' | 'smart' | 'direct';
 export type ProxyModeType = 'systemProxy' | 'tun';
 export type ProtocolType = 'vless' | 'trojan';
+
+// 兼容旧代码的类型别名
+export type ServerConfigWithId = import('../../shared/types').ServerConfig;
 
 // 连接状态类型
 export interface ConnectionStatus {

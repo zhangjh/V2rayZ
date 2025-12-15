@@ -1,59 +1,59 @@
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { useAppStore } from '@/store/app-store'
-import { toast } from 'sonner'
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useAppStore } from '@/store/app-store';
+import { toast } from 'sonner';
 
 export function AdvancedSettings() {
-  const config = useAppStore((state) => state.config)
-  const saveConfig = useAppStore((state) => state.saveConfig)
-  
-  const [socksPort, setSocksPort] = useState(config?.socksPort?.toString() || '65534')
-  const [httpPort, setHttpPort] = useState(config?.httpPort?.toString() || '65533')
-  const [isLoading, setIsLoading] = useState(false)
+  const config = useAppStore((state) => state.config);
+  const saveConfig = useAppStore((state) => state.saveConfig);
+
+  const [socksPort, setSocksPort] = useState(config?.socksPort?.toString() || '65534');
+  const [httpPort, setHttpPort] = useState(config?.httpPort?.toString() || '65533');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSavePorts = async () => {
-    if (!config) return
+    if (!config) return;
 
-    const socksPortNum = parseInt(socksPort, 10)
-    const httpPortNum = parseInt(httpPort, 10)
+    const socksPortNum = parseInt(socksPort, 10);
+    const httpPortNum = parseInt(httpPort, 10);
 
     // Validate ports
     if (isNaN(socksPortNum) || socksPortNum < 1024 || socksPortNum > 65535) {
-      toast.error('SOCKS 端口必须在 1024-65535 之间')
-      return
+      toast.error('SOCKS 端口必须在 1024-65535 之间');
+      return;
     }
 
     if (isNaN(httpPortNum) || httpPortNum < 1024 || httpPortNum > 65535) {
-      toast.error('HTTP 端口必须在 1024-65535 之间')
-      return
+      toast.error('HTTP 端口必须在 1024-65535 之间');
+      return;
     }
 
     if (socksPortNum === httpPortNum) {
-      toast.error('SOCKS 和 HTTP 端口不能相同')
-      return
+      toast.error('SOCKS 和 HTTP 端口不能相同');
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       const updatedConfig = {
         ...config,
         socksPort: socksPortNum,
         httpPort: httpPortNum,
-      }
-      await saveConfig(updatedConfig)
-      toast.success('端口设置已保存，重启代理后生效')
-    } catch (error) {
-      toast.error('保存端口设置失败')
+      };
+      await saveConfig(updatedConfig);
+      toast.success('端口设置已保存，重启代理后生效');
+    } catch {
+      toast.error('保存端口设置失败');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   if (!config) {
-    return null
+    return null;
   }
 
   return (
@@ -77,9 +77,7 @@ export function AdvancedSettings() {
                 className="max-w-[200px]"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              默认: 65534
-            </p>
+            <p className="text-xs text-muted-foreground">默认: 65534</p>
           </div>
 
           <div className="space-y-2">
@@ -95,9 +93,7 @@ export function AdvancedSettings() {
                 className="max-w-[200px]"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              默认: 65533
-            </p>
+            <p className="text-xs text-muted-foreground">默认: 65533</p>
           </div>
 
           <Button onClick={handleSavePorts} disabled={isLoading}>
@@ -111,7 +107,7 @@ export function AdvancedSettings() {
             <p className="text-xs text-muted-foreground mb-3">
               复制以下命令到终端中设置代理（需要先启动代理）
             </p>
-            
+
             <div className="space-y-3">
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Windows (CMD)</Label>
@@ -120,12 +116,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       set http_proxy=http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`set http_proxy=http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `set http_proxy=http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -135,12 +133,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       set https_proxy=http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`set https_proxy=http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `set https_proxy=http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -150,18 +150,22 @@ export function AdvancedSettings() {
               </div>
 
               <div>
-                <Label className="text-xs font-medium text-muted-foreground">Windows (PowerShell)</Label>
+                <Label className="text-xs font-medium text-muted-foreground">
+                  Windows (PowerShell)
+                </Label>
                 <div className="mt-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       $env:http_proxy="http://127.0.0.1:{httpPort}"
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`$env:http_proxy="http://127.0.0.1:${httpPort}"`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `$env:http_proxy="http://127.0.0.1:${httpPort}"`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -171,12 +175,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       $env:https_proxy="http://127.0.0.1:{httpPort}"
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`$env:https_proxy="http://127.0.0.1:${httpPort}"`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `$env:https_proxy="http://127.0.0.1:${httpPort}"`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -186,18 +192,22 @@ export function AdvancedSettings() {
               </div>
 
               <div>
-                <Label className="text-xs font-medium text-muted-foreground">Linux/macOS (Bash/Zsh)</Label>
+                <Label className="text-xs font-medium text-muted-foreground">
+                  Linux/macOS (Bash/Zsh)
+                </Label>
                 <div className="mt-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       export http_proxy=http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`export http_proxy=http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `export http_proxy=http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -207,12 +217,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       export https_proxy=http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`export https_proxy=http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `export https_proxy=http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -228,12 +240,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       git config --global http.proxy http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`git config --global http.proxy http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `git config --global http.proxy http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -243,12 +257,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       git config --global https.proxy http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`git config --global https.proxy http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `git config --global https.proxy http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -264,12 +280,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       npm config set proxy http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`npm config set proxy http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `npm config set proxy http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -279,12 +297,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       npm config set https-proxy http://127.0.0.1:{httpPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`npm config set https-proxy http://127.0.0.1:${httpPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `npm config set https-proxy http://127.0.0.1:${httpPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -294,18 +314,22 @@ export function AdvancedSettings() {
               </div>
 
               <div>
-                <Label className="text-xs font-medium text-muted-foreground">SOCKS5 代理设置（通用）</Label>
+                <Label className="text-xs font-medium text-muted-foreground">
+                  SOCKS5 代理设置（通用）
+                </Label>
                 <div className="mt-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       set ALL_PROXY=socks5://127.0.0.1:{socksPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`set ALL_PROXY=socks5://127.0.0.1:${socksPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `set ALL_PROXY=socks5://127.0.0.1:${socksPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -315,12 +339,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       $env:ALL_PROXY="socks5://127.0.0.1:{socksPort}"
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`$env:ALL_PROXY="socks5://127.0.0.1:${socksPort}"`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `$env:ALL_PROXY="socks5://127.0.0.1:${socksPort}"`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -330,12 +356,14 @@ export function AdvancedSettings() {
                     <code className="flex-1 px-2 py-1 text-xs bg-muted rounded font-mono">
                       export ALL_PROXY=socks5://127.0.0.1:{socksPort}
                     </code>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`export ALL_PROXY=socks5://127.0.0.1:${socksPort}`)
-                        toast.success('已复制到剪贴板')
+                        navigator.clipboard.writeText(
+                          `export ALL_PROXY=socks5://127.0.0.1:${socksPort}`
+                        );
+                        toast.success('已复制到剪贴板');
                       }}
                     >
                       复制
@@ -361,5 +389,5 @@ export function AdvancedSettings() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

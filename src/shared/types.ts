@@ -52,27 +52,27 @@ export interface ServerConfig {
   protocol: Protocol;
   address: string;
   port: number;
-  
+
   // VLESS 特定
   uuid?: string;
   encryption?: string;
   flow?: string;
-  
+
   // Trojan 特定
   password?: string;
-  
+
   // 传输层配置
   network?: Network;
   security?: Security;
-  
+
   // TLS 配置
   tlsSettings?: TlsSettings;
-  
+
   // 传输层特定配置
   wsSettings?: WebSocketSettings;
   grpcSettings?: GrpcSettings;
   httpSettings?: HttpSettings;
-  
+
   // 元数据
   createdAt?: string;
   updatedAt?: string;
@@ -111,26 +111,26 @@ export interface UserConfig {
   // 服务器配置
   servers: ServerConfig[];
   selectedServerId: string | null;
-  
+
   // 代理模式
   proxyMode: ProxyMode;
   proxyModeType: ProxyModeType;
-  
+
   // TUN 模式配置
   tunConfig: TunModeConfig;
-  
+
   // 路由规则
   customRules: DomainRule[];
-  
+
   // 应用设置
   autoStart: boolean;
   autoConnect: boolean;
   minimizeToTray: boolean;
-  
+
   // 端口配置
   socksPort: number;
   httpPort: number;
-  
+
   // 日志设置
   logLevel: LogLevel;
 }
@@ -198,7 +198,12 @@ export interface ApiResponse<T = any> {
 // 连接状态
 // ============================================================================
 
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error';
+export type ConnectionState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'disconnecting'
+  | 'error';
 
 export interface ConnectionStateInfo {
   state: ConnectionState;

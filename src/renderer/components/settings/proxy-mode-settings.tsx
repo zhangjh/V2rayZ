@@ -1,9 +1,9 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { useAppStore } from '@/store/app-store'
-import { toast } from 'sonner'
-import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useAppStore } from '@/store/app-store';
+import { toast } from 'sonner';
+import { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,55 +13,55 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import type { ProxyModeType } from '@/bridge/types'
+} from '@/components/ui/alert-dialog';
+import type { ProxyModeType } from '@/bridge/types';
 
 export function ProxyModeSettings() {
-  const config = useAppStore((state) => state.config)
-  const saveConfig = useAppStore((state) => state.saveConfig)
-  const connectionStatus = useAppStore((state) => state.connectionStatus)
-  
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [pendingModeType, setPendingModeType] = useState<ProxyModeType | null>(null)
+  const config = useAppStore((state) => state.config);
+  const saveConfig = useAppStore((state) => state.saveConfig);
+  const connectionStatus = useAppStore((state) => state.connectionStatus);
+
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingModeType, setPendingModeType] = useState<ProxyModeType | null>(null);
 
   if (!config) {
-    return null
+    return null;
   }
 
-  const isConnected = connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled
+  const isConnected = connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled;
 
   const handleModeTypeChange = (value: ProxyModeType) => {
     if (isConnected) {
-      setPendingModeType(value)
-      setShowConfirmDialog(true)
+      setPendingModeType(value);
+      setShowConfirmDialog(true);
     } else {
-      applyModeTypeChange(value)
+      applyModeTypeChange(value);
     }
-  }
+  };
 
   const applyModeTypeChange = async (modeType: ProxyModeType) => {
     try {
       const updatedConfig = {
         ...config,
         proxyModeType: modeType,
-      }
+      };
 
-      await saveConfig(updatedConfig)
+      await saveConfig(updatedConfig);
       toast.success('代理模式已更新', {
         description: isConnected ? '请重新连接以应用新模式' : undefined,
-      })
-    } catch (error) {
-      toast.error('保存设置失败')
+      });
+    } catch {
+      toast.error('保存设置失败');
     }
-  }
+  };
 
   const handleConfirmModeChange = () => {
     if (pendingModeType) {
-      applyModeTypeChange(pendingModeType)
-      setPendingModeType(null)
+      applyModeTypeChange(pendingModeType);
+      setPendingModeType(null);
     }
-    setShowConfirmDialog(false)
-  }
+    setShowConfirmDialog(false);
+  };
 
   return (
     <>
@@ -123,23 +123,18 @@ export function ProxyModeSettings() {
               当前代理正在运行中。切换代理模式将断开当前连接，您需要手动重新连接。
               <br />
               <br />
-              确定要切换到{' '}
-              <strong>
-                {pendingModeType === 'Tun' ? 'TUN模式' : '系统代理模式'}
+              确定要切换到 <strong>
+                {pendingModeType === 'tun' ? 'TUN模式' : '系统代理模式'}
               </strong>{' '}
               吗？
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingModeType(null)}>
-              取消
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmModeChange}>
-              确认切换
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => setPendingModeType(null)}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmModeChange}>确认切换</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

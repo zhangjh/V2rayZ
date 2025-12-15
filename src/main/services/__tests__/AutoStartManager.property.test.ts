@@ -172,18 +172,21 @@ describe('AutoStartManager Property Tests', () => {
 
     it('在状态切换序列中查询应该始终准确', async () => {
       await fc.assert(
-        fc.asyncProperty(fc.array(fc.boolean(), { minLength: 1, maxLength: 10 }), async (sequence) => {
-          // 执行一系列状态切换
-          for (const enabled of sequence) {
-            await autoStartManager.setAutoStart(enabled);
-            const status = await autoStartManager.isAutoStartEnabled();
-            expect(status).toBe(enabled);
-          }
+        fc.asyncProperty(
+          fc.array(fc.boolean(), { minLength: 1, maxLength: 10 }),
+          async (sequence) => {
+            // 执行一系列状态切换
+            for (const enabled of sequence) {
+              await autoStartManager.setAutoStart(enabled);
+              const status = await autoStartManager.isAutoStartEnabled();
+              expect(status).toBe(enabled);
+            }
 
-          // 最后一次查询应该与序列的最后一个值一致
-          const finalStatus = await autoStartManager.isAutoStartEnabled();
-          expect(finalStatus).toBe(sequence[sequence.length - 1]);
-        }),
+            // 最后一次查询应该与序列的最后一个值一致
+            const finalStatus = await autoStartManager.isAutoStartEnabled();
+            expect(finalStatus).toBe(sequence[sequence.length - 1]);
+          }
+        ),
         { numRuns: 100 }
       );
     });

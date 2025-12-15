@@ -1,7 +1,7 @@
 /**
  * RoutingRuleManager 属性测试
  * 使用 fast-check 进行基于属性的测试
- * 
+ *
  * Feature: electron-cross-platform, Property 29: 自定义域名规则集成
  * Validates: Requirements 9.3
  */
@@ -24,9 +24,9 @@ const domainRuleArbitrary = (): fc.Arbitrary<DomainRule> => {
       // 普通域名
       fc.domain(),
       // 通配符域名
-      fc.domain().map(d => `*.${d}`),
+      fc.domain().map((d) => `*.${d}`),
       // 包含通配符的域名
-      fc.domain().map(d => {
+      fc.domain().map((d) => {
         const parts = d.split('.');
         if (parts.length > 1) {
           return `${parts[0]}*${parts.slice(1).join('.')}`;
@@ -78,7 +78,7 @@ describe('RoutingRuleManager Property Tests', () => {
   /**
    * 属性 29: 自定义域名规则集成
    * 对于任何自定义域名规则，添加到配置后生成的 sing-box 配置应该在 route.rules 中包含对应的规则条目。
-   * 
+   *
    * Validates: Requirements 9.3
    */
   describe('Property 29: Custom domain rule integration', () => {
@@ -89,7 +89,7 @@ describe('RoutingRuleManager Property Tests', () => {
           const routeConfig = manager.generateRouteConfig(config);
 
           // 获取启用的自定义规则
-          const enabledRules = config.customRules.filter(r => r.enabled);
+          const enabledRules = config.customRules.filter((r) => r.enabled);
 
           if (enabledRules.length === 0) {
             // 如果没有启用的规则，跳过验证
@@ -117,13 +117,13 @@ describe('RoutingRuleManager Property Tests', () => {
           const routeDomains = new Set<string>();
           for (const rule of routeConfig.rules) {
             if (rule.domain) {
-              rule.domain.forEach(d => routeDomains.add(d));
+              rule.domain.forEach((d) => routeDomains.add(d));
             }
             if (rule.domain_suffix) {
-              rule.domain_suffix.forEach(d => routeDomains.add(d));
+              rule.domain_suffix.forEach((d) => routeDomains.add(d));
             }
             if (rule.domain_keyword) {
-              rule.domain_keyword.forEach(d => routeDomains.add(d));
+              rule.domain_keyword.forEach((d) => routeDomains.add(d));
             }
           }
 
@@ -143,7 +143,7 @@ describe('RoutingRuleManager Property Tests', () => {
           const routeConfig = manager.generateRouteConfig(config);
 
           // 获取启用的自定义规则
-          const enabledRules = config.customRules.filter(r => r.enabled);
+          const enabledRules = config.customRules.filter((r) => r.enabled);
 
           if (enabledRules.length === 0) {
             return;
@@ -171,17 +171,17 @@ describe('RoutingRuleManager Property Tests', () => {
                 // 检查是否包含我们的域名
                 const ruleDomains = new Set<string>();
                 if (routeRule.domain) {
-                  routeRule.domain.forEach(d => ruleDomains.add(d));
+                  routeRule.domain.forEach((d) => ruleDomains.add(d));
                 }
                 if (routeRule.domain_suffix) {
-                  routeRule.domain_suffix.forEach(d => ruleDomains.add(d));
+                  routeRule.domain_suffix.forEach((d) => ruleDomains.add(d));
                 }
                 if (routeRule.domain_keyword) {
-                  routeRule.domain_keyword.forEach(d => ruleDomains.add(d));
+                  routeRule.domain_keyword.forEach((d) => ruleDomains.add(d));
                 }
 
                 // 验证至少有一些域名匹配
-                const hasMatch = Array.from(domains).some(d => ruleDomains.has(d));
+                const hasMatch = Array.from(domains).some((d) => ruleDomains.has(d));
                 if (hasMatch) {
                   // 找到匹配的规则，验证通过
                   expect(routeRule.outbound).toBe(expectedOutbound);
@@ -233,20 +233,20 @@ describe('RoutingRuleManager Property Tests', () => {
             const routeDomains = new Set<string>();
             for (const rule of routeConfig.rules) {
               if (rule.domain) {
-                rule.domain.forEach(d => routeDomains.add(d));
+                rule.domain.forEach((d) => routeDomains.add(d));
               }
               if (rule.domain_suffix) {
-                rule.domain_suffix.forEach(d => routeDomains.add(d));
+                rule.domain_suffix.forEach((d) => routeDomains.add(d));
               }
               if (rule.domain_keyword) {
-                rule.domain_keyword.forEach(d => routeDomains.add(d));
+                rule.domain_keyword.forEach((d) => routeDomains.add(d));
               }
             }
 
             // 禁用的域名不应该出现在路由规则中
             // 注意：如果其他启用的规则包含相同域名，则可能出现
             // 所以我们只检查如果只有这一个规则且被禁用，则不应出现
-            if (config.customRules.filter(r => r.enabled).length === 0) {
+            if (config.customRules.filter((r) => r.enabled).length === 0) {
               expect(routeDomains.has(disabledDomain)).toBe(false);
             }
           }
@@ -293,7 +293,7 @@ describe('RoutingRuleManager Property Tests', () => {
 
             // 验证通配符域名被转换为 domain_suffix
             const hasSuffixRule = routeConfig.rules.some(
-              rule =>
+              (rule) =>
                 rule.domain_suffix &&
                 rule.domain_suffix.includes(baseDomain) &&
                 rule.outbound === action
@@ -344,10 +344,7 @@ describe('RoutingRuleManager Property Tests', () => {
 
             // 验证精确域名被添加到 domain 字段
             const hasExactRule = routeConfig.rules.some(
-              rule =>
-                rule.domain &&
-                rule.domain.includes(domain) &&
-                rule.outbound === action
+              (rule) => rule.domain && rule.domain.includes(domain) && rule.outbound === action
             );
 
             expect(hasExactRule).toBe(true);
@@ -363,7 +360,7 @@ describe('RoutingRuleManager Property Tests', () => {
           fc.array(domainRuleArbitrary(), { minLength: 3, maxLength: 10 }),
           async (rules) => {
             // 确保所有规则都启用
-            const enabledRules = rules.map(r => ({ ...r, enabled: true }));
+            const enabledRules = rules.map((r) => ({ ...r, enabled: true }));
 
             const config: UserConfig = {
               servers: [],
@@ -397,9 +394,7 @@ describe('RoutingRuleManager Property Tests', () => {
             // 验证每个 action 在路由规则中都有对应的规则
             for (const [action, count] of actionCounts.entries()) {
               if (count > 0) {
-                const hasActionRule = routeConfig.rules.some(
-                  rule => rule.outbound === action
-                );
+                const hasActionRule = routeConfig.rules.some((rule) => rule.outbound === action);
                 expect(hasActionRule).toBe(true);
               }
             }
@@ -426,7 +421,7 @@ describe('RoutingRuleManager Property Tests', () => {
           const routeConfig = manager.generateRouteConfig(config);
 
           // 获取启用的自定义规则数量
-          const enabledCustomRulesCount = config.customRules.filter(r => r.enabled).length;
+          const enabledCustomRulesCount = config.customRules.filter((r) => r.enabled).length;
 
           if (enabledCustomRulesCount === 0) {
             return;
@@ -438,7 +433,7 @@ describe('RoutingRuleManager Property Tests', () => {
           // 自定义规则应该在前面
           // 我们通过检查前几个规则是否包含自定义域名来验证
           const customDomains = new Set<string>();
-          for (const rule of config.customRules.filter(r => r.enabled)) {
+          for (const rule of config.customRules.filter((r) => r.enabled)) {
             const domain = rule.domain.startsWith('*.')
               ? rule.domain.slice(2)
               : rule.domain.replace(/\*/g, '');
@@ -474,41 +469,38 @@ describe('RoutingRuleManager Property Tests', () => {
 
     it('should handle empty custom rules gracefully', async () => {
       await fc.assert(
-        fc.asyncProperty(
-          fc.constantFrom('global', 'smart', 'direct'),
-          async (proxyMode) => {
-            const config: UserConfig = {
-              servers: [],
-              selectedServerId: null,
-              proxyMode,
-              proxyModeType: 'systemProxy',
-              tunConfig: {
-                mtu: 9000,
-                stack: 'system',
-                autoRoute: true,
-                strictRoute: true,
-              },
-              customRules: [], // 空的自定义规则
-              autoStart: false,
-              autoConnect: false,
-              minimizeToTray: true,
-              socksPort: 65534,
-              httpPort: 65533,
-              logLevel: 'info',
-            };
+        fc.asyncProperty(fc.constantFrom('global', 'smart', 'direct'), async (proxyMode) => {
+          const config: UserConfig = {
+            servers: [],
+            selectedServerId: null,
+            proxyMode,
+            proxyModeType: 'systemProxy',
+            tunConfig: {
+              mtu: 9000,
+              stack: 'system',
+              autoRoute: true,
+              strictRoute: true,
+            },
+            customRules: [], // 空的自定义规则
+            autoStart: false,
+            autoConnect: false,
+            minimizeToTray: true,
+            socksPort: 65534,
+            httpPort: 65533,
+            logLevel: 'info',
+          };
 
-            // 生成路由配置应该成功
-            const routeConfig = manager.generateRouteConfig(config);
+          // 生成路由配置应该成功
+          const routeConfig = manager.generateRouteConfig(config);
 
-            // 验证配置有效
-            expect(routeConfig).toBeDefined();
-            expect(routeConfig.rules).toBeDefined();
-            expect(Array.isArray(routeConfig.rules)).toBe(true);
+          // 验证配置有效
+          expect(routeConfig).toBeDefined();
+          expect(routeConfig.rules).toBeDefined();
+          expect(Array.isArray(routeConfig.rules)).toBe(true);
 
-            // 验证有默认的 final 出站
-            expect(routeConfig.final).toBeDefined();
-          }
-        ),
+          // 验证有默认的 final 出站
+          expect(routeConfig.final).toBeDefined();
+        }),
         { numRuns: 50 }
       );
     });
@@ -554,7 +546,7 @@ describe('RoutingRuleManager Property Tests', () => {
 
           // 验证两个 action 都有对应的规则
           const hasProxyRule = routeConfig.rules.some(
-            rule =>
+            (rule) =>
               rule.outbound === 'proxy' &&
               (rule.domain?.includes(domain) ||
                 rule.domain_suffix?.includes(domain) ||
@@ -562,7 +554,7 @@ describe('RoutingRuleManager Property Tests', () => {
           );
 
           const hasDirectRule = routeConfig.rules.some(
-            rule =>
+            (rule) =>
               rule.outbound === 'direct' &&
               (rule.domain?.includes(domain) ||
                 rule.domain_suffix?.includes(domain) ||
@@ -580,9 +572,9 @@ describe('RoutingRuleManager Property Tests', () => {
   /**
    * 属性 30: 路由规则修改触发重启
    * 对于任何路由规则修改（添加、删除、更新），如果代理正在运行，系统应该重新生成配置并重启代理。
-   * 
+   *
    * 注意：此测试验证配置生成的变化。完整的重启逻辑将在 ProxyManager 中实现和测试。
-   * 
+   *
    * Validates: Requirements 9.4
    */
   describe('Property 30: Route rule modification triggers restart', () => {
@@ -609,7 +601,7 @@ describe('RoutingRuleManager Property Tests', () => {
 
             // 验证配置发生了变化
             // 如果初始配置没有自定义规则，添加后应该有变化
-            if (baseConfig.customRules.filter(r => r.enabled).length === 0) {
+            if (baseConfig.customRules.filter((r) => r.enabled).length === 0) {
               expect(modifiedRouteConfig).not.toEqual(initialConfig);
             }
 
@@ -621,13 +613,13 @@ describe('RoutingRuleManager Property Tests', () => {
             const routeDomains = new Set<string>();
             for (const rule of modifiedRouteConfig.rules) {
               if (rule.domain) {
-                rule.domain.forEach(d => routeDomains.add(d));
+                rule.domain.forEach((d) => routeDomains.add(d));
               }
               if (rule.domain_suffix) {
-                rule.domain_suffix.forEach(d => routeDomains.add(d));
+                rule.domain_suffix.forEach((d) => routeDomains.add(d));
               }
               if (rule.domain_keyword) {
-                rule.domain_keyword.forEach(d => routeDomains.add(d));
+                rule.domain_keyword.forEach((d) => routeDomains.add(d));
               }
             }
 
@@ -644,7 +636,7 @@ describe('RoutingRuleManager Property Tests', () => {
           fc.array(domainRuleArbitrary(), { minLength: 1, maxLength: 10 }),
           async (rules) => {
             // 确保所有规则都启用
-            const enabledRules = rules.map(r => ({ ...r, enabled: true }));
+            const enabledRules = rules.map((r) => ({ ...r, enabled: true }));
 
             const baseConfig: UserConfig = {
               servers: [],
@@ -692,13 +684,13 @@ describe('RoutingRuleManager Property Tests', () => {
             const routeDomains = new Set<string>();
             for (const rule of modifiedRouteConfig.rules) {
               if (rule.domain) {
-                rule.domain.forEach(d => routeDomains.add(d));
+                rule.domain.forEach((d) => routeDomains.add(d));
               }
               if (rule.domain_suffix) {
-                rule.domain_suffix.forEach(d => routeDomains.add(d));
+                rule.domain_suffix.forEach((d) => routeDomains.add(d));
               }
               if (rule.domain_keyword) {
-                rule.domain_keyword.forEach(d => routeDomains.add(d));
+                rule.domain_keyword.forEach((d) => routeDomains.add(d));
               }
             }
 
@@ -769,7 +761,7 @@ describe('RoutingRuleManager Property Tests', () => {
 
             // 验证新 action 的规则存在
             const hasNewActionRule = modifiedRouteConfig.rules.some(
-              rule =>
+              (rule) =>
                 rule.outbound === newAction &&
                 (rule.domain?.includes(domain) ||
                   rule.domain_suffix?.includes(domain) ||
@@ -833,13 +825,13 @@ describe('RoutingRuleManager Property Tests', () => {
           const routeDomains = new Set<string>();
           for (const routeRule of disabledConfig.rules) {
             if (routeRule.domain) {
-              routeRule.domain.forEach(d => routeDomains.add(d));
+              routeRule.domain.forEach((d) => routeDomains.add(d));
             }
             if (routeRule.domain_suffix) {
-              routeRule.domain_suffix.forEach(d => routeDomains.add(d));
+              routeRule.domain_suffix.forEach((d) => routeDomains.add(d));
             }
             if (routeRule.domain_keyword) {
-              routeRule.domain_keyword.forEach(d => routeDomains.add(d));
+              routeRule.domain_keyword.forEach((d) => routeDomains.add(d));
             }
           }
 
@@ -909,32 +901,28 @@ describe('RoutingRuleManager Property Tests', () => {
 
     it('should detect configuration changes that require restart', async () => {
       await fc.assert(
-        fc.asyncProperty(
-          userConfigArbitrary(),
-          userConfigArbitrary(),
-          async (config1, config2) => {
-            // 生成两个配置
-            const routeConfig1 = manager.generateRouteConfig(config1);
-            const routeConfig2 = manager.generateRouteConfig(config2);
+        fc.asyncProperty(userConfigArbitrary(), userConfigArbitrary(), async (config1, config2) => {
+          // 生成两个配置
+          const routeConfig1 = manager.generateRouteConfig(config1);
+          const routeConfig2 = manager.generateRouteConfig(config2);
 
-            // 如果配置不同，则需要重启
-            const configsAreDifferent = JSON.stringify(routeConfig1) !== JSON.stringify(routeConfig2);
+          // 如果配置不同，则需要重启
+          const configsAreDifferent = JSON.stringify(routeConfig1) !== JSON.stringify(routeConfig2);
 
-            // 获取启用的自定义规则
-            const enabledRules1 = config1.customRules.filter(r => r.enabled);
-            const enabledRules2 = config2.customRules.filter(r => r.enabled);
+          // 获取启用的自定义规则
+          const enabledRules1 = config1.customRules.filter((r) => r.enabled);
+          const enabledRules2 = config2.customRules.filter((r) => r.enabled);
 
-            // 如果代理模式、启用的自定义规则或其他路由相关设置不同，配置应该不同
-            const settingsAreDifferent =
-              config1.proxyMode !== config2.proxyMode ||
-              JSON.stringify(enabledRules1) !== JSON.stringify(enabledRules2);
+          // 如果代理模式、启用的自定义规则或其他路由相关设置不同，配置应该不同
+          const settingsAreDifferent =
+            config1.proxyMode !== config2.proxyMode ||
+            JSON.stringify(enabledRules1) !== JSON.stringify(enabledRules2);
 
-            // 如果设置不同，配置也应该不同
-            if (settingsAreDifferent) {
-              expect(configsAreDifferent).toBe(true);
-            }
+          // 如果设置不同，配置也应该不同
+          if (settingsAreDifferent) {
+            expect(configsAreDifferent).toBe(true);
           }
-        ),
+        }),
         { numRuns: 100 }
       );
     });

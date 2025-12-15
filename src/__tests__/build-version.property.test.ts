@@ -137,8 +137,13 @@ describe('Build Version Property Tests', () => {
           }
 
           // 检查主程序的版本信息（通过 package.json）
-          const appPackageJsonPath = path.join(unpackedDir, 'resources', 'app.asar.unpacked', 'package.json');
-          
+          const appPackageJsonPath = path.join(
+            unpackedDir,
+            'resources',
+            'app.asar.unpacked',
+            'package.json'
+          );
+
           // 如果 app.asar.unpacked 不存在，尝试读取 app.asar 中的信息
           // 这里我们简化处理，只检查文件是否存在
           const resourcesDir = path.join(unpackedDir, 'resources');

@@ -61,7 +61,7 @@ export class ConfigManager implements IConfigManager {
       // 文件不存在或解析失败，返回默认配置
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.warn('配置文件加载失败，使用默认配置:', errorMessage);
-      
+
       // 记录详细错误信息
       if (error instanceof SyntaxError) {
         console.error('配置文件 JSON 格式错误:', errorMessage);
@@ -72,7 +72,7 @@ export class ConfigManager implements IConfigManager {
       } else {
         console.error('配置验证失败:', errorMessage);
       }
-      
+
       const defaultConfig = this.createDefaultConfig();
       this.currentConfig = defaultConfig;
 
@@ -167,7 +167,12 @@ export class ConfigManager implements IConfigManager {
       if (!server.address || typeof server.address !== 'string') {
         throw new Error('Server address is required and must be a string');
       }
-      if (!server.port || typeof server.port !== 'number' || server.port < 1 || server.port > 65535) {
+      if (
+        !server.port ||
+        typeof server.port !== 'number' ||
+        server.port < 1 ||
+        server.port > 65535
+      ) {
         throw new Error('Server port must be a number between 1 and 65535');
       }
 
@@ -192,7 +197,7 @@ export class ConfigManager implements IConfigManager {
         throw new Error('selectedServerId must be a string or null');
       }
       // 检查服务器是否存在
-      const serverExists = config.servers.some(s => s.id === config.selectedServerId);
+      const serverExists = config.servers.some((s) => s.id === config.selectedServerId);
       if (!serverExists) {
         throw new Error('selectedServerId references a non-existent server');
       }
@@ -214,7 +219,11 @@ export class ConfigManager implements IConfigManager {
     if (!config.tunConfig) {
       throw new Error('tunConfig is required');
     }
-    if (typeof config.tunConfig.mtu !== 'number' || config.tunConfig.mtu < 1280 || config.tunConfig.mtu > 65535) {
+    if (
+      typeof config.tunConfig.mtu !== 'number' ||
+      config.tunConfig.mtu < 1280 ||
+      config.tunConfig.mtu > 65535
+    ) {
       throw new Error('tunConfig.mtu must be a number between 1280 and 65535');
     }
     if (!['system', 'gvisor', 'mixed'].includes(config.tunConfig.stack)) {

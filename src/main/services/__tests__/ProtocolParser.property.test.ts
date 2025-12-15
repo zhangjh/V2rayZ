@@ -20,17 +20,26 @@ const vlessParamsArbitrary = () => {
     port: fc.integer({ min: 1, max: 65535 }),
     name: fc.string({ minLength: 1, maxLength: 50 }),
     encryption: fc.option(fc.constantFrom('none', 'auto', 'aes-128-gcm'), { nil: undefined }),
-    flow: fc.option(fc.constantFrom('xtls-rprx-vision', 'xtls-rprx-vision-udp443'), { nil: undefined }),
+    flow: fc.option(fc.constantFrom('xtls-rprx-vision', 'xtls-rprx-vision-udp443'), {
+      nil: undefined,
+    }),
     network: fc.option(fc.constantFrom('tcp', 'ws', 'grpc', 'http'), { nil: undefined }),
     security: fc.option(fc.constantFrom('none', 'tls', 'reality'), { nil: undefined }),
     // WebSocket 参数
-    wsPath: fc.option(fc.string({ minLength: 1, maxLength: 50 }).map(s => `/${s}`), { nil: undefined }),
+    wsPath: fc.option(
+      fc.string({ minLength: 1, maxLength: 50 }).map((s) => `/${s}`),
+      { nil: undefined }
+    ),
     wsHost: fc.option(fc.domain(), { nil: undefined }),
     // TLS 参数
     sni: fc.option(fc.domain(), { nil: undefined }),
     allowInsecure: fc.option(fc.boolean(), { nil: undefined }),
-    alpn: fc.option(fc.array(fc.constantFrom('h2', 'http/1.1'), { minLength: 1, maxLength: 2 }), { nil: undefined }),
-    fingerprint: fc.option(fc.constantFrom('chrome', 'firefox', 'safari', 'edge'), { nil: undefined }),
+    alpn: fc.option(fc.array(fc.constantFrom('h2', 'http/1.1'), { minLength: 1, maxLength: 2 }), {
+      nil: undefined,
+    }),
+    fingerprint: fc.option(fc.constantFrom('chrome', 'firefox', 'safari', 'edge'), {
+      nil: undefined,
+    }),
   });
 };
 
@@ -40,20 +49,29 @@ const vlessParamsArbitrary = () => {
 const trojanParamsArbitrary = () => {
   return fc.record({
     // 密码使用字母数字字符，避免 URL 特殊字符
-    password: fc.stringMatching(/^[a-zA-Z0-9_\-\.]+$/).filter(s => s.length >= 1 && s.length <= 100),
+    password: fc
+      .stringMatching(/^[a-zA-Z0-9_\-\.]+$/)
+      .filter((s) => s.length >= 1 && s.length <= 100),
     address: fc.domain(),
     port: fc.integer({ min: 1, max: 65535 }),
     name: fc.string({ minLength: 1, maxLength: 50 }),
     network: fc.option(fc.constantFrom('tcp', 'ws', 'grpc', 'http'), { nil: undefined }),
     security: fc.option(fc.constantFrom('none', 'tls', 'reality'), { nil: undefined }),
     // WebSocket 参数
-    wsPath: fc.option(fc.string({ minLength: 1, maxLength: 50 }).map(s => `/${s}`), { nil: undefined }),
+    wsPath: fc.option(
+      fc.string({ minLength: 1, maxLength: 50 }).map((s) => `/${s}`),
+      { nil: undefined }
+    ),
     wsHost: fc.option(fc.domain(), { nil: undefined }),
     // TLS 参数
     sni: fc.option(fc.domain(), { nil: undefined }),
     allowInsecure: fc.option(fc.boolean(), { nil: undefined }),
-    alpn: fc.option(fc.array(fc.constantFrom('h2', 'http/1.1'), { minLength: 1, maxLength: 2 }), { nil: undefined }),
-    fingerprint: fc.option(fc.constantFrom('chrome', 'firefox', 'safari', 'edge'), { nil: undefined }),
+    alpn: fc.option(fc.array(fc.constantFrom('h2', 'http/1.1'), { minLength: 1, maxLength: 2 }), {
+      nil: undefined,
+    }),
+    fingerprint: fc.option(fc.constantFrom('chrome', 'firefox', 'safari', 'edge'), {
+      nil: undefined,
+    }),
   });
 };
 
@@ -64,7 +82,9 @@ const trojanParamsArbitrary = () => {
 /**
  * 构建 VLESS URL
  */
-function buildVlessUrl(params: ReturnType<typeof vlessParamsArbitrary> extends fc.Arbitrary<infer T> ? T : never): string {
+function buildVlessUrl(
+  params: ReturnType<typeof vlessParamsArbitrary> extends fc.Arbitrary<infer T> ? T : never
+): string {
   const searchParams = new URLSearchParams();
 
   if (params.encryption) searchParams.set('encryption', params.encryption);
@@ -81,7 +101,8 @@ function buildVlessUrl(params: ReturnType<typeof vlessParamsArbitrary> extends f
   // TLS 参数
   if (params.security === 'tls' || params.security === 'reality') {
     if (params.sni) searchParams.set('sni', params.sni);
-    if (params.allowInsecure !== undefined) searchParams.set('allowInsecure', params.allowInsecure ? '1' : '0');
+    if (params.allowInsecure !== undefined)
+      searchParams.set('allowInsecure', params.allowInsecure ? '1' : '0');
     if (params.alpn) searchParams.set('alpn', params.alpn.join(','));
     if (params.fingerprint) searchParams.set('fp', params.fingerprint);
   }
@@ -95,7 +116,9 @@ function buildVlessUrl(params: ReturnType<typeof vlessParamsArbitrary> extends f
 /**
  * 构建 Trojan URL
  */
-function buildTrojanUrl(params: ReturnType<typeof trojanParamsArbitrary> extends fc.Arbitrary<infer T> ? T : never): string {
+function buildTrojanUrl(
+  params: ReturnType<typeof trojanParamsArbitrary> extends fc.Arbitrary<infer T> ? T : never
+): string {
   const searchParams = new URLSearchParams();
 
   if (params.network) searchParams.set('type', params.network);
@@ -110,7 +133,8 @@ function buildTrojanUrl(params: ReturnType<typeof trojanParamsArbitrary> extends
   // TLS 参数
   if (params.security === 'tls' || params.security === 'reality') {
     if (params.sni) searchParams.set('sni', params.sni);
-    if (params.allowInsecure !== undefined) searchParams.set('allowInsecure', params.allowInsecure ? '1' : '0');
+    if (params.allowInsecure !== undefined)
+      searchParams.set('allowInsecure', params.allowInsecure ? '1' : '0');
     if (params.alpn) searchParams.set('alpn', params.alpn.join(','));
     if (params.fingerprint) searchParams.set('fp', params.fingerprint);
   }
@@ -136,7 +160,7 @@ describe('ProtocolParser Property Tests', () => {
    * 属性 25: VLESS URL 解析正确性
    * 对于任何有效的 VLESS 协议 URL，解析后的服务器配置应该包含所有必需字段（address、port、uuid），
    * 并且字段值应该与 URL 中的参数匹配。
-   * 
+   *
    * Feature: electron-cross-platform, Property 25: VLESS URL 解析正确性
    * Validates: Requirements 8.1
    */
@@ -234,10 +258,7 @@ describe('ProtocolParser Property Tests', () => {
     });
 
     it('should reject VLESS URLs without UUID', () => {
-      const invalidUrls = [
-        'vless://@example.com:443',
-        'vless://example.com:443',
-      ];
+      const invalidUrls = ['vless://@example.com:443', 'vless://example.com:443'];
 
       for (const url of invalidUrls) {
         expect(() => parser.parseUrl(url)).toThrow();
@@ -249,7 +270,7 @@ describe('ProtocolParser Property Tests', () => {
    * 属性 26: Trojan URL 解析正确性
    * 对于任何有效的 Trojan 协议 URL，解析后的服务器配置应该包含所有必需字段（address、port、password），
    * 并且字段值应该与 URL 中的参数匹配。
-   * 
+   *
    * Feature: electron-cross-platform, Property 26: Trojan URL 解析正确性
    * Validates: Requirements 8.2
    */
@@ -305,7 +326,7 @@ describe('ProtocolParser Property Tests', () => {
     it('should use default name when hash is missing', async () => {
       await fc.assert(
         fc.property(
-          fc.stringMatching(/^[a-zA-Z0-9_\-\.]+$/).filter(s => s.length >= 1 && s.length <= 100),
+          fc.stringMatching(/^[a-zA-Z0-9_\-\.]+$/).filter((s) => s.length >= 1 && s.length <= 100),
           fc.domain(),
           fc.integer({ min: 1, max: 65535 }),
           (password, address, port) => {
@@ -323,7 +344,7 @@ describe('ProtocolParser Property Tests', () => {
     it('should handle URLs with minimal parameters', async () => {
       await fc.assert(
         fc.property(
-          fc.stringMatching(/^[a-zA-Z0-9_\-\.]+$/).filter(s => s.length >= 1 && s.length <= 100),
+          fc.stringMatching(/^[a-zA-Z0-9_\-\.]+$/).filter((s) => s.length >= 1 && s.length <= 100),
           fc.domain(),
           fc.integer({ min: 1, max: 65535 }),
           (password, address, port) => {
@@ -341,10 +362,7 @@ describe('ProtocolParser Property Tests', () => {
     });
 
     it('should reject Trojan URLs without password', () => {
-      const invalidUrls = [
-        'trojan://@example.com:443',
-        'trojan://example.com:443',
-      ];
+      const invalidUrls = ['trojan://@example.com:443', 'trojan://example.com:443'];
 
       for (const url of invalidUrls) {
         expect(() => parser.parseUrl(url)).toThrow();
@@ -356,7 +374,7 @@ describe('ProtocolParser Property Tests', () => {
    * 属性 27: 传输层配置解析
    * 对于任何包含传输层配置的协议 URL（WebSocket、gRPC），
    * 解析后的配置应该包含对应的传输设置（path、headers 等）。
-   * 
+   *
    * Feature: electron-cross-platform, Property 27: 传输层配置解析
    * Validates: Requirements 8.4
    */
@@ -454,7 +472,7 @@ describe('ProtocolParser Property Tests', () => {
   /**
    * 属性 28: TLS 配置解析
    * 对于任何包含 TLS 配置的协议 URL，解析后的配置应该包含 TLS 设置（serverName、allowInsecure 等）。
-   * 
+   *
    * Feature: electron-cross-platform, Property 28: TLS 配置解析
    * Validates: Requirements 8.5
    */
@@ -590,12 +608,7 @@ describe('ProtocolParser Property Tests', () => {
    */
   describe('Error handling', () => {
     it('should throw error for malformed URLs', () => {
-      const malformedUrls = [
-        'vless://',
-        'trojan://',
-        'not-a-url',
-        '',
-      ];
+      const malformedUrls = ['vless://', 'trojan://', 'not-a-url', ''];
 
       for (const url of malformedUrls) {
         expect(() => parser.parseUrl(url)).toThrow();

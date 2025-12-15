@@ -8,11 +8,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EventEmitter } from 'events';
-import type {
-  UserConfig,
-  ServerConfig,
-  ProxyStatus,
-} from '../../shared/types';
+import type { UserConfig, ServerConfig, ProxyStatus } from '../../shared/types';
 // RoutingRuleManager 不再使用，配置生成已内置
 import type { ILogManager } from './LogManager';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
@@ -170,11 +166,16 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private logFileWatcher: ReturnType<typeof setInterval> | null = null;
   private lastLogFileSize: number = 0;
 
-  constructor(logManager?: ILogManager, mainWindow?: BrowserWindow, configPath?: string, singboxPath?: string) {
+  constructor(
+    logManager?: ILogManager,
+    mainWindow?: BrowserWindow,
+    configPath?: string,
+    singboxPath?: string
+  ) {
     super();
     this.logManager = logManager || null;
     this.mainWindow = mainWindow || null;
-    
+
     // 配置文件路径
     if (configPath) {
       this.configPath = configPath;
@@ -182,7 +183,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       const userDataPath = app.getPath('userData');
       this.configPath = path.join(userDataPath, 'singbox_config.json');
     }
-    
+
     // sing-box 可执行文件路径
     if (singboxPath) {
       this.singboxPath = singboxPath;
@@ -206,7 +207,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     // 查找选中的服务器
-    const selectedServer = config.servers.find(s => s.id === config.selectedServerId);
+    const selectedServer = config.servers.find((s) => s.id === config.selectedServerId);
     if (!selectedServer) {
       throw new Error('Selected server not found');
     }
@@ -221,41 +222,38 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     await this.writeSingBoxConfig(singboxConfig);
 
     // 使用重试机制启动 sing-box 进程
-    await retry(
-      () => this.startSingBoxProcess(),
-      {
-        maxRetries: 2,
-        delay: 2000,
-        exponentialBackoff: true,
-        shouldRetry: (error) => {
-          // 只对特定错误进行重试
-          const message = error.message.toLowerCase();
-          
-          // 不重试的错误类型
-          const nonRetryableErrors = [
-            '找不到',
-            '权限',
-            'permission',
-            'enoent',
-            'eacces',
-            'eperm',
-            '配置文件格式错误',
-            'invalid config',
-          ];
-          
-          // 如果是不可重试的错误，直接失败
-          if (nonRetryableErrors.some(pattern => message.includes(pattern))) {
-            return false;
-          }
-          
-          // 其他错误可以重试
-          return true;
-        },
-        onRetry: (error, attempt) => {
-          this.logToManager('warn', `启动失败，正在进行第 ${attempt} 次重试: ${error.message}`);
-        },
-      }
-    );
+    await retry(() => this.startSingBoxProcess(), {
+      maxRetries: 2,
+      delay: 2000,
+      exponentialBackoff: true,
+      shouldRetry: (error) => {
+        // 只对特定错误进行重试
+        const message = error.message.toLowerCase();
+
+        // 不重试的错误类型
+        const nonRetryableErrors = [
+          '找不到',
+          '权限',
+          'permission',
+          'enoent',
+          'eacces',
+          'eperm',
+          '配置文件格式错误',
+          'invalid config',
+        ];
+
+        // 如果是不可重试的错误，直接失败
+        if (nonRetryableErrors.some((pattern) => message.includes(pattern))) {
+          return false;
+        }
+
+        // 其他错误可以重试
+        return true;
+      },
+      onRetry: (error, attempt) => {
+        this.logToManager('warn', `启动失败，正在进行第 ${attempt} 次重试: ${error.message}`);
+      },
+    });
   }
 
   /**
@@ -285,7 +283,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   async switchMode(newConfig: UserConfig): Promise<void> {
     // 检查是否有模式变化
     const modeChanged = this.hasModeChanged(newConfig);
-    
+
     if (!modeChanged) {
       // 模式没有变化，只更新配置
       this.currentConfig = newConfig;
@@ -326,8 +324,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     // 检查端口
-    if (this.currentConfig.socksPort !== newConfig.socksPort ||
-        this.currentConfig.httpPort !== newConfig.httpPort) {
+    if (
+      this.currentConfig.socksPort !== newConfig.socksPort ||
+      this.currentConfig.httpPort !== newConfig.httpPort
+    ) {
       return true;
     }
 
@@ -335,11 +335,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     if (newConfig.proxyModeType === 'tun') {
       const oldTun = this.currentConfig.tunConfig;
       const newTun = newConfig.tunConfig;
-      
-      if (oldTun.mtu !== newTun.mtu ||
-          oldTun.stack !== newTun.stack ||
-          oldTun.autoRoute !== newTun.autoRoute ||
-          oldTun.strictRoute !== newTun.strictRoute) {
+
+      if (
+        oldTun.mtu !== newTun.mtu ||
+        oldTun.stack !== newTun.stack ||
+        oldTun.autoRoute !== newTun.autoRoute ||
+        oldTun.strictRoute !== newTun.strictRoute
+      ) {
         return true;
       }
     }
@@ -359,7 +361,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // macOS TUN 模式：检查 singboxPid 而不是 singboxProcess
     const isRunning = this.singboxProcess !== null || this.singboxPid !== null;
     const activePid = this.singboxPid || this.pid;
-    
+
     if (!isRunning || !activePid) {
       return {
         running: false,
@@ -378,7 +380,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       startTime: this.startTime || undefined,
       uptime,
       currentServer: this.currentConfig?.servers.find(
-        s => s.id === this.currentConfig?.selectedServerId
+        (s) => s.id === this.currentConfig?.selectedServerId
       ),
     };
   }
@@ -387,7 +389,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 生成 sing-box 配置（sing-box 1.12.x 格式）
    */
   generateSingBoxConfig(config: UserConfig): SingBoxConfig {
-    const selectedServer = config.servers.find(s => s.id === config.selectedServerId);
+    const selectedServer = config.servers.find((s) => s.id === config.selectedServerId);
     if (!selectedServer) {
       throw new Error('Selected server not found');
     }
@@ -437,19 +439,19 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       level: config.logLevel || 'info',
       timestamp: true,
     };
-    
+
     // 在 macOS TUN 模式下，使用 osascript 运行时无法捕获 stdout
     // 需要将日志输出到文件，然后通过文件监控读取
     // 注意：这里直接根据 config 参数判断，而不是 this.currentConfig
-    const isMacTunMode = process.platform === 'darwin' && 
-      config.proxyModeType?.toLowerCase() !== 'systemproxy';
+    const isMacTunMode =
+      process.platform === 'darwin' && config.proxyModeType?.toLowerCase() !== 'systemproxy';
     if (isMacTunMode) {
       logConfig.output = this.getLogFilePath();
     }
-    
+
     return logConfig;
   }
-  
+
   /**
    * 获取 sing-box 日志文件路径
    */
@@ -482,7 +484,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     // 使用小写比较代理模式
     const proxyMode = (config.proxyMode || 'smart').toLowerCase();
-    
+
     // 智能分流模式添加 DNS 规则（默认启用）
     if (proxyMode === 'smart' || proxyMode === 'global') {
       dnsConfig.rules = [
@@ -505,7 +507,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private generateInbounds(config: UserConfig): SingBoxInbound[] {
     const inbounds: SingBoxInbound[] = [];
-    
+
     // 使用小写比较，兼容 SystemProxy/systemProxy 和 Tun/tun
     const modeType = (config.proxyModeType || 'tun').toLowerCase();
 
@@ -581,7 +583,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private generateProxyOutbound(server: ServerConfig): SingBoxOutbound {
     // sing-box 要求协议类型必须是小写
     const protocol = server.protocol.toLowerCase();
-    
+
     const outbound: SingBoxOutbound = {
       type: protocol,
       tag: 'proxy',
@@ -654,7 +656,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private generateRouteConfig(config: UserConfig): SingBoxRouteConfig {
     const rules: SingBoxRouteRule[] = [];
-    
+
     // 使用小写比较代理模式
     const proxyMode = (config.proxyMode || 'smart').toLowerCase();
 
@@ -734,7 +736,9 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   /**
    * 生成自定义路由规则
    */
-  private generateCustomRules(customRules: import('../../shared/types').DomainRule[]): SingBoxRouteRule[] {
+  private generateCustomRules(
+    customRules: import('../../shared/types').DomainRule[]
+  ): SingBoxRouteRule[] {
     const rules: SingBoxRouteRule[] = [];
 
     for (const rule of customRules) {
@@ -759,7 +763,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       } else if (rule.action === 'direct') {
         singboxRule.outbound = 'direct';
       } else if (rule.action === 'block') {
-        singboxRule.action = 'reject';
+        singboxRule.outbound = 'block';
       }
 
       rules.push(singboxRule);
@@ -785,7 +789,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // Windows 和 macOS 的 TUN 模式都需要管理员权限
     return isTunMode && (process.platform === 'darwin' || process.platform === 'win32');
   }
-  
+
   /**
    * 检查是否需要使用 osascript 运行（仅 macOS）
    */
@@ -812,7 +816,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         // 在 Windows 上，应用应该已经以管理员权限运行（通过 UAC 提升）
         let command: string;
         let args: string[];
-        
+
         if (this.needsOsascript()) {
           // macOS: 使用 osascript 请求管理员权限运行
           // 注意：路径中可能包含空格，需要使用转义引号
@@ -840,7 +844,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         // 记录启动信息
         this.pid = this.singboxProcess.pid || null;
         this.startTime = new Date();
-        
+
         this.logToManager('info', `正在启动 sing-box 进程 (PID: ${this.pid})...`);
 
         // 监听进程输出
@@ -869,7 +873,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
         this.singboxProcess.on('exit', (code, signal) => {
           console.log(`sing-box process exited with code ${code}, signal ${signal}`);
-          
+
           // 对于 macOS TUN 模式，osascript 退出码为 0 表示成功启动了后台进程
           if (this.needsOsascript()) {
             if (code === 0) {
@@ -879,14 +883,15 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
               return; // 不调用 handleProcessExit，因为 sing-box 还在运行
             } else {
               // osascript 执行失败（用户取消或其他错误）
-              const errorMessage = code === 1 ? '用户取消了管理员权限请求' : `启动失败，退出码: ${code}`;
+              const errorMessage =
+                code === 1 ? '用户取消了管理员权限请求' : `启动失败，退出码: ${code}`;
               this.logToManager('error', errorMessage);
               reject(new Error(errorMessage));
               this.handleProcessExit(code, signal);
               return;
             }
           }
-          
+
           // 如果在启动阶段就退出了，说明启动失败
           const startupTime = Date.now() - (this.startTime?.getTime() || Date.now());
           if (startupTime < 2000 && code !== null && code !== 0) {
@@ -894,7 +899,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
             this.logToManager('error', errorMessage);
             reject(new Error(errorMessage));
           }
-          
+
           this.handleProcessExit(code, signal);
         });
 
@@ -905,7 +910,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
             if (this.needsOsascript()) {
               this.startLogFileWatcher();
             }
-            
+
             // 触发启动事件
             this.emit('started');
             this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STARTED, {
@@ -933,7 +938,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private parseLaunchError(error: Error): string {
     const errorCode = (error as NodeJS.ErrnoException).code;
-    
+
     switch (errorCode) {
       case 'ENOENT':
         return '找不到 sing-box 可执行文件，请检查安装是否完整';
@@ -953,34 +958,38 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // 首先尝试从错误输出中提取有用信息
     if (errorOutput) {
       const lowerOutput = errorOutput.toLowerCase();
-      
+
       if (lowerOutput.includes('permission denied') || lowerOutput.includes('access denied')) {
         return 'TUN 模式需要管理员权限，请以管理员身份运行应用';
       }
-      
+
       if (lowerOutput.includes('address already in use') || lowerOutput.includes('bind')) {
         return '端口已被占用，请在设置中更换其他端口或关闭占用端口的程序';
       }
-      
-      if (lowerOutput.includes('invalid config') || lowerOutput.includes('parse') || lowerOutput.includes('json')) {
+
+      if (
+        lowerOutput.includes('invalid config') ||
+        lowerOutput.includes('parse') ||
+        lowerOutput.includes('json')
+      ) {
         return 'sing-box 配置文件格式错误，请检查服务器配置';
       }
-      
+
       if (lowerOutput.includes('connection refused') || lowerOutput.includes('dial')) {
         return '无法连接到代理服务器，请检查服务器地址和端口';
       }
-      
+
       if (lowerOutput.includes('certificate') || lowerOutput.includes('tls')) {
         return 'TLS 证书验证失败，请检查服务器 TLS 配置';
       }
-      
+
       // 如果有具体的错误信息，翻译后返回
       const friendlyMessage = this.translateErrorMessage(errorOutput);
       if (friendlyMessage !== errorOutput) {
         return `sing-box 启动失败: ${friendlyMessage}`;
       }
     }
-    
+
     // 根据退出码返回通用错误信息
     switch (exitCode) {
       case 1:
@@ -1004,14 +1013,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     if (this.singboxPid && process.platform === 'darwin') {
       return this.stopSingBoxWithSudo();
     }
-    
+
     if (!this.singboxProcess) {
       return;
     }
 
     return new Promise((resolve) => {
       const proc = this.singboxProcess!;
-      
+
       // 设置超时强制终止
       const killTimeout = setTimeout(() => {
         if (proc.killed === false) {
@@ -1031,7 +1040,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       proc.kill('SIGTERM');
     });
   }
-  
+
   /**
    * 使用 sudo 停止 sing-box 进程（macOS TUN 模式）
    */
@@ -1040,22 +1049,22 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       this.cleanup();
       return;
     }
-    
+
     this.logToManager('info', `正在停止 sing-box 进程 (PID: ${this.singboxPid})...`);
-    
+
     return new Promise((resolve) => {
       const killProcess = spawn('/usr/bin/osascript', [
         '-e',
         `do shell script "kill -TERM ${this.singboxPid}" with administrator privileges`,
       ]);
-      
+
       killProcess.on('exit', (code) => {
         if (code === 0) {
           this.logToManager('info', 'sing-box 进程已停止');
         } else {
           this.logToManager('warn', `停止 sing-box 进程可能失败，退出码: ${code}`);
         }
-        
+
         // 清理 PID 文件
         const fsSync = require('fs');
         try {
@@ -1063,16 +1072,16 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         } catch {
           // 忽略错误
         }
-        
+
         this.cleanup();
-        
+
         // 触发停止事件
         this.emit('stopped');
         this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
-        
+
         resolve();
       });
-      
+
       killProcess.on('error', (error) => {
         this.logToManager('error', `停止 sing-box 进程失败: ${error.message}`);
         this.cleanup();
@@ -1091,7 +1100,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     this.singboxPid = null;
     this.startTime = null;
   }
-  
+
   /**
    * 从 PID 文件读取 sing-box 的实际 PID（macOS TUN 模式）
    */
@@ -1109,14 +1118,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       this.logToManager('warn', `无法读取 sing-box PID 文件: ${error}`);
     }
   }
-  
+
   /**
    * 获取 PID 文件路径
    */
   private getPidFilePath(): string {
     return path.join(app.getPath('userData'), 'singbox.pid');
   }
-  
+
   /**
    * 启动日志文件监控（用于 macOS TUN 模式）
    */
@@ -1124,10 +1133,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     if (this.logFileWatcher) {
       return;
     }
-    
+
     const logFilePath = this.getLogFilePath();
     this.lastLogFileSize = 0;
-    
+
     // 清空旧的日志文件
     const fsSync = require('fs');
     try {
@@ -1135,7 +1144,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     } catch {
       // 忽略错误
     }
-    
+
     // 每 500ms 检查一次日志文件
     this.logFileWatcher = setInterval(async () => {
       try {
@@ -1146,10 +1155,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           const buffer = Buffer.alloc(stats.size - this.lastLogFileSize);
           await fd.read(buffer, 0, buffer.length, this.lastLogFileSize);
           await fd.close();
-          
+
           const newContent = buffer.toString('utf-8');
           this.lastLogFileSize = stats.size;
-          
+
           // 处理日志内容
           if (newContent.trim()) {
             this.handleProcessOutput(newContent);
@@ -1160,7 +1169,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       }
     }, 500);
   }
-  
+
   /**
    * 停止日志文件监控
    */
@@ -1178,10 +1187,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private handleProcessOutput(data: string): void {
     // 移除 ANSI 颜色代码
     const cleanData = this.removeAnsiCodes(data);
-    
+
     // 按行分割
-    const lines = cleanData.split('\n').filter(line => line.trim());
-    
+    const lines = cleanData.split('\n').filter((line) => line.trim());
+
     for (const line of lines) {
       this.parseAndLogLine(line);
     }
@@ -1234,13 +1243,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     // 高价值日志模式 - 这些日志应该保留
     const keepPatterns = [
-      'started',          // 启动完成
-      'stopped',          // 停止
+      'started', // 启动完成
+      'stopped', // 停止
       'sing-box started', // sing-box 启动
-      'error',            // 错误
-      'fatal',            // 致命错误
-      'warn',             // 警告
-      'failed',           // 失败
+      'error', // 错误
+      'fatal', // 致命错误
+      'warn', // 警告
+      'failed', // 失败
       'updated default interface', // 网络接口变化
     ];
 
@@ -1253,25 +1262,25 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     // 过滤的低价值日志模式（sing-box 的连接日志太频繁）
     const filterPatterns = [
-      'outbound connection',     // 出站连接（太频繁）
-      'outbound packet',         // 出站数据包（太频繁）
-      'inbound connection',      // 入站连接建立（太频繁）
-      'inbound/tun',             // TUN 入站日志（太频繁）
-      'inbound/http',            // HTTP 入站日志
-      'inbound/socks',           // SOCKS 入站日志
-      'connection to',           // 连接到目标
-      'connection from',         // 来自的连接
-      'dns query',               // DNS 查询
-      'dns response',            // DNS 响应
-      'dns: exchanged',          // DNS 交换
-      'dns: cached',             // DNS 缓存
-      'resolved',                // DNS 解析完成
-      'connection closed',       // 连接关闭
-      'connection established',  // 连接建立
-      'handshake',               // 握手
-      'tls handshake',           // TLS 握手
-      'udp packet',              // UDP 包
-      'tcp connection',          // TCP 连接
+      'outbound connection', // 出站连接（太频繁）
+      'outbound packet', // 出站数据包（太频繁）
+      'inbound connection', // 入站连接建立（太频繁）
+      'inbound/tun', // TUN 入站日志（太频繁）
+      'inbound/http', // HTTP 入站日志
+      'inbound/socks', // SOCKS 入站日志
+      'connection to', // 连接到目标
+      'connection from', // 来自的连接
+      'dns query', // DNS 查询
+      'dns response', // DNS 响应
+      'dns: exchanged', // DNS 交换
+      'dns: cached', // DNS 缓存
+      'resolved', // DNS 解析完成
+      'connection closed', // 连接关闭
+      'connection established', // 连接建立
+      'handshake', // 握手
+      'tls handshake', // TLS 握手
+      'udp packet', // UDP 包
+      'tcp connection', // TCP 连接
     ];
 
     for (const pattern of filterPatterns) {
@@ -1288,11 +1297,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private isDuplicateLog(message: string): boolean {
     const now = Date.now();
-    
+
     // 如果消息相同且在 1 秒内
     if (message === this.lastLogMessage && now - this.lastLogTime < 1000) {
       this.lastLogCount++;
-      
+
       // 如果重复超过 5 次，过滤掉
       if (this.lastLogCount > 5) {
         return true;
@@ -1303,18 +1312,20 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       this.lastLogCount = 1;
       this.lastLogTime = now;
     }
-    
+
     return false;
   }
 
   /**
    * 解析 sing-box 日志
    */
-  private parseSingBoxLog(line: string): { level: 'debug' | 'info' | 'warn' | 'error' | 'fatal'; message: string } | null {
+  private parseSingBoxLog(
+    line: string
+  ): { level: 'debug' | 'info' | 'warn' | 'error' | 'fatal'; message: string } | null {
     // sing-box 日志格式示例：
     // 2024-01-01 12:00:00 INFO message
     // 2024-01-01 12:00:00 [INFO] message
-    
+
     // 尝试匹配日志级别
     const levelMatch = line.match(/\b(DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\b/i);
     if (!levelMatch) {
@@ -1327,7 +1338,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     // 提取消息内容（去掉时间戳和级别）
-    const message = line.replace(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/, '')
+    const message = line
+      .replace(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/, '')
       .replace(/\[?(DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\]?/i, '')
       .trim();
 
@@ -1344,7 +1356,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     const lowerMessage = message.toLowerCase();
 
     // 常见错误模式匹配
-    if (lowerMessage.includes('connection refused') || lowerMessage.includes('connect: connection refused')) {
+    if (
+      lowerMessage.includes('connection refused') ||
+      lowerMessage.includes('connect: connection refused')
+    ) {
       return '连接被拒绝：无法连接到代理服务器，请检查服务器地址和端口是否正确';
     }
 
@@ -1356,7 +1371,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       return 'DNS 解析失败：无法解析服务器域名，请检查 DNS 设置';
     }
 
-    if (lowerMessage.includes('certificate') || lowerMessage.includes('tls') || lowerMessage.includes('ssl')) {
+    if (
+      lowerMessage.includes('certificate') ||
+      lowerMessage.includes('tls') ||
+      lowerMessage.includes('ssl')
+    ) {
       return 'TLS 证书错误：服务器证书验证失败，请检查 TLS 设置';
     }
 
@@ -1368,7 +1387,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       return '权限不足：需要管理员权限才能启动 TUN 模式';
     }
 
-    if (lowerMessage.includes('address already in use') || lowerMessage.includes('bind: address already in use')) {
+    if (
+      lowerMessage.includes('address already in use') ||
+      lowerMessage.includes('bind: address already in use')
+    ) {
       return '端口已被占用：请更换其他端口或关闭占用端口的程序';
     }
 
@@ -1383,7 +1405,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   /**
    * 记录日志到 LogManager
    */
-  private logToManager(level: 'debug' | 'info' | 'warn' | 'error' | 'fatal', message: string): void {
+  private logToManager(
+    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal',
+    message: string
+  ): void {
     if (this.logManager) {
       this.logManager.addLog(level, message, 'sing-box');
     }
@@ -1394,7 +1419,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private handleProcessError(error: Error): void {
     const errorMessage = this.translateErrorMessage(error.message);
-    
+
     // 触发错误事件
     this.emit('error', {
       message: errorMessage,
@@ -1414,15 +1439,15 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private handleProcessExit(code: number | null, signal: NodeJS.Signals | null): void {
     // 解析退出原因
     const exitReason = this.parseExitReason(code, signal);
-    
+
     this.logToManager('info', `sing-box process exited: ${exitReason}`);
-    
+
     // 如果是异常退出（非正常停止）
     if (code !== null && code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
       const errorMessage = this.parseExitError(code);
-      
+
       this.logToManager('error', `sing-box异常退出: ${errorMessage}`);
-      
+
       // 触发错误事件
       this.emit('error', {
         message: errorMessage,
@@ -1441,7 +1466,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       this.emit('stopped');
       this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
     }
-    
+
     this.cleanup();
   }
 

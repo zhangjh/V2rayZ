@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
-import { Button } from '@/components/ui/button'
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -11,18 +11,18 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, CheckCircle2 } from 'lucide-react'
-import type { ServerConfig } from '@/bridge/types'
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, CheckCircle2 } from 'lucide-react';
+import type { ServerConfig } from '@/bridge/types';
 
 const trojanFormSchema = z.object({
   address: z.string().min(1, '服务器地址不能为空'),
@@ -32,18 +32,23 @@ const trojanFormSchema = z.object({
   security: z.enum(['None', 'Tls']),
   tlsServerName: z.string().optional(),
   tlsAllowInsecure: z.boolean(),
-})
+});
 
-type TrojanFormValues = z.infer<typeof trojanFormSchema>
+type TrojanFormValues = z.infer<typeof trojanFormSchema>;
 
 interface TrojanFormProps {
-  serverConfig?: ServerConfig
-  onSubmit: (config: any) => Promise<void>
-  onTestConnection: () => Promise<void>
-  isTestingConnection: boolean
+  serverConfig?: ServerConfig;
+  onSubmit: (config: any) => Promise<void>;
+  onTestConnection: () => Promise<void>;
+  isTestingConnection: boolean;
 }
 
-export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTestingConnection }: TrojanFormProps) {
+export function TrojanForm({
+  serverConfig,
+  onSubmit,
+  onTestConnection,
+  isTestingConnection,
+}: TrojanFormProps) {
   const form = useForm<TrojanFormValues>({
     resolver: zodResolver(trojanFormSchema),
     defaultValues: {
@@ -55,24 +60,24 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
       tlsServerName: '',
       tlsAllowInsecure: false,
     },
-  })
+  });
 
   useEffect(() => {
-    console.log('[TrojanForm] Server config changed:', serverConfig)
-    if (serverConfig && serverConfig.protocol === 'Trojan') {
+    console.log('[TrojanForm] Server config changed:', serverConfig);
+    if (serverConfig && serverConfig.protocol === 'trojan') {
       const formData = {
         address: serverConfig.address || '',
         port: serverConfig.port || 443,
         password: serverConfig.password || '',
-        network: serverConfig.network || 'Tcp',
-        security: serverConfig.security || 'Tls',
+        network: (serverConfig.network || 'tcp') as 'Tcp' | 'Ws' | 'H2',
+        security: (serverConfig.security || 'tls') as 'None' | 'Tls',
         tlsServerName: serverConfig.tlsSettings?.serverName || '',
         tlsAllowInsecure: serverConfig.tlsSettings?.allowInsecure || false,
-      }
-      console.log('[TrojanForm] Resetting form with:', formData)
-      form.reset(formData)
+      };
+      console.log('[TrojanForm] Resetting form with:', formData);
+      form.reset(formData);
     }
-  }, [serverConfig, form])
+  }, [serverConfig, form]);
 
   const handleSubmit = async (values: TrojanFormValues) => {
     const serverConfig = {
@@ -82,16 +87,19 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
       password: values.password,
       network: values.network,
       security: values.security,
-      tlsSettings: values.security === 'Tls' ? {
-        serverName: values.tlsServerName || null,
-        allowInsecure: values.tlsAllowInsecure,
-      } : null,
-    }
+      tlsSettings:
+        values.security === 'Tls'
+          ? {
+              serverName: values.tlsServerName || null,
+              allowInsecure: values.tlsAllowInsecure,
+            }
+          : null,
+    };
 
-    await onSubmit(serverConfig)
-  }
+    await onSubmit(serverConfig);
+  };
 
-  const isTlsEnabled = form.watch('security') === 'Tls'
+  const isTlsEnabled = form.watch('security') === 'Tls';
 
   return (
     <Form {...form}>
@@ -105,9 +113,7 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
               <FormControl>
                 <Input placeholder="example.com" {...field} />
               </FormControl>
-              <FormDescription>
-                服务器的域名或 IP 地址
-              </FormDescription>
+              <FormDescription>服务器的域名或 IP 地址</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -127,9 +133,7 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
                   onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                 />
               </FormControl>
-              <FormDescription>
-                服务器端口号（1-65535）
-              </FormDescription>
+              <FormDescription>服务器端口号（1-65535）</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -142,15 +146,9 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
             <FormItem>
               <FormLabel>密码 (Password)</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
-                  placeholder="输入 Trojan 密码"
-                  {...field}
-                />
+                <Input type="password" placeholder="输入 Trojan 密码" {...field} />
               </FormControl>
-              <FormDescription>
-                Trojan 服务器的认证密码
-              </FormDescription>
+              <FormDescription>Trojan 服务器的认证密码</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -162,10 +160,7 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
           render={({ field }) => (
             <FormItem>
               <FormLabel>传输协议</FormLabel>
-              <Select
-                onValueChange={field.onChange}
-                value={field.value}
-              >
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="选择传输协议" />
@@ -177,9 +172,7 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
                   <SelectItem value="H2">HTTP/2</SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription>
-                底层传输协议类型
-              </FormDescription>
+              <FormDescription>底层传输协议类型</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -191,10 +184,7 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
           render={({ field }) => (
             <FormItem>
               <FormLabel>传输层加密</FormLabel>
-              <Select
-                onValueChange={field.onChange}
-                value={field.value}
-              >
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="选择传输层加密" />
@@ -205,9 +195,7 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
                   <SelectItem value="Tls">TLS</SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription>
-                传输层安全协议
-              </FormDescription>
+              <FormDescription>传输层安全协议</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -224,9 +212,7 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
                   <FormControl>
                     <Input placeholder="example.com" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    用于 TLS SNI，留空则使用服务器地址
-                  </FormDescription>
+                  <FormDescription>用于 TLS SNI，留空则使用服务器地址</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -238,16 +224,11 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                   <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>允许不安全的连接</FormLabel>
-                    <FormDescription>
-                      跳过 TLS 证书验证（不推荐，仅用于测试）
-                    </FormDescription>
+                    <FormDescription>跳过 TLS 证书验证（不推荐，仅用于测试）</FormDescription>
                   </div>
                 </FormItem>
               )}
@@ -256,13 +237,8 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
         )}
 
         <div className="flex gap-4">
-          <Button
-            type="submit"
-            disabled={form.formState.isSubmitting}
-          >
-            {form.formState.isSubmitting && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
+          <Button type="submit" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             保存配置
           </Button>
           <Button
@@ -289,5 +265,5 @@ export function TrojanForm({ serverConfig, onSubmit, onTestConnection, isTesting
         </div>
       </form>
     </Form>
-  )
+  );
 }

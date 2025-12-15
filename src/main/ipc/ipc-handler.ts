@@ -26,10 +26,7 @@ export class IpcHandlerRegistry {
    * @param channel IPC 通道名称
    * @param handler 处理器函数
    */
-  register<TArgs = any, TResult = any>(
-    channel: string,
-    handler: IpcHandler<TArgs, TResult>
-  ): void {
+  register<TArgs = any, TResult = any>(channel: string, handler: IpcHandler<TArgs, TResult>): void {
     if (this.handlers.has(channel)) {
       console.warn(`IPC handler for channel "${channel}" is already registered. Overwriting.`);
     }
@@ -41,27 +38,27 @@ export class IpcHandlerRegistry {
     ): Promise<ApiResponse<TResult>> => {
       try {
         console.log(`[IPC] Handling request for channel: ${channel}`, args);
-        
+
         const result = await handler(event, args);
-        
+
         console.log(`[IPC] Request successful for channel: ${channel}`);
-        
+
         return {
           success: true,
           data: result,
         };
       } catch (error) {
         console.error(`[IPC] Error handling channel "${channel}":`, error);
-        
+
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorCode = (error as any)?.code;
         const errorStack = error instanceof Error ? error.stack : undefined;
-        
+
         // 记录详细错误信息
         if (errorStack) {
           console.error(`[IPC] Stack trace:`, errorStack);
         }
-        
+
         return {
           success: false,
           error: errorMessage,
@@ -72,7 +69,7 @@ export class IpcHandlerRegistry {
 
     this.handlers.set(channel, wrappedHandler);
     ipcMain.handle(channel, wrappedHandler);
-    
+
     console.log(`[IPC] Registered handler for channel: ${channel}`);
   }
 

@@ -1,4 +1,12 @@
-import { Tray, Menu, nativeImage, BrowserWindow, app, MenuItemConstructorOptions, shell } from 'electron';
+import {
+  Tray,
+  Menu,
+  nativeImage,
+  BrowserWindow,
+  app,
+  MenuItemConstructorOptions,
+  shell,
+} from 'electron';
 import { LogManager } from './LogManager';
 import { ServerConfig, ProxyMode } from '../../shared/types';
 
@@ -216,19 +224,19 @@ export class TrayManager implements ITrayManager {
     // 构建服务器子菜单
     const serverSubmenu: MenuItemConstructorOptions[] = [];
     const maxLabelLength = 25; // 最大显示长度
-    
+
     if (data.servers.length > 0) {
       // 添加服务器列表
       data.servers.forEach((server) => {
         const name = server.name || server.address;
         const protocol = (server.protocol || '').toUpperCase();
         let label = `${name}（${protocol}）`;
-        
+
         // 超长截断
         if (label.length > maxLabelLength) {
           label = label.substring(0, maxLabelLength - 3) + '...';
         }
-        
+
         serverSubmenu.push({
           label,
           type: 'radio' as const,
@@ -242,7 +250,7 @@ export class TrayManager implements ITrayManager {
       serverSubmenu.push({ label: '未配置服务器', enabled: false });
       serverSubmenu.push({ type: 'separator' });
     }
-    
+
     // 添加"管理服务器"选项
     serverSubmenu.push({
       label: '管理服务器',
@@ -257,7 +265,9 @@ export class TrayManager implements ITrayManager {
     };
 
     // 构建代理模式子菜单
-    const proxyModeSubmenu: MenuItemConstructorOptions[] = (['global', 'smart', 'direct'] as ProxyMode[]).map((mode) => ({
+    const proxyModeSubmenu: MenuItemConstructorOptions[] = (
+      ['global', 'smart', 'direct'] as ProxyMode[]
+    ).map((mode) => ({
       label: proxyModeLabels[mode],
       type: 'radio' as const,
       checked: data.proxyMode === mode,
@@ -320,15 +330,15 @@ export class TrayManager implements ITrayManager {
   private loadTrayIcon(state: TrayIconState): Electron.NativeImage {
     const { resourceManager } = require('./ResourceManager');
     const iconPath = resourceManager.getTrayIconPath(state === 'connected');
-    
+
     // 检查图标文件是否存在
     const fs = require('fs');
     let icon: Electron.NativeImage;
-    
+
     if (fs.existsSync(iconPath)) {
       icon = nativeImage.createFromPath(iconPath);
       this.logManager.addLog('debug', `Loaded tray icon from: ${iconPath}`, 'TrayManager');
-      
+
       // macOS 托盘图标需要调整大小为 22x22（或 16x16）
       // 高 DPI 屏幕会自动使用 @2x 版本
       if (process.platform === 'darwin') {
@@ -336,18 +346,22 @@ export class TrayManager implements ITrayManager {
       }
     } else {
       // 图标文件不存在，创建一个简单的默认图标
-      this.logManager.addLog('warn', `Tray icon not found: ${iconPath}, using default`, 'TrayManager');
+      this.logManager.addLog(
+        'warn',
+        `Tray icon not found: ${iconPath}, using default`,
+        'TrayManager'
+      );
       icon = this.createDefaultTrayIcon();
     }
-    
+
     // 在 macOS 上，托盘图标应该是模板图像
     if (process.platform === 'darwin') {
       icon.setTemplateImage(true);
     }
-    
+
     return icon;
   }
-  
+
   /**
    * 创建默认托盘图标（当图标文件不存在时使用）
    */
@@ -365,7 +379,6 @@ export class TrayManager implements ITrayManager {
       `data:image/svg+xml;base64,${Buffer.from(canvas).toString('base64')}`
     );
   }
-
 
   /**
    * 处理托盘图标点击事件
@@ -468,7 +481,7 @@ export class TrayManager implements ITrayManager {
       this.onCheckUpdate();
     } else {
       // 默认行为：打开 GitHub releases 页面
-      shell.openExternal('https://github.com/your-repo/v2rayz/releases');
+      shell.openExternal('https://github.com/zhangjh/V2rayZ/releases');
     }
   }
 

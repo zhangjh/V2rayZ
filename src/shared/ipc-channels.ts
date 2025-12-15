@@ -53,6 +53,16 @@ export const IPC_CHANNELS = {
   // 版本信息
   VERSION_GET_INFO: 'version:getInfo',
 
+  // 更新管理
+  UPDATE_CHECK: 'update:check',
+  UPDATE_DOWNLOAD: 'update:download',
+  UPDATE_INSTALL: 'update:install',
+  UPDATE_SKIP: 'update:skip',
+  UPDATE_OPEN_RELEASES: 'update:openReleases',
+
+  // 更新事件 (主进程 -> 渲染进程)
+  EVENT_UPDATE_PROGRESS: 'update:progress',
+
   // 管理员权限
   ADMIN_CHECK: 'admin:check',
   ADMIN_REQUEST_ELEVATION: 'admin:requestElevation',

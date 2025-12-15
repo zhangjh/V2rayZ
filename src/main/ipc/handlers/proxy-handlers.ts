@@ -38,11 +38,11 @@ export function registerProxyHandlers(
       console.log('[Proxy Handlers] PROXY_START received config:', config);
       console.log('[Proxy Handlers] config type:', typeof config);
       console.log('[Proxy Handlers] config selectedServerId:', config?.selectedServerId);
-      
+
       if (!config) {
         throw new Error('配置参数未传递');
       }
-      
+
       // 启动 sing-box 进程
       await proxyManager.start(config);
 
@@ -66,29 +66,26 @@ export function registerProxyHandlers(
   );
 
   // 停止代理
-  registerIpcHandler<void, void>(
-    IPC_CHANNELS.PROXY_STOP,
-    async (_event: IpcMainInvokeEvent) => {
-      // 先禁用系统代理（不管当前状态如何，都尝试禁用）
-      if (systemProxyManager) {
-        try {
-          console.log('[Proxy Handlers] Disabling system proxy...');
-          await systemProxyManager.disableProxy();
-          console.log('[Proxy Handlers] System proxy disabled');
-        } catch (error) {
-          console.error('[Proxy Handlers] Failed to disable system proxy:', error);
-        }
-      }
-
-      // 停止 sing-box 进程
-      await proxyManager.stop();
-
-      // 更新托盘状态
-      if (trayStateCallback) {
-        trayStateCallback(false);
+  registerIpcHandler<void, void>(IPC_CHANNELS.PROXY_STOP, async (_event: IpcMainInvokeEvent) => {
+    // 先禁用系统代理（不管当前状态如何，都尝试禁用）
+    if (systemProxyManager) {
+      try {
+        console.log('[Proxy Handlers] Disabling system proxy...');
+        await systemProxyManager.disableProxy();
+        console.log('[Proxy Handlers] System proxy disabled');
+      } catch (error) {
+        console.error('[Proxy Handlers] Failed to disable system proxy:', error);
       }
     }
-  );
+
+    // 停止 sing-box 进程
+    await proxyManager.stop();
+
+    // 更新托盘状态
+    if (trayStateCallback) {
+      trayStateCallback(false);
+    }
+  });
 
   // 获取代理状态
   registerIpcHandler<void, ProxyStatus>(

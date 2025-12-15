@@ -1,72 +1,81 @@
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { useAppStore } from '@/store/app-store'
-import { ServerList } from '@/components/settings/server-list'
-import { ServerConfigDialog } from '@/components/settings/server-config-dialog'
-import type { ServerConfigWithId } from '@/bridge/types'
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { useAppStore } from '@/store/app-store';
+import { ServerList } from '@/components/settings/server-list';
+import { ServerConfigDialog } from '@/components/settings/server-config-dialog';
+import type { ServerConfig } from '@/bridge/types';
+
+type ServerConfigWithId = ServerConfig;
 
 export function ServerPage() {
-  const config = useAppStore((state) => state.config)
-  const saveConfig = useAppStore((state) => state.saveConfig)
-  const deleteServer = useAppStore((state) => state.deleteServer)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingServer, setEditingServer] = useState<ServerConfigWithId | undefined>()
-  const [isTestingConnection, setIsTestingConnection] = useState(false)
+  const config = useAppStore((state) => state.config);
+  const saveConfig = useAppStore((state) => state.saveConfig);
+  const deleteServer = useAppStore((state) => state.deleteServer);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingServer, setEditingServer] = useState<ServerConfigWithId | undefined>();
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
-  const servers = config?.servers || []
-  const selectedServerId = config?.selectedServerId
+  const servers = config?.servers || [];
+  const selectedServerId = config?.selectedServerId;
 
   const handleAddServer = () => {
-    setEditingServer(undefined)
-    setIsDialogOpen(true)
-  }
+    setEditingServer(undefined);
+    setIsDialogOpen(true);
+  };
 
   const handleEditServer = (server: ServerConfigWithId) => {
-    setEditingServer(server)
-    setIsDialogOpen(true)
-  }
+    setEditingServer(server);
+    setIsDialogOpen(true);
+  };
 
   const handleDeleteServer = async (serverId: string) => {
     try {
-      await deleteServer(serverId)
-      toast.success('服务器已删除')
+      await deleteServer(serverId);
+      toast.success('服务器已删除');
     } catch (error) {
       toast.error('删除失败', {
         description: error instanceof Error ? error.message : '删除服务器时发生错误',
-      })
+      });
     }
-  }
+  };
 
   const handleSelectServer = async (serverId: string) => {
-    if (!config) return
-    
+    if (!config) return;
+
     try {
       const updatedConfig = {
         ...config,
         selectedServerId: serverId,
-      }
+      };
 
-      await saveConfig(updatedConfig)
-      toast.success('服务器已选择')
+      await saveConfig(updatedConfig);
+      toast.success('服务器已选择');
     } catch (error) {
       toast.error('选择失败', {
         description: error instanceof Error ? error.message : '选择服务器时发生错误',
-      })
+      });
     }
-  }
+  };
 
-  const handleSaveServer = async (serverData: Omit<ServerConfigWithId, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleSaveServer = async (
+    serverData: Omit<ServerConfigWithId, 'id' | 'createdAt' | 'updatedAt'>
+  ) => {
     try {
-      const now = new Date().toISOString()
-      let updatedServers: ServerConfigWithId[]
+      const now = new Date().toISOString();
+      let updatedServers: ServerConfigWithId[];
 
       if (editingServer) {
         // Update existing server
-        updatedServers = servers.map(s => 
-          s.id === editingServer.id 
-            ? { ...serverData, id: editingServer.id, createdAt: editingServer.createdAt, updatedAt: now }
+        updatedServers = servers.map((s) =>
+          s.id === editingServer.id
+            ? {
+                ...serverData,
+                id: editingServer.id,
+                createdAt: editingServer.createdAt,
+                updatedAt: now,
+              }
             : s
-        )
+        );
       } else {
         // Add new server
         const newServer: ServerConfigWithId = {
@@ -74,54 +83,54 @@ export function ServerPage() {
           id: crypto.randomUUID(),
           createdAt: now,
           updatedAt: now,
-        }
-        updatedServers = [...servers, newServer]
+        };
+        updatedServers = [...servers, newServer];
       }
 
       if (!config) {
-        throw new Error('配置未加载')
+        throw new Error('配置未加载');
       }
 
       const updatedConfig = {
         ...config,
         servers: updatedServers,
-      }
+      };
 
-      await saveConfig(updatedConfig)
+      await saveConfig(updatedConfig);
 
-      const action = editingServer ? '更新' : '添加'
+      const action = editingServer ? '更新' : '添加';
       toast.success(`服务器配置已${action}`, {
         description: `${serverData.name} 配置已成功保存`,
-      })
+      });
     } catch (error) {
       toast.error('保存失败', {
         description: error instanceof Error ? error.message : '保存服务器配置时发生错误',
-      })
-      throw error
+      });
+      throw error;
     }
-  }
+  };
 
   const handleTestConnection = async () => {
-    setIsTestingConnection(true)
+    setIsTestingConnection(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       toast.success('连接测试成功', {
         description: '服务器配置有效，可以正常连接。',
-      })
+      });
     } catch (error) {
       toast.error('连接测试失败', {
         description: error instanceof Error ? error.message : '测试连接时发生错误',
-      })
+      });
     } finally {
-      setIsTestingConnection(false)
+      setIsTestingConnection(false);
     }
-  }
+  };
 
   const handleImportSuccess = () => {
     // 导入成功后刷新配置
     // 这里可以触发重新加载配置，但由于使用了状态管理，配置会自动更新
-    toast.success('服务器导入成功')
-  }
+    toast.success('服务器导入成功');
+  };
 
   return (
     <div className="space-y-6">
@@ -134,7 +143,7 @@ export function ServerPage() {
 
       <ServerList
         servers={servers}
-        selectedServerId={selectedServerId}
+        selectedServerId={selectedServerId ?? undefined}
         onAddServer={handleAddServer}
         onEditServer={handleEditServer}
         onDeleteServer={handleDeleteServer}
@@ -151,5 +160,5 @@ export function ServerPage() {
         isTestingConnection={isTestingConnection}
       />
     </div>
-  )
+  );
 }
