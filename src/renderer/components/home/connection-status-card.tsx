@@ -26,9 +26,8 @@ export function ConnectionStatusCard() {
 
   const getStatusInfo = () => {
     // Use proxyModeType from connectionStatus if available, otherwise fall back to config
-    const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy';
-    // 统一转换为小写进行比较
-    const isTunMode = proxyModeType?.toLowerCase() === 'tun';
+    const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'systemProxy';
+    const isTunMode = proxyModeType === 'tun';
     const modeText = isTunMode ? 'TUN模式' : '系统代理模式';
 
     // Show error from store if present

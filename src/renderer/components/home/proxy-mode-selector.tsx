@@ -14,12 +14,11 @@ export function ProxyModeSelector() {
   const startProxy = useAppStore((state) => state.startProxy);
   const stopProxy = useAppStore((state) => state.stopProxy);
 
-  const currentMode = config?.proxyMode || 'Smart';
+  const currentMode = config?.proxyMode || 'smart';
 
   // Check connection status based on proxy mode type
-  const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'SystemProxy';
-  // 统一转换为小写进行比较
-  const isTunMode = proxyModeType?.toLowerCase() === 'tun';
+  const proxyModeType = connectionStatus?.proxyModeType || config?.proxyModeType || 'systemProxy';
+  const isTunMode = proxyModeType === 'tun';
   const isConnected = isTunMode
     ? connectionStatus?.proxyCore?.running === true // TUN mode: only check proxy core
     : connectionStatus?.proxyCore?.running && connectionStatus?.proxy?.enabled; // System proxy: check both
@@ -73,7 +72,7 @@ export function ProxyModeSelector() {
           className="space-y-3"
         >
           <div className="flex items-center space-x-3">
-            <RadioGroupItem value="Global" id="mode-global" />
+            <RadioGroupItem value="global" id="mode-global" />
             <Label htmlFor="mode-global" className="cursor-pointer">
               <div>
                 <div className="font-medium">全局代理</div>
@@ -83,7 +82,7 @@ export function ProxyModeSelector() {
           </div>
 
           <div className="flex items-center space-x-3">
-            <RadioGroupItem value="Smart" id="mode-smart" />
+            <RadioGroupItem value="smart" id="mode-smart" />
             <Label htmlFor="mode-smart" className="cursor-pointer">
               <div>
                 <div className="font-medium">智能分流</div>
@@ -93,7 +92,7 @@ export function ProxyModeSelector() {
           </div>
 
           <div className="flex items-center space-x-3">
-            <RadioGroupItem value="Direct" id="mode-direct" />
+            <RadioGroupItem value="direct" id="mode-direct" />
             <Label htmlFor="mode-direct" className="cursor-pointer">
               <div>
                 <div className="font-medium">直接连接</div>
