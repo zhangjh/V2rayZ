@@ -62,7 +62,7 @@
         "arch": ["x64", "arm64"]
       }
     ],
-    "icon": "resources/mac-x64/app.icns",
+    "icon": "build/icon.icns",
     "category": "public.app-category.utilities",
     "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
     "hardenedRuntime": true,
@@ -96,7 +96,7 @@
       }
     ],
     "title": "${productName} ${version}",
-    "icon": "resources/mac-x64/app.icns",
+    "icon": "build/icon.icns",
     "background": null,
     "window": {
       "width": 540,
