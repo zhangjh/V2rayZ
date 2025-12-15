@@ -28,13 +28,21 @@ interface SingBoxLogConfig {
 interface SingBoxDnsServer {
   tag: string;
   type: string;
-  server: string;
+  server?: string;
   detour?: string;
 }
 
 interface SingBoxDnsRule {
   rule_set?: string;
+  query_type?: string[];
+  domain?: string[];
   server: string;
+}
+
+interface SingBoxFakeIPConfig {
+  enabled: boolean;
+  inet4_range?: string;
+  inet6_range?: string;
 }
 
 interface SingBoxDnsConfig {
@@ -42,6 +50,7 @@ interface SingBoxDnsConfig {
   rules?: SingBoxDnsRule[];
   final?: string;
   strategy?: string;
+  fakeip?: SingBoxFakeIPConfig;
 }
 
 interface SingBoxInbound {
@@ -57,6 +66,7 @@ interface SingBoxInbound {
   strict_route?: boolean;
   stack?: string;
   sniff?: boolean;
+  sniff_override_destination?: boolean;
   platform?: {
     http_proxy?: {
       enabled: boolean;
@@ -95,6 +105,8 @@ interface SingBoxOutbound {
     headers?: Record<string, string | string[]>;
     service_name?: string;
   };
+  // DNS resolver for outbound server domain
+  domain_resolver?: string;
 }
 
 interface SingBoxRouteRule {
@@ -408,7 +420,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     const singboxConfig: SingBoxConfig = {
       log: this.generateLogConfig(config),
-      dns: this.generateDnsConfig(config),
+      dns: this.generateDnsConfig(config, selectedServer),
       inbounds: this.generateInbounds(config),
       outbounds: this.generateOutbounds(selectedServer),
       route: this.generateRouteConfig(config),
@@ -462,8 +474,12 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * 生成 DNS 配置（sing-box 1.12.x 格式）
+   * 关键：代理服务器域名必须使用本地 DNS 解析，否则会形成死循环
    */
-  private generateDnsConfig(config: UserConfig): SingBoxDnsConfig {
+  private generateDnsConfig(config: UserConfig, selectedServer: ServerConfig): SingBoxDnsConfig {
+    // 使用小写比较代理模式和模式类型
+    const proxyMode = (config.proxyMode || 'smart').toLowerCase();
+
     const dnsConfig: SingBoxDnsConfig = {
       servers: [
         {
@@ -482,12 +498,22 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       strategy: 'ipv4_only',
     };
 
-    // 使用小写比较代理模式
-    const proxyMode = (config.proxyMode || 'smart').toLowerCase();
+    // DNS 规则：代理服务器域名必须使用本地 DNS 解析
+    // 这是最重要的规则，必须放在最前面，否则代理服务器的 DNS 查询会通过代理发送，形成死循环
+    const dnsRules: SingBoxDnsRule[] = [];
 
-    // 智能分流模式添加 DNS 规则（默认启用）
-    if (proxyMode === 'smart' || proxyMode === 'global') {
-      dnsConfig.rules = [
+    // 添加代理服务器域名使用本地 DNS 的规则
+    if (selectedServer?.address) {
+      dnsRules.push({
+        domain: [selectedServer.address],
+        server: 'dns-local',
+      } as SingBoxDnsRule);
+    }
+
+    // 根据代理模式配置其他 DNS 规则
+    if (proxyMode === 'smart') {
+      // 智能分流模式：中国域名走本地 DNS，国外域名走远程 DNS
+      dnsRules.push(
         {
           rule_set: 'geosite-cn',
           server: 'dns-local',
@@ -495,8 +521,18 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         {
           rule_set: 'geosite-geolocation-!cn',
           server: 'dns-remote',
-        },
-      ];
+        }
+      );
+    }
+    // 全局代理模式：所有域名走远程 DNS（final: dns-remote 已设置）
+    // 直连模式：所有域名走本地 DNS
+    if (proxyMode === 'direct') {
+      dnsConfig.final = 'dns-local';
+    }
+
+    // 设置 DNS 规则
+    if (dnsRules.length > 0) {
+      dnsConfig.rules = dnsRules;
     }
 
     return dnsConfig;
@@ -510,6 +546,9 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     // 使用小写比较，兼容 SystemProxy/systemProxy 和 Tun/tun
     const modeType = (config.proxyModeType || 'tun').toLowerCase();
+
+    console.log('[ProxyManager] generateInbounds - proxyModeType:', config.proxyModeType);
+    console.log('[ProxyManager] generateInbounds - modeType (lowercase):', modeType);
 
     if (modeType === 'systemproxy') {
       // 系统代理模式：HTTP + SOCKS inbound
@@ -530,23 +569,31 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     } else {
       // TUN 模式（默认，参考示例配置）
       // 不指定 interface_name，让 sing-box 自动选择可用的接口
-      inbounds.push({
+      const tunInbound: SingBoxInbound = {
         type: 'tun',
         tag: 'tun-in',
         address: [config.tunConfig?.inet4Address || '172.19.0.1/30'],
         mtu: config.tunConfig?.mtu || 1400,
         auto_route: config.tunConfig?.autoRoute ?? true,
-        strict_route: config.tunConfig?.strictRoute ?? true,
+        // macOS 上不使用 strict_route，避免网络完全不通
+        strict_route: process.platform === 'darwin' ? false : (config.tunConfig?.strictRoute ?? true),
         stack: config.tunConfig?.stack || 'gvisor',
         sniff: true,
-        platform: {
+        sniff_override_destination: true,
+      };
+
+      // macOS 平台特定配置
+      if (process.platform === 'darwin') {
+        tunInbound.platform = {
           http_proxy: {
             enabled: true,
             server: '127.0.0.1',
             server_port: config.httpPort || 2080,
           },
-        },
-      });
+        };
+      }
+
+      inbounds.push(tunInbound);
     }
 
     return inbounds;
@@ -589,6 +636,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       tag: 'proxy',
       server: server.address,
       server_port: server.port,
+      // 关键：代理服务器域名必须使用本地 DNS 解析，否则会形成死循环
+      // 因为 dns-remote 通过 proxy 出站，如果代理服务器域名也用 dns-remote 解析，
+      // 就会导致：解析代理服务器 -> 需要连接代理 -> 需要解析代理服务器 -> 死循环
+      domain_resolver: 'dns-local',
     };
 
     // VLESS 特定配置
@@ -660,17 +711,27 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // 使用小写比较代理模式
     const proxyMode = (config.proxyMode || 'smart').toLowerCase();
 
+    // 获取当前选中的服务器，用于排除代理服务器域名
+    const selectedServer = config.servers.find((s) => s.id === config.selectedServerId);
+
     // DNS 劫持规则（必须）
     rules.push({
       protocol: 'dns',
       action: 'hijack-dns',
     });
 
-    // QUIC 阻断规则（可选，提高性能）
-    rules.push({
-      protocol: 'quic',
-      action: 'reject',
-    });
+    // 排除代理服务器域名，确保代理服务器的连接走直连
+    // 这必须放在其他规则之前，否则可能被 geosite-cn 匹配导致死循环
+    if (selectedServer?.address) {
+      rules.push({
+        domain: [selectedServer.address],
+        action: 'route',
+        outbound: 'direct',
+      });
+    }
+
+    // 注意：不要阻断 QUIC 协议，因为 Google 等服务大量使用 QUIC (HTTP/3)
+    // 阻断 QUIC 会导致这些服务无法正常访问
 
     // 智能分流规则（默认启用，除非是直连模式）
     if (proxyMode !== 'direct') {
@@ -699,9 +760,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     rules.push(...customRules);
 
     // 始终添加 rule_set 配置（除非是直连模式）
+    // 全局代理模式使用远程 DNS 避免 DNS 污染，智能分流模式使用本地 DNS 提高国内访问速度
     const routeConfig: SingBoxRouteConfig = {
       rules,
-      default_domain_resolver: 'dns-local',
+      default_domain_resolver: proxyMode === 'global' ? 'dns-remote' : 'dns-local',
       auto_detect_interface: true,
       final: proxyMode === 'direct' ? 'direct' : 'proxy',
     };

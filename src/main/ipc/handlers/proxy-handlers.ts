@@ -35,9 +35,11 @@ export function registerProxyHandlers(
   registerIpcHandler<UserConfig, void>(
     IPC_CHANNELS.PROXY_START,
     async (_event: IpcMainInvokeEvent, config: UserConfig) => {
-      console.log('[Proxy Handlers] PROXY_START received config:', config);
+      console.log('[Proxy Handlers] PROXY_START received config:', JSON.stringify(config, null, 2));
       console.log('[Proxy Handlers] config type:', typeof config);
       console.log('[Proxy Handlers] config selectedServerId:', config?.selectedServerId);
+      console.log('[Proxy Handlers] config proxyModeType:', config?.proxyModeType);
+      console.log('[Proxy Handlers] config proxyMode:', config?.proxyMode);
 
       if (!config) {
         throw new Error('配置参数未传递');
