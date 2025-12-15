@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppStore } from '@/store/app-store';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ArrowDown } from 'lucide-react';
 import { getLogs, clearLogs, addEventListener, removeEventListener } from '@/bridge/api-wrapper';
 import type { LogEntry } from '@/bridge/types';
 
 export function RealTimeLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const [isAutoScroll, setIsAutoScroll] = useState(false); // 默认不自动滚动
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const userScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const connectionStatus = useAppStore((state) => state.connectionStatus);
 
   // Load initial logs and set up real-time updates
@@ -45,17 +47,59 @@ export function RealTimeLogs() {
     };
   }, []);
 
-  // Auto scroll to bottom when new logs arrive
+  // 获取滚动元素
+  const getScrollElement = useCallback(() => {
+    return scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
+  }, []);
+
+  // 检查是否在底部
+  const checkIsAtBottom = useCallback((element: HTMLElement) => {
+    const threshold = 30; // 距离底部30px以内认为在底部
+    return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+  }, []);
+
+  // 监听滚动事件
   useEffect(() => {
-    if (isAutoScroll && scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector(
-        '[data-radix-scroll-area-viewport]'
-      );
+    const scrollElement = getScrollElement();
+    if (!scrollElement) return;
+
+    const handleScroll = () => {
+      // 标记用户正在滚动
+      setIsUserScrolling(true);
+      
+      // 清除之前的超时
+      if (userScrollTimeoutRef.current) {
+        clearTimeout(userScrollTimeoutRef.current);
+      }
+      
+      // 设置超时，滚动停止后更新状态
+      userScrollTimeoutRef.current = setTimeout(() => {
+        setIsUserScrolling(false);
+        // 检查是否滚动到底部
+        const atBottom = checkIsAtBottom(scrollElement);
+        setIsAutoScroll(atBottom);
+      }, 150);
+    };
+
+    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      scrollElement.removeEventListener('scroll', handleScroll);
+      if (userScrollTimeoutRef.current) {
+        clearTimeout(userScrollTimeoutRef.current);
+      }
+    };
+  }, [getScrollElement, checkIsAtBottom]);
+
+  // 只有在自动滚动模式且用户没有主动滚动时才自动滚动到底部
+  useEffect(() => {
+    if (isAutoScroll && !isUserScrolling) {
+      const scrollElement = getScrollElement();
       if (scrollElement) {
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [logs, isAutoScroll]);
+  }, [logs, isAutoScroll, isUserScrolling, getScrollElement]);
 
   const handleClearLogs = async () => {
     try {
@@ -105,11 +149,6 @@ export function RealTimeLogs() {
         <ScrollArea
           ref={scrollAreaRef}
           className="h-64 w-full rounded border bg-muted/30 p-3"
-          onScroll={(e) => {
-            const target = e.target as HTMLElement;
-            const isAtBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 10;
-            setIsAutoScroll(isAtBottom);
-          }}
         >
           {logs.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -134,28 +173,28 @@ export function RealTimeLogs() {
           )}
         </ScrollArea>
 
-        {!isAutoScroll && (
-          <div className="mt-2 text-center">
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {isAutoScroll ? '自动滚动已开启' : '自动滚动已关闭（滚动到底部可开启）'}
+          </span>
+          {!isAutoScroll && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setIsAutoScroll(true);
-                if (scrollAreaRef.current) {
-                  const scrollElement = scrollAreaRef.current.querySelector(
-                    '[data-radix-scroll-area-viewport]'
-                  );
-                  if (scrollElement) {
-                    scrollElement.scrollTop = scrollElement.scrollHeight;
-                  }
+                const scrollElement = getScrollElement();
+                if (scrollElement) {
+                  scrollElement.scrollTop = scrollElement.scrollHeight;
                 }
               }}
-              className="text-xs"
+              className="text-xs h-7"
             >
+              <ArrowDown className="h-3 w-3 mr-1" />
               滚动到底部
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );
