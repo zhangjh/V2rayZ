@@ -27,9 +27,8 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "resources/win/app.ico",
+    "icon": "build/icon.ico",
     "artifactName": "${productName}-${version}-win-${arch}.${ext}",
-    "signAndEditExecutable": false,
     "extraResources": [
       {
         "from": "resources/win",

@@ -21,7 +21,8 @@ export class ResourceManager {
    * 获取 sing-box 可执行文件路径
    */
   getSingBoxPath(): string {
-    const filename = this.platform === 'win32' ? 'sing-box.exe' : 'sing-box';
+    // Windows 和其他平台统一使用无扩展名的 sing-box
+    const filename = 'sing-box';
     const platformDir = this.getPlatformResourceDir();
     const singboxPath = path.join(platformDir, filename);
 
