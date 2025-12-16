@@ -121,7 +121,7 @@
         "path": "/Applications"
       }
     ],
-    "title": "${productName} ${version}",
+    "title": "${productName}-${version}",
     "icon": "build/icon.icns",
     "backgroundColor": "#ffffff",
     "window": {
