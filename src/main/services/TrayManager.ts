@@ -363,11 +363,6 @@ export class TrayManager implements ITrayManager {
       icon = this.createDefaultTrayIcon();
     }
 
-    // 在 macOS 上，托盘图标应该是模板图像
-    if (process.platform === 'darwin') {
-      icon.setTemplateImage(true);
-    }
-
     return icon;
   }
 

@@ -104,6 +104,14 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "resources",
+        "to": ".",
+        "filter": [
+          "app.png",
+          "app-gray.png"
+        ]
       }
     ]
   },

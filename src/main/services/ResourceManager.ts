@@ -116,11 +116,16 @@ export class ResourceManager {
     if (this.platform === 'win32') {
       return path.join(baseDir, 'win');
     } else if (this.platform === 'darwin') {
-      // macOS 根据架构选择不同的目录
-      if (this.arch === 'arm64') {
-        return path.join(baseDir, 'mac-arm64');
+      if (this.isDev) {
+        // 开发环境：根据架构选择不同的目录
+        if (this.arch === 'arm64') {
+          return path.join(baseDir, 'mac-arm64');
+        } else {
+          return path.join(baseDir, 'mac-x64');
+        }
       } else {
-        return path.join(baseDir, 'mac-x64');
+        // 生产环境：打包后统一使用 mac 目录
+        return path.join(baseDir, 'mac');
       }
     }
 
