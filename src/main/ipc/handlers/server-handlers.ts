@@ -26,11 +26,16 @@ export function registerServerHandlers(
   );
 
   // 从 URL 添加服务器
-  registerIpcHandler<{ url: string }, ServerConfig>(
+  registerIpcHandler<{ url: string; name?: string }, ServerConfig>(
     IPC_CHANNELS.SERVER_ADD_FROM_URL,
-    async (_event: IpcMainInvokeEvent, args: { url: string }) => {
+    async (_event: IpcMainInvokeEvent, args: { url: string; name?: string }) => {
       // 解析 URL
       const serverConfig = protocolParser.parseUrl(args.url);
+
+      // 如果传入了自定义名称，使用自定义名称
+      if (args.name) {
+        serverConfig.name = args.name;
+      }
 
       // 加载当前配置
       const config = await configManager.loadConfig();

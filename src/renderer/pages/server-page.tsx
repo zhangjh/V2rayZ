@@ -126,9 +126,11 @@ export function ServerPage() {
     }
   };
 
-  const handleImportSuccess = () => {
+  const loadConfig = useAppStore((state) => state.loadConfig);
+
+  const handleImportSuccess = async () => {
     // 导入成功后刷新配置
-    // 这里可以触发重新加载配置，但由于使用了状态管理，配置会自动更新
+    await loadConfig();
     toast.success('服务器导入成功');
   };
 
