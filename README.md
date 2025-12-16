@@ -22,9 +22,33 @@
 
 ## 📥 安装
 
-1. 从 [Releases](../../releases) 页面下载最新的安装程序
-2. Windows: 运行 `.exe` 安装包
-3. macOS: 打开 `.dmg` 文件并拖入 Applications
+从 [Releases](../../releases) 页面下载最新版本：
+- Windows: 运行 `.exe` 安装包
+- macOS (Apple Silicon): 打开 `.dmg` 文件并拖入 Applications
+- macOS (Intel): 需要从源码构建，参见下方说明
+
+## 🛠️ 从源码构建
+
+```bash
+# 克隆仓库
+git clone https://github.com/zhangjh/FlowZ.git
+cd FlowZ
+
+# 安装依赖
+npm install
+
+# 开发模式运行
+npm run dev
+
+# 构建
+npm run build
+
+# 打包
+npm run package:win   # Windows
+npm run package:mac   # macOS
+```
+
+macOS Intel 用户需要修改 `electron-builder.json` 中的 `mac.target.arch` 为 `["x64"]`。
 
 ## 🚀 快速开始
 
