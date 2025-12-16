@@ -17,7 +17,7 @@ jobs:
         include:
           - os: windows-latest
             platform: win
-          - os: macos-13
+          - os: macos-14
             platform: mac
 
     steps:
