@@ -45,6 +45,11 @@ export function registerServerHandlers(
         serverConfig.name = args.name;
       }
 
+      // 设置创建时间和更新时间
+      const now = new Date().toISOString();
+      serverConfig.createdAt = now;
+      serverConfig.updatedAt = now;
+
       // 加载当前配置
       const config = await configManager.loadConfig();
 
