@@ -21,8 +21,8 @@ export class ResourceManager {
    * 获取 sing-box 可执行文件路径
    */
   getSingBoxPath(): string {
-    // Windows 和其他平台统一使用无扩展名的 sing-box
-    const filename = 'sing-box';
+    // Windows 平台需要 .exe 扩展名
+    const filename = this.platform === 'win32' ? 'sing-box.exe' : 'sing-box';
     const platformDir = this.getPlatformResourceDir();
     const singboxPath = path.join(platformDir, filename);
 
@@ -36,8 +36,8 @@ export class ResourceManager {
     if (this.isDev) {
       return path.join(process.cwd(), 'resources', 'app.png');
     }
-    // 生产环境：app.png 在 extraResources 根目录
-    return path.join(process.resourcesPath, 'resources', 'app.png');
+    // 生产环境：app.png 在 process.resourcesPath 根目录
+    return path.join(process.resourcesPath, 'app.png');
   }
 
   /**
@@ -49,7 +49,7 @@ export class ResourceManager {
     if (this.isDev) {
       return path.join(process.cwd(), 'resources', filename);
     }
-    return path.join(process.resourcesPath, 'resources', filename);
+    return path.join(process.resourcesPath, filename);
   }
 
   /**
@@ -145,9 +145,9 @@ export class ResourceManager {
       return path.join(process.cwd(), 'resources');
     } else {
       // 生产环境：打包后的 resources 目录
-      // process.resourcesPath 指向 Contents/Resources
-      // extraResources 被复制到 Contents/Resources/resources 子目录
-      return path.join(process.resourcesPath, 'resources');
+      // process.resourcesPath 指向 app.asar 所在的 resources 目录
+      // extraResources 直接复制到 process.resourcesPath 下
+      return process.resourcesPath;
     }
   }
 

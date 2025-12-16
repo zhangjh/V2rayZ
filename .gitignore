@@ -68,19 +68,6 @@ dist-ssr/
 *.sln
 *.sw?
 
-# WebView2
-**/WebView2/
-
-# wwwroot (React build output - keep .gitkeep)
-V2rayClient/wwwroot/*
-!V2rayClient/wwwroot/.gitkeep
-
-# Resources (proxy core binaries and GeoData files)
-V2rayClient/Resources/sing-box.exe
-V2rayClient/Resources/geoip.dat
-V2rayClient/Resources/geosite.dat
-V2rayClient/Resources/*.zip
-
 # Test results
 TestResults/
 *.trx

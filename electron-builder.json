@@ -27,7 +27,7 @@
     "extraResources": [
       {
         "from": "resources",
-        "to": "resources",
+        "to": ".",
         "filter": [
           "app.png",
           "app-gray.png"
@@ -35,14 +35,14 @@
       },
       {
         "from": "resources/win",
-        "to": "resources/win",
+        "to": "win",
         "filter": [
           "**/*"
         ]
       },
       {
         "from": "resources/data",
-        "to": "resources/data",
+        "to": "data",
         "filter": [
           "**/*"
         ]
@@ -80,14 +80,14 @@
     "extraResources": [
       {
         "from": "resources/mac-${arch}",
-        "to": "resources/mac",
+        "to": "mac",
         "filter": [
           "**/*"
         ]
       },
       {
         "from": "resources/data",
-        "to": "resources/data",
+        "to": "data",
         "filter": [
           "**/*"
         ]
