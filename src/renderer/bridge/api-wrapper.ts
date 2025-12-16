@@ -232,6 +232,18 @@ export async function getVersionInfo(): Promise<
 }
 
 /**
+ * Shell APIs
+ */
+export async function openExternal(url: string): Promise<ApiResponse<boolean>> {
+  try {
+    await window.electron.ipcRenderer.invoke('shell:openExternal', url);
+    return { success: true, data: true };
+  } catch (error: any) {
+    return { success: false, error: error?.message };
+  }
+}
+
+/**
  * Protocol URL Parsing APIs
  */
 export async function parseProtocolUrl(

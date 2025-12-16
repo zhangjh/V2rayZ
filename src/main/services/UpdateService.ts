@@ -60,6 +60,13 @@ export class UpdateService {
       const currentVersion = app.getVersion();
       const latestVersion = latestRelease.tag_name.replace(/^v/, '');
 
+      // 检查是否为新版本
+      if (!this.isNewerVersion(latestVersion, currentVersion)) {
+        this.logManager.addLog('info', `当前已是最新版本: ${currentVersion}`, 'UpdateService');
+        this.updateProgress({ status: 'no-update', percentage: 0, message: '当前已是最新版本' });
+        return { hasUpdate: false };
+      }
+
       // 查找适合当前平台的安装包
       const asset = this.findSuitableAsset(latestRelease.assets);
 
@@ -83,13 +90,6 @@ export class UpdateService {
         isPrerelease: latestRelease.prerelease,
         fileName: asset.name,
       };
-
-      // 检查是否为新版本
-      if (!this.isNewerVersion(latestVersion, currentVersion)) {
-        this.logManager.addLog('info', `当前已是最新版本: ${currentVersion}`, 'UpdateService');
-        this.updateProgress({ status: 'no-update', percentage: 0, message: '当前已是最新版本' });
-        return { hasUpdate: false };
-      }
 
       // 检查是否被跳过
       if (this.skippedVersion === latestVersion) {

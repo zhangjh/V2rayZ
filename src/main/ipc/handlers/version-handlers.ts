@@ -3,7 +3,7 @@
  * 处理版本信息相关的 IPC 请求
  */
 
-import { IpcMainInvokeEvent, app } from 'electron';
+import { IpcMainInvokeEvent, app, shell } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/ipc-channels';
 import { registerIpcHandler } from '../ipc-handler';
 
@@ -35,6 +35,15 @@ export function registerVersionHandlers(): void {
         copyright: `© ${new Date().getFullYear()} FlowZ. All rights reserved.`,
         repositoryUrl: 'https://github.com/zhangjh/FlowZ',
       };
+    }
+  );
+
+  // 打开外部链接
+  registerIpcHandler<string, boolean>(
+    IPC_CHANNELS.SHELL_OPEN_EXTERNAL,
+    async (_event: IpcMainInvokeEvent, url: string) => {
+      await shell.openExternal(url);
+      return true;
     }
   );
 

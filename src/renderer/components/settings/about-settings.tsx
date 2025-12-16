@@ -4,7 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { ExternalLink, Loader2 } from 'lucide-react';
-import { getVersionInfo, checkForUpdates } from '@/bridge/api-wrapper';
+import {
+  getVersionInfo,
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  openExternal,
+} from '@/bridge/api-wrapper';
 
 interface VersionInfo {
   appVersion: string;
@@ -62,15 +68,29 @@ export function AboutSettings() {
       }
 
       if (data.hasUpdate && data.updateInfo) {
-        toast.success(`发现新版本 ${data.updateInfo.version}`, {
-          description: '请前往 GitHub 下载最新版本',
+        const updateInfo = data.updateInfo;
+        toast.success(`发现新版本 ${updateInfo.version}`, {
+          description: '点击下载并安装',
           action: {
-            label: '查看',
-            onClick: () => {
-              window.open(data.updateInfo?.downloadUrl || versionInfo?.repositoryUrl, '_blank');
+            label: '立即更新',
+            onClick: async () => {
+              toast.info('正在下载更新...');
+              const downloadResult = await downloadUpdate(updateInfo);
+              if (downloadResult.success && downloadResult.data) {
+                toast.info('下载完成，正在安装...');
+                await installUpdate(downloadResult.data);
+              } else {
+                toast.error('下载失败', {
+                  description: downloadResult.error,
+                  action: {
+                    label: '手动下载',
+                    onClick: () => openExternal(updateInfo.downloadUrl),
+                  },
+                });
+              }
             },
           },
-          duration: 10000,
+          duration: 15000,
         });
       } else {
         toast.success('当前已是最新版本');
@@ -85,12 +105,9 @@ export function AboutSettings() {
     }
   };
 
-  const handleOpenGitHub = () => {
-    if (versionInfo?.repositoryUrl) {
-      window.open(versionInfo.repositoryUrl, '_blank');
-    } else {
-      toast.info('GitHub 链接: https://github.com/zhangjh/FlowZ');
-    }
+  const handleOpenGitHub = async () => {
+    const url = versionInfo?.repositoryUrl || 'https://github.com/zhangjh/FlowZ';
+    await openExternal(url);
   };
 
   if (loading) {

@@ -60,6 +60,9 @@ export const IPC_CHANNELS = {
   UPDATE_SKIP: 'update:skip',
   UPDATE_OPEN_RELEASES: 'update:openReleases',
 
+  // Shell 操作
+  SHELL_OPEN_EXTERNAL: 'shell:openExternal',
+
   // 更新事件 (主进程 -> 渲染进程)
   EVENT_UPDATE_PROGRESS: 'update:progress',
 
