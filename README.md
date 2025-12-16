@@ -50,6 +50,8 @@ npm run package:mac   # macOS
 
 macOS Intel 用户需要修改 `electron-builder.json` 中的 `mac.target.arch` 为 `["x64"]`。
 
+### mac下若打开提示“软件已损坏”，可在终端执行`xattr -cr /Applications/FLowZ.app`后再打开
+
 ## 🚀 快速开始
 
 ### 1. 配置服务器
