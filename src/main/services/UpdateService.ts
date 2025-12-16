@@ -159,19 +159,72 @@ export class UpdateService {
    */
   async installUpdate(installerPath: string): Promise<boolean> {
     try {
-      this.logManager.addLog('info', `打开安装包: ${installerPath}`, 'UpdateService');
+      this.logManager.addLog('info', `准备安装更新: ${installerPath}`, 'UpdateService');
 
-      // 使用系统默认程序打开安装包
-      await shell.openPath(installerPath);
+      // 检查文件是否存在
+      if (!fs.existsSync(installerPath)) {
+        this.logManager.addLog('error', `安装包不存在: ${installerPath}`, 'UpdateService');
+        return false;
+      }
 
-      // 延迟退出应用，让安装程序启动
-      setTimeout(() => {
-        app.quit();
-      }, 1000);
+      if (process.platform === 'win32') {
+        // Windows: 创建批处理脚本，等待 3 秒后启动安装程序
+        const { spawn } = require('child_process');
+        const batPath = path.join(app.getPath('temp'), 'flowz_update.bat');
+
+        // 简单的批处理：等待 3 秒，然后启动安装程序，最后删除自己
+        // 使用 ping 命令实现延迟（比 timeout 更可靠）
+        const batContent = [
+          '@echo off',
+          'ping 127.0.0.1 -n 4 > nul',
+          `start "" "${installerPath}"`,
+          `del "%~f0"`,
+        ].join('\r\n');
+
+        fs.writeFileSync(batPath, batContent, 'utf-8');
+
+        // 启动批处理（独立进程，隐藏窗口）
+        const bat = spawn('cmd.exe', ['/c', 'start', '/min', '', batPath], {
+          detached: true,
+          stdio: 'ignore',
+          shell: false,
+        });
+        bat.unref();
+
+        this.logManager.addLog('info', '更新脚本已启动，正在退出应用...', 'UpdateService');
+
+        // 立即退出应用
+        setTimeout(() => {
+          app.exit(0);
+        }, 500);
+      } else if (process.platform === 'darwin') {
+        // macOS: 打开 DMG 文件，用户需要手动拖拽安装
+        // 先退出应用，再打开 DMG
+        const { exec } = require('child_process');
+
+        // 使用 nohup 确保命令在应用退出后继续执行
+        exec(`sleep 2 && open "${installerPath}"`, {
+          detached: true,
+          stdio: 'ignore',
+        });
+
+        this.logManager.addLog('info', 'DMG 文件将在应用退出后打开...', 'UpdateService');
+
+        setTimeout(() => {
+          app.exit(0);
+        }, 1000);
+      } else {
+        // Linux: 直接打开安装包
+        await shell.openPath(installerPath);
+        this.logManager.addLog('info', '安装程序已启动，正在退出应用...', 'UpdateService');
+        setTimeout(() => {
+          app.exit(0);
+        }, 1000);
+      }
 
       return true;
     } catch (error: any) {
-      this.logManager.addLog('error', `打开安装包失败: ${error?.message}`, 'UpdateService');
+      this.logManager.addLog('error', `安装更新失败: ${error?.message}`, 'UpdateService');
       return false;
     }
   }
