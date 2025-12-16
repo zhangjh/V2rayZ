@@ -1350,6 +1350,9 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       'dns: cached', // DNS 缓存
       'resolved', // DNS 解析完成
       'connection closed', // 连接关闭
+      'connection upload closed', // 上传连接关闭
+      'connection download closed', // 下载连接关闭
+      'forcibly closed', // 连接被强制关闭
       'connection established', // 连接建立
       'handshake', // 握手
       'tls handshake', // TLS 握手
