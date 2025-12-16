@@ -13,32 +13,39 @@
   "asarUnpack": [
     "dist/renderer/**/*"
   ],
-  "extraResources": [
-    {
-      "from": "resources",
-      "to": "resources",
-      "filter": ["**/*"]
-    }
-  ],
   "win": {
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       }
     ],
     "icon": "build/icon.ico",
     "artifactName": "${productName}-${version}-win-${arch}.${ext}",
     "extraResources": [
       {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "app.png",
+          "app-gray.png"
+        ]
+      },
+      {
         "from": "resources/win",
         "to": "resources/win",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/data",
         "to": "resources/data",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ]
   },
@@ -48,17 +55,19 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "V2rayZ",
-    "include": "installer.nsh",
-    "installerIcon": "resources/win/app.ico",
-    "uninstallerIcon": "resources/win/app.ico",
-    "installerHeaderIcon": "resources/win/app.ico",
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "installerHeaderIcon": "build/icon.ico",
     "deleteAppDataOnUninstall": false
   },
   "mac": {
     "target": [
       {
         "target": "dmg",
-        "arch": ["x64", "arm64"]
+        "arch": [
+          "x64",
+          "arm64"
+        ]
       }
     ],
     "icon": "build/icon.icns",
@@ -72,12 +81,16 @@
       {
         "from": "resources/mac-${arch}",
         "to": "resources/mac",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/data",
         "to": "resources/data",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ]
   },
@@ -103,9 +116,12 @@
     }
   },
   "linux": {
-    "target": ["AppImage", "deb"],
+    "target": [
+      "AppImage",
+      "deb"
+    ],
     "category": "Network",
-    "icon": "resources/win/app.ico"
+    "icon": "build/icon.ico"
   },
   "publish": null
 }

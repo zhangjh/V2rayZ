@@ -81,7 +81,7 @@ echo -e "${YELLOW}3. 检查 Windows 资源文件${NC}"
 echo "----------------------------------------"
 
 check_file "resources/win/sing-box.exe" "Windows sing-box 可执行文件"
-check_file "resources/win/app.ico" "Windows 应用图标"
+check_file "build/icon.ico" "Windows 应用图标"
 
 if [ -f "resources/win/sing-box.exe" ]; then
     SIZE=$(du -h "resources/win/sing-box.exe" | cut -f1)
