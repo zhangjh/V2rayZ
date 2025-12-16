@@ -577,7 +577,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         auto_route: config.tunConfig?.autoRoute ?? true,
         // macOS 上不使用 strict_route，避免网络完全不通
         strict_route: process.platform === 'darwin' ? false : (config.tunConfig?.strictRoute ?? true),
-        stack: config.tunConfig?.stack || 'gvisor',
+        stack: config.tunConfig?.stack || 'mixed',
         sniff: true,
         sniff_override_destination: true,
       };
@@ -730,8 +730,20 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       });
     }
 
-    // 注意：不要阻断 QUIC 协议，因为 Google 等服务大量使用 QUIC (HTTP/3)
-    // 阻断 QUIC 会导致这些服务无法正常访问
+    // 私有 IP 段直连（内网地址不应该走代理）
+    rules.push({
+      ip_cidr: [
+        '10.0.0.0/8',
+        '172.16.0.0/12',
+        '192.168.0.0/16',
+        '127.0.0.0/8',
+        '169.254.0.0/16',
+        '224.0.0.0/4',
+        '240.0.0.0/4',
+      ],
+      action: 'route',
+      outbound: 'direct',
+    });
 
     // 智能分流规则（默认启用，除非是直连模式）
     if (proxyMode !== 'direct') {
