@@ -173,6 +173,13 @@ export const serverApi = {
   async addFromUrl(url: string, name?: string): Promise<ServerConfig> {
     return ipcClient.invoke(IPC_CHANNELS.SERVER_ADD_FROM_URL, { url, name });
   },
+
+  /**
+   * 生成分享 URL
+   */
+  async generateUrl(server: ServerConfig): Promise<string> {
+    return ipcClient.invoke(IPC_CHANNELS.SERVER_GENERATE_URL, { server });
+  },
 };
 
 /**

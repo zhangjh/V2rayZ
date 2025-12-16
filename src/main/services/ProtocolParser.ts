@@ -25,6 +25,11 @@ export interface IProtocolParser {
    * 解析协议 URL 为服务器配置
    */
   parseUrl(url: string): ServerConfig;
+
+  /**
+   * 将服务器配置生成为分享 URL
+   */
+  generateUrl(config: ServerConfig): string;
 }
 
 export class ProtocolParser implements IProtocolParser {
@@ -279,5 +284,132 @@ export class ProtocolParser implements IProtocolParser {
     }
 
     return settings;
+  }
+
+  /**
+   * 将服务器配置生成为分享 URL
+   */
+  generateUrl(config: ServerConfig): string {
+    if (config.protocol === 'vless') {
+      return this.generateVlessUrl(config);
+    } else if (config.protocol === 'trojan') {
+      return this.generateTrojanUrl(config);
+    }
+    throw new Error(`不支持的协议: ${config.protocol}`);
+  }
+
+  /**
+   * 生成 VLESS URL
+   */
+  private generateVlessUrl(config: ServerConfig): string {
+    const params = new URLSearchParams();
+
+    // 加密方式
+    if (config.encryption) {
+      params.set('encryption', config.encryption);
+    }
+
+    // Flow
+    if (config.flow) {
+      params.set('flow', config.flow);
+    }
+
+    // 传输层配置
+    this.appendTransportParams(params, config);
+
+    // 安全配置
+    this.appendSecurityParams(params, config);
+
+    const name = encodeURIComponent(config.name || `${config.address}:${config.port}`);
+    return `vless://${config.uuid}@${config.address}:${config.port}?${params.toString()}#${name}`;
+  }
+
+  /**
+   * 生成 Trojan URL
+   */
+  private generateTrojanUrl(config: ServerConfig): string {
+    const params = new URLSearchParams();
+
+    // 传输层配置
+    this.appendTransportParams(params, config);
+
+    // 安全配置
+    this.appendSecurityParams(params, config);
+
+    const name = encodeURIComponent(config.name || `${config.address}:${config.port}`);
+    const password = encodeURIComponent(config.password || '');
+    return `trojan://${password}@${config.address}:${config.port}?${params.toString()}#${name}`;
+  }
+
+  /**
+   * 添加传输层参数
+   */
+  private appendTransportParams(params: URLSearchParams, config: ServerConfig): void {
+    if (config.network) {
+      params.set('type', config.network);
+    }
+
+    // WebSocket 配置
+    if (config.network === 'ws' && config.wsSettings) {
+      if (config.wsSettings.path) {
+        params.set('path', config.wsSettings.path);
+      }
+      if (config.wsSettings.headers?.Host) {
+        params.set('host', config.wsSettings.headers.Host);
+      }
+      if (config.wsSettings.maxEarlyData) {
+        params.set('maxEarlyData', config.wsSettings.maxEarlyData.toString());
+      }
+      if (config.wsSettings.earlyDataHeaderName) {
+        params.set('earlyDataHeaderName', config.wsSettings.earlyDataHeaderName);
+      }
+    }
+
+    // gRPC 配置
+    if (config.network === 'grpc' && config.grpcSettings) {
+      if (config.grpcSettings.serviceName) {
+        params.set('serviceName', config.grpcSettings.serviceName);
+      }
+      if (config.grpcSettings.multiMode) {
+        params.set('mode', 'multi');
+      }
+    }
+
+    // HTTP 配置
+    if (config.network === 'http' && config.httpSettings) {
+      if (config.httpSettings.host) {
+        params.set('host', config.httpSettings.host.join(','));
+      }
+      if (config.httpSettings.path) {
+        params.set('path', config.httpSettings.path);
+      }
+      if (config.httpSettings.method) {
+        params.set('method', config.httpSettings.method);
+      }
+    }
+  }
+
+  /**
+   * 添加安全参数
+   */
+  private appendSecurityParams(params: URLSearchParams, config: ServerConfig): void {
+    if (config.security) {
+      params.set('security', config.security);
+    }
+
+    if (config.tlsSettings) {
+      if (config.tlsSettings.serverName) {
+        params.set('sni', config.tlsSettings.serverName);
+      }
+      if (config.tlsSettings.allowInsecure) {
+        params.set('allowInsecure', '1');
+      }
+      if (config.tlsSettings.alpn && config.tlsSettings.alpn.length > 0) {
+        params.set('alpn', config.tlsSettings.alpn.join(','));
+      }
+      if (config.tlsSettings.fingerprint) {
+        params.set('fp', config.tlsSettings.fingerprint);
+      }
+    }
   }
 }

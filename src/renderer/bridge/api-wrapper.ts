@@ -272,6 +272,16 @@ export async function addServerFromUrl(
   }
 }
 
+export async function generateShareUrl(server: ServerConfig): Promise<ApiResponse<string>> {
+  try {
+    const url = await api.server.generateUrl(server);
+    return { success: true, data: url };
+  } catch (error: any) {
+    ErrorHandler.handleApiError(error, '生成分享链接');
+    return { success: false, error: error?.message };
+  }
+}
+
 /**
  * Update Management APIs
  */

@@ -25,6 +25,14 @@ export function registerServerHandlers(
     }
   );
 
+  // 生成分享 URL
+  registerIpcHandler<{ server: ServerConfig }, string>(
+    IPC_CHANNELS.SERVER_GENERATE_URL,
+    async (_event: IpcMainInvokeEvent, args: { server: ServerConfig }) => {
+      return protocolParser.generateUrl(args.server);
+    }
+  );
+
   // 从 URL 添加服务器
   registerIpcHandler<{ url: string; name?: string }, ServerConfig>(
     IPC_CHANNELS.SERVER_ADD_FROM_URL,

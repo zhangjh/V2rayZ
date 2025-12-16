@@ -20,6 +20,7 @@ export const IPC_CHANNELS = {
   // 服务器管理
   SERVER_SWITCH: 'server:switch',
   SERVER_PARSE_URL: 'server:parseUrl',
+  SERVER_GENERATE_URL: 'server:generateUrl',
   SERVER_ADD_FROM_URL: 'server:addFromUrl',
   SERVER_ADD: 'server:add',
   SERVER_UPDATE: 'server:update',
