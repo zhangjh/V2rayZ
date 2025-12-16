@@ -2,7 +2,7 @@
 
 简洁现代的跨平台代理客户端，基于 sing-box 核心，支持 VLESS 和 Trojan 协议，主打配置简单，规则明确，体验优良所见即所得。
 
-<img width="1483" height="954" alt="image" src="https://github.com/user-attachments/assets/2788f605-5701-4e30-9efc-911ce260bc63" />
+<img width="1464" height="941" alt="image" src="https://github.com/user-attachments/assets/fe8709c6-fb80-4084-b73f-8bcb83c9f4b8" />
 
 ## ✨ 功能特性
 
@@ -47,7 +47,8 @@
 这种模式体验更佳，所有应用都可以实现代理，不需要手动配置，比如终端环境等。
 如果不希望使用TUN模式，可以进入设置页面手动选择"系统代理模式"。
 
-<img width="1483" height="954" alt="image" src="https://github.com/user-attachments/assets/598da480-d2da-4f7e-a048-61b72fb92ebf" />
+<img width="1469" height="933" alt="image" src="https://github.com/user-attachments/assets/3d4e8183-27c3-41b8-b95c-18cc4005b497" />
+
 
 ### 4. 自定义规则
 手动配置某些域名规则的代理模式：代理、直连、阻止，支持通配符方式。
