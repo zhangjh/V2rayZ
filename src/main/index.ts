@@ -250,14 +250,17 @@ export function getTrayManager(): TrayManager | null {
 
 /**
  * 更新托盘菜单状态
+ * @param isProxyRunning 代理是否正在运行
+ * @param hasError 是否存在连接错误
  */
-async function updateTrayMenuState(isProxyRunning: boolean): Promise<void> {
+async function updateTrayMenuState(isProxyRunning: boolean, hasError?: boolean): Promise<void> {
   if (!trayManager) return;
 
   try {
     const config = await configManager.loadConfig();
     trayManager.updateFullTrayMenu({
       isProxyRunning,
+      hasError,
       servers: config.servers,
       selectedServerId: config.selectedServerId,
       proxyMode: config.proxyMode,
@@ -314,6 +317,18 @@ app.whenReady().then(async () => {
   // 初始化 ProxyManager（需要在窗口创建后）
   proxyManager = new ProxyManager(logManager, mainWindow || undefined);
 
+  // 监听代理管理器事件，更新托盘状态
+  proxyManager.on('error', (error: Error) => {
+    logManager.addLog('error', `Proxy error: ${error.message}`, 'Main');
+    // 发生错误时，更新托盘显示为"连接异常"
+    updateTrayMenuState(false, true);
+  });
+
+  proxyManager.on('stopped', () => {
+    // 正常停止时，重置错误状态
+    updateTrayMenuState(false, false);
+  });
+
   // 注册 IPC 处理器（需要在 ProxyManager 创建后）
   registerConfigHandlers(configManager);
   registerServerHandlers(protocolParser, configManager);
@@ -329,8 +344,8 @@ app.whenReady().then(async () => {
   registerUpdateHandlers();
 
   // 设置托盘状态更新回调
-  setTrayStateCallback((isRunning: boolean) => {
-    updateTrayMenuState(isRunning);
+  setTrayStateCallback((isRunning: boolean, hasError?: boolean) => {
+    updateTrayMenuState(isRunning, hasError);
   });
 
   // 创建托盘图标

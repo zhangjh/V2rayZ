@@ -20,6 +20,7 @@ export type TrayIconState = 'idle' | 'connected' | 'connecting';
  */
 export interface TrayMenuData {
   isProxyRunning: boolean;
+  hasError?: boolean;
   servers: ServerConfig[];
   selectedServerId: string | null;
   proxyMode: ProxyMode;
@@ -218,8 +219,16 @@ export class TrayManager implements ITrayManager {
     this.selectedServerId = data.selectedServerId;
     this.proxyMode = data.proxyMode;
 
-    // 状态显示
-    const statusLabel = data.isProxyRunning ? '● 已连接' : '● 已断开';
+    // 状态显示：使用 emoji 区分不同状态
+    // 🔵 蓝色 = 已连接，⚪ 灰色 = 已断开，🔴 红色 = 连接异常
+    let statusLabel: string;
+    if (data.hasError) {
+      statusLabel = '🔴 连接异常';
+    } else if (data.isProxyRunning) {
+      statusLabel = '🔵 已连接';
+    } else {
+      statusLabel = '⚪ 已断开';
+    }
 
     // 构建服务器子菜单
     const serverSubmenu: MenuItemConstructorOptions[] = [];

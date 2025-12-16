@@ -13,7 +13,7 @@ import { ISystemProxyManager } from '../../services/SystemProxyManager';
 /**
  * 托盘状态更新回调
  */
-export type TrayStateUpdateCallback = (isRunning: boolean) => void;
+export type TrayStateUpdateCallback = (isRunning: boolean, hasError?: boolean) => void;
 
 let trayStateCallback: TrayStateUpdateCallback | null = null;
 
