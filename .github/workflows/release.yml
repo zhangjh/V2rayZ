@@ -41,6 +41,35 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Create DMG (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # 为每个架构创建 DMG
+          for arch in arm64 x64; do
+            APP_PATH="dist-package/mac-${arch}/FlowZ.app"
+            DMG_PATH="dist-package/FlowZ-${VERSION}-mac-${arch}.dmg"
+            
+            if [ -d "$APP_PATH" ]; then
+              echo "Creating DMG for ${arch}..."
+              
+              # 创建临时目录
+              TEMP_DIR=$(mktemp -d)
+              cp -R "$APP_PATH" "$TEMP_DIR/"
+              ln -s /Applications "$TEMP_DIR/Applications"
+              
+              # 创建 DMG
+              hdiutil create -volname "FlowZ ${VERSION}" \
+                -srcfolder "$TEMP_DIR" \
+                -ov -format UDZO \
+                "$DMG_PATH"
+              
+              rm -rf "$TEMP_DIR"
+              echo "Created: $DMG_PATH"
+            fi
+          done
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -74,16 +103,16 @@ jobs:
         id: release_notes
         run: |
           if [ -f CHANGELOG.md ]; then
-            # 提取当前版本的更新内容
             VERSION=${{ steps.version.outputs.VERSION }}
             NOTES=$(sed -n "/## \[*${VERSION}\]*/,/## \[*/p" CHANGELOG.md | sed '$d')
             if [ -z "$NOTES" ]; then
               NOTES="Release $VERSION"
             fi
           else
-            # 从 Git commits 生成
             NOTES=$(git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"- %s" || git log --pretty=format:"- %s")
-            NOTES="## What's Changed\n\n$NOTES"
+            NOTES="## What's Changed
+
+          $NOTES"
           fi
           echo "NOTES<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
