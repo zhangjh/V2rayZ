@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ${{ matrix.os }}
@@ -95,7 +98,6 @@ jobs:
           prerelease: false
           files: |
             artifacts/**/*.exe
-            artifacts/**/*.zip
             artifacts/**/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

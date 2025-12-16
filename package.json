@@ -25,6 +25,7 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\"",
     "release": "node scripts/auto-release.js",
+    "release:tag": "node scripts/push-release.js",
     "release:prepare": "npm run build && npm run package:all"
   },
   "keywords": [
