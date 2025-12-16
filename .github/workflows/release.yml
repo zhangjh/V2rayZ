@@ -45,30 +45,21 @@ jobs:
         if: matrix.platform == 'mac'
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
+          APP_PATH="dist-package/mac-arm64/FlowZ.app"
+          DMG_PATH="dist-package/FlowZ-${VERSION}-mac-arm64.dmg"
           
-          # 为每个架构创建 DMG
-          for arch in arm64 x64; do
-            APP_PATH="dist-package/mac-${arch}/FlowZ.app"
-            DMG_PATH="dist-package/FlowZ-${VERSION}-mac-${arch}.dmg"
-            
-            if [ -d "$APP_PATH" ]; then
-              echo "Creating DMG for ${arch}..."
-              
-              # 创建临时目录
-              TEMP_DIR=$(mktemp -d)
-              cp -R "$APP_PATH" "$TEMP_DIR/"
-              ln -s /Applications "$TEMP_DIR/Applications"
-              
-              # 创建 DMG
-              hdiutil create -volname "FlowZ ${VERSION}" \
-                -srcfolder "$TEMP_DIR" \
-                -ov -format UDZO \
-                "$DMG_PATH"
-              
-              rm -rf "$TEMP_DIR"
-              echo "Created: $DMG_PATH"
-            fi
-          done
+          echo "Creating DMG..."
+          TEMP_DIR=$(mktemp -d)
+          cp -R "$APP_PATH" "$TEMP_DIR/"
+          ln -s /Applications "$TEMP_DIR/Applications"
+          
+          hdiutil create -volname "FlowZ ${VERSION}" \
+            -srcfolder "$TEMP_DIR" \
+            -ov -format UDZO \
+            "$DMG_PATH"
+          
+          rm -rf "$TEMP_DIR"
+          echo "Created: $DMG_PATH"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
