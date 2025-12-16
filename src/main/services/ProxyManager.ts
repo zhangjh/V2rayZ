@@ -1299,8 +1299,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       // 转换为友好的中文提示
       const friendlyMessage = this.translateErrorMessage(logInfo.message);
 
-      // 记录到 LogManager
-      this.logToManager(logInfo.level, friendlyMessage);
+      // 空消息不记录（如私有 IP 超时）
+      if (friendlyMessage) {
+        this.logToManager(logInfo.level, friendlyMessage);
+      }
     } else {
       // 无法解析的日志，直接记录
       this.logToManager('info', line);
@@ -1455,7 +1457,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out')) {
-      return '连接超时：服务器响应超时，请检查网络连接或更换服务器';
+      // 尝试提取目标地址
+      const match = message.match(/connection.*?to\s+([^\s:]+(?::\d+)?)/i);
+      const target = match ? match[1] : '';
+      // 私有 IP 超时不显示（内网服务走代理必然超时）
+      if (target && /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(target)) {
+        return ''; // 返回空字符串，后续会被过滤
+      }
+      return target ? `连接超时: ${target}` : '连接超时：服务器响应超时';
     }
 
     if (lowerMessage.includes('dns') && lowerMessage.includes('fail')) {
