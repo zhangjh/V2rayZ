@@ -123,7 +123,7 @@
     ],
     "title": "${productName} ${version}",
     "icon": "build/icon.icns",
-    "background": null,
+    "backgroundColor": "#ffffff",
     "window": {
       "width": 540,
       "height": 380
