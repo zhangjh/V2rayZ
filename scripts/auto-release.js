@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * V2rayZ 自动发布脚本
+ * FlowZ 自动发布脚本
  * 功能：
  * 1. 从 package.json 读取版本号
  * 2. 创建 Git tag 并推送
@@ -17,7 +17,7 @@ const readline = require('readline');
 // 配置
 const CONFIG = {
   repoOwner: 'zhangjh',
-  repoName: 'V2rayZ',
+  repoName: 'FlowZ',
   distDir: path.join(__dirname, '../dist-package'),
   // 只上传安装包，不上传 zip
   allowedExtensions: ['.exe', '.dmg'],
@@ -65,7 +65,7 @@ function warning(message) {
 
 function showHelp() {
   console.log(`
-V2rayZ 自动发布脚本
+FlowZ 自动发布脚本
 
 用法: node auto-release.js [选项]
 
@@ -230,7 +230,7 @@ function generateReleaseNotes(version) {
       commits = exec('git log -20 --pretty=format:"- %s"', { silent: true });
     }
 
-    return `## V2rayZ v${version}
+    return `## FlowZ v${version}
 
 ### 更新内容
 ${commits || '- 性能优化和错误修复'}
@@ -245,7 +245,7 @@ ${commits || '- 性能优化和错误修复'}
 - macOS 10.15+ (Catalina 或更高版本)
 `;
   } catch {
-    return `## V2rayZ v${version}\n\n性能优化和错误修复。`;
+    return `## FlowZ v${version}\n\n性能优化和错误修复。`;
   }
 }
 
@@ -282,7 +282,7 @@ function createGitHubRelease(tag, version, releaseNotes, artifacts) {
   fs.writeFileSync(notesFile, releaseNotes);
 
   try {
-    let command = `gh release create ${tag} --title "V2rayZ v${version}" --notes-file "${notesFile}"`;
+    let command = `gh release create ${tag} --title "FlowZ v${version}" --notes-file "${notesFile}"`;
 
     if (args.preRelease) {
       command += ' --prerelease';
@@ -318,7 +318,7 @@ async function main() {
     process.exit(0);
   }
 
-  log('\n🚀 V2rayZ 自动发布\n', colors.bright + colors.cyan);
+  log('\n🚀 FlowZ 自动发布\n', colors.bright + colors.cyan);
 
   // 环境检查
   info('检查环境...');

@@ -29,11 +29,11 @@ export function registerVersionHandlers(): void {
     async (_event: IpcMainInvokeEvent) => {
       return {
         appVersion: app.getVersion(),
-        appName: 'V2rayZ',
+        appName: 'FlowZ',
         buildDate: new Date().toISOString().split('T')[0],
         singBoxVersion: SINGBOX_VERSION,
-        copyright: `© ${new Date().getFullYear()} V2rayZ. All rights reserved.`,
-        repositoryUrl: 'https://github.com/nicezhangjh/V2rayZ',
+        copyright: `© ${new Date().getFullYear()} FlowZ. All rights reserved.`,
+        repositoryUrl: 'https://github.com/nicezhangjh/FlowZ',
       };
     }
   );

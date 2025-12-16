@@ -1,6 +1,6 @@
 {
-  "appId": "com.v2rayz.electron",
-  "productName": "V2rayZ",
+  "appId": "com.flowz.app",
+  "productName": "FlowZ",
   "copyright": "Copyright © 2025",
   "directories": {
     "output": "dist-package",
@@ -68,7 +68,7 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "V2rayZ",
+    "shortcutName": "FlowZ",
     "installerIcon": "build/icon.ico",
     "uninstallerIcon": "build/icon.ico",
     "installerHeaderIcon": "build/icon.ico",

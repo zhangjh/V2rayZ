@@ -11,7 +11,7 @@ import { LogManager } from './LogManager';
 import type { UpdateInfo, UpdateCheckResult, UpdateProgress } from '../../shared/types/update';
 
 const GITHUB_OWNER = 'zhangjh';
-const GITHUB_REPO = 'V2rayZ';
+const GITHUB_REPO = 'FlowZ';
 
 export class UpdateService {
   private logManager: LogManager;
@@ -237,7 +237,7 @@ export class UpdateService {
         path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`,
         method: 'GET',
         headers: {
-          'User-Agent': 'V2rayZ-Electron',
+          'User-Agent': 'FlowZ-Electron',
           Accept: 'application/vnd.github.v3+json',
         },
       };
@@ -322,7 +322,7 @@ export class UpdateService {
 
       const request = (downloadUrl: string) => {
         https
-          .get(downloadUrl, { headers: { 'User-Agent': 'V2rayZ-Electron' } }, (response) => {
+          .get(downloadUrl, { headers: { 'User-Agent': 'FlowZ-Electron' } }, (response) => {
             // 处理重定向
             if (response.statusCode === 302 || response.statusCode === 301) {
               const redirectUrl = response.headers.location;

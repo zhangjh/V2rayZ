@@ -129,7 +129,7 @@ export class TrayManager implements ITrayManager {
       const icon = this.loadTrayIcon('idle');
 
       this.tray = new Tray(icon);
-      this.tray.setToolTip('V2rayZ');
+      this.tray.setToolTip('FlowZ');
 
       // 设置托盘图标点击事件
       this.tray.on('click', () => {
@@ -177,9 +177,9 @@ export class TrayManager implements ITrayManager {
 
       // 更新工具提示
       const tooltips: Record<TrayIconState, string> = {
-        idle: 'V2rayZ - 未连接',
-        connecting: 'V2rayZ - 连接中...',
-        connected: 'V2rayZ - 已连接',
+        idle: 'FlowZ - 未连接',
+        connecting: 'FlowZ - 连接中...',
+        connected: 'FlowZ - 已连接',
       };
       this.tray.setToolTip(tooltips[state]);
 
@@ -490,7 +490,7 @@ export class TrayManager implements ITrayManager {
       this.onCheckUpdate();
     } else {
       // 默认行为：打开 GitHub releases 页面
-      shell.openExternal('https://github.com/zhangjh/V2rayZ/releases');
+      shell.openExternal('https://github.com/zhangjh/FlowZ/releases');
     }
   }
 

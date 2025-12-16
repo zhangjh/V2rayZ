@@ -89,7 +89,7 @@ export function AboutSettings() {
     if (versionInfo?.repositoryUrl) {
       window.open(versionInfo.repositoryUrl, '_blank');
     } else {
-      toast.info('GitHub 链接: https://github.com/zhangjh/V2rayZ');
+      toast.info('GitHub 链接: https://github.com/zhangjh/FlowZ');
     }
   };
 
@@ -118,7 +118,7 @@ export function AboutSettings() {
           <div>
             <h4 className="text-sm font-medium text-muted-foreground">应用版本</h4>
             <p className="text-lg font-semibold">
-              {versionInfo?.appName || 'V2rayZ'} v{versionInfo?.appVersion || '1.0.0'}
+              {versionInfo?.appName || 'FlowZ'} v{versionInfo?.appVersion || '1.0.0'}
             </p>
           </div>
 
@@ -155,7 +155,7 @@ export function AboutSettings() {
           <Separator />
 
           <div className="text-xs text-muted-foreground space-y-1">
-            <p>{versionInfo?.copyright || '© 2025 V2rayZ. All rights reserved.'}</p>
+            <p>{versionInfo?.copyright || '© 2025 FlowZ. All rights reserved.'}</p>
             <p>基于 sing-box 构建的 Windows 客户端</p>
           </div>
         </div>

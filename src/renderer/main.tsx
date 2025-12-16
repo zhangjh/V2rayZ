@@ -31,7 +31,7 @@ window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider defaultTheme="system" storageKey="v2ray-ui-theme">
+    <ThemeProvider defaultTheme="system" storageKey="flowz-ui-theme">
       <App />
     </ThemeProvider>
   </React.StrictMode>

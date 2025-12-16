@@ -19,7 +19,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
     <div className="w-[200px] border-r bg-card h-full flex flex-col">
       <div className={cn('p-4 border-b', isMac && 'pt-8')}>
-        <h1 className="text-lg font-semibold">V2rayZ</h1>
+        <h1 className="text-lg font-semibold">FlowZ</h1>
       </div>
       <nav className="flex-1 p-2">
         {navItems.map((item) => {

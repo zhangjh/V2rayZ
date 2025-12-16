@@ -1,8 +1,8 @@
 {
-  "name": "v2rayz-electron",
+  "name": "flowz",
   "version": "3.0.0",
   "singboxVersion": "1.12.13",
-  "description": "跨平台 V2ray 桌面客户端 - 基于 Electron",
+  "description": "FlowZ - 简洁现代的跨平台代理客户端",
   "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "node scripts/dev.js",
@@ -29,10 +29,11 @@
   },
   "keywords": [
     "electron",
-    "v2ray",
     "proxy",
+    "sing-box",
     "vless",
-    "trojan"
+    "trojan",
+    "flowz"
   ],
   "author": "",
   "license": "MIT",

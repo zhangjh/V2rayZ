@@ -40,7 +40,7 @@ export abstract class AutoStartBase implements IAutoStartManager {
  * 使用注册表 Run 键管理启动项
  */
 export class WindowsAutoStart extends AutoStartBase {
-  private readonly appName = 'V2rayZ';
+  private readonly appName = 'FlowZ';
   private readonly regKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
 
   /**

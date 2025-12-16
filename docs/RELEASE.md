@@ -1,6 +1,6 @@
 # 发布指南
 
-本文档描述了如何发布 V2rayZ Electron 的新版本。
+本文档描述了如何发布 FlowZ Electron 的新版本。
 
 ## 前置要求
 
@@ -119,14 +119,14 @@
 每次发布会生成以下文件：
 
 ### Windows
-- `V2rayZ-{version}-win-x64.exe` - NSIS 安装程序
-- `V2rayZ-{version}-win-x64.zip` - 便携版
+- `FlowZ-{version}-win-x64.exe` - NSIS 安装程序
+- `FlowZ-{version}-win-x64.zip` - 便携版
 
 ### macOS
-- `V2rayZ-{version}-mac-x64.dmg` - Intel 芯片 DMG 镜像
-- `V2rayZ-{version}-mac-arm64.dmg` - Apple Silicon DMG 镜像
-- `V2rayZ-{version}-mac-x64.zip` - Intel 芯片便携版
-- `V2rayZ-{version}-mac-arm64.zip` - Apple Silicon 便携版
+- `FlowZ-{version}-mac-x64.dmg` - Intel 芯片 DMG 镜像
+- `FlowZ-{version}-mac-arm64.dmg` - Apple Silicon DMG 镜像
+- `FlowZ-{version}-mac-x64.zip` - Intel 芯片便携版
+- `FlowZ-{version}-mac-arm64.zip` - Apple Silicon 便携版
 
 ## 故障排除
 
