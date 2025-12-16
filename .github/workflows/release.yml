@@ -14,7 +14,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-13
+            platform: mac
 
     steps:
       - name: Checkout code
@@ -32,21 +36,17 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Package application (Windows)
-        if: matrix.os == 'windows-latest'
-        run: npm run package:win
-
-      - name: Package application (macOS)
-        if: matrix.os == 'macos-latest'
-        run: npm run package:mac
+      - name: Package application
+        run: npm run package:${{ matrix.platform }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
+          name: release-${{ matrix.platform }}
           path: |
             dist-package/*.exe
-            dist-package/*.zip
             dist-package/*.dmg
           retention-days: 5
 
