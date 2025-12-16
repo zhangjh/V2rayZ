@@ -1,6 +1,8 @@
 # FlowZ
 
-简洁现代的跨平台代理客户端，基于 sing-box 核心，支持 VLESS 和 Trojan 协议。
+简洁现代的跨平台代理客户端，基于 sing-box 核心，支持 VLESS 和 Trojan 协议，主打配置简单，规则明确，体验优良所见即所得。
+
+<img width="1483" height="954" alt="image" src="https://github.com/user-attachments/assets/2788f605-5701-4e30-9efc-911ce260bc63" />
 
 ## ✨ 功能特性
 
@@ -44,6 +46,8 @@
 - **直连模式**：不使用代理
 这种模式体验更佳，所有应用都可以实现代理，不需要手动配置，比如终端环境等。
 如果不希望使用TUN模式，可以进入设置页面手动选择"系统代理模式"。
+
+<img width="1483" height="954" alt="image" src="https://github.com/user-attachments/assets/598da480-d2da-4f7e-a048-61b72fb92ebf" />
 
 ### 4. 自定义规则
 手动配置某些域名规则的代理模式：代理、直连、阻止，支持通配符方式。
