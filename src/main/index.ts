@@ -322,6 +322,13 @@ app.whenReady().then(async () => {
   // 记录应用启动日志
   logManager.addLog('info', 'Application started', 'Main');
 
+  // macOS: 禁用 App Nap，防止系统认为应用"没有响应"
+  // 当应用在后台运行代理时，App Nap 会导致系统误判应用状态
+  if (process.platform === 'darwin') {
+    const { powerSaveBlocker } = require('electron');
+    powerSaveBlocker.start('prevent-app-suspension');
+  }
+
   // 设置 macOS Dock 图标
   if (process.platform === 'darwin' && app.dock) {
     const iconPath = resourceManager.getAppIconPath();
