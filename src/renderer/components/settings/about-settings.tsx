@@ -173,7 +173,7 @@ export function AboutSettings() {
 
           <div className="text-xs text-muted-foreground space-y-1">
             <p>{versionInfo?.copyright || '© 2025 FlowZ. All rights reserved.'}</p>
-            <p>基于 sing-box 构建的 Windows 客户端</p>
+            <p>基于 sing-box 构建的跨平台客户端代理应用</p>
           </div>
         </div>
       </CardContent>

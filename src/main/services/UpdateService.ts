@@ -199,14 +199,26 @@ export class UpdateService {
         }, 500);
       } else if (process.platform === 'darwin') {
         // macOS: 打开 DMG 文件，用户需要手动拖拽安装
-        // 先退出应用，再打开 DMG
-        const { exec } = require('child_process');
+        const { spawn } = require('child_process');
 
-        // 使用 nohup 确保命令在应用退出后继续执行
-        exec(`sleep 2 && open "${installerPath}"`, {
+        // 创建一个 shell 脚本来处理更新
+        const scriptPath = path.join(app.getPath('temp'), 'flowz_update.sh');
+
+        // 脚本内容：等待应用退出，挂载 DMG，复制新版本，卸载 DMG，启动新版本
+        const scriptContent = `#!/bin/bash
+sleep 2
+# 打开 DMG 文件让用户手动安装
+open "${installerPath}"
+`;
+
+        fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+
+        // 使用 spawn 启动独立进程执行脚本
+        const child = spawn('/bin/bash', [scriptPath], {
           detached: true,
           stdio: 'ignore',
         });
+        child.unref();
 
         this.logManager.addLog('info', 'DMG 文件将在应用退出后打开...', 'UpdateService');
 
@@ -325,27 +337,37 @@ export class UpdateService {
     const arch = process.arch;
 
     // 根据平台选择合适的安装包
-    const patterns: string[] = [];
+    // 文件命名格式: FlowZ-{version}-{platform}-{arch}.{ext}
+    // 例如: FlowZ-3.0.3-mac-arm64.dmg, FlowZ-3.0.3-win-x64.exe
 
     if (platform === 'win32') {
-      patterns.push('.exe');
+      // Windows: 查找 .exe 安装包
+      const winAsset = assets.find(
+        (a: any) => a.name.endsWith('.exe') && a.name.includes('win')
+      );
+      return winAsset || null;
     } else if (platform === 'darwin') {
       // macOS: 优先选择对应架构的 dmg
-      if (arch === 'arm64') {
-        patterns.push('arm64.dmg', 'mac-arm64.dmg');
-      } else {
-        patterns.push('x64.dmg', 'mac-x64.dmg');
-      }
-      patterns.push('.dmg'); // 通用 dmg 作为后备
-    } else if (platform === 'linux') {
-      patterns.push('.AppImage', '.deb');
-    }
+      const archPattern = arch === 'arm64' ? 'mac-arm64' : 'mac-x64';
 
-    for (const pattern of patterns) {
-      const asset = assets.find((a: any) => a.name.toLowerCase().includes(pattern.toLowerCase()));
-      if (asset) {
-        return asset;
+      // 优先匹配精确架构
+      let asset = assets.find(
+        (a: any) => a.name.includes(archPattern) && a.name.endsWith('.dmg')
+      );
+
+      // 如果没找到，尝试通用 dmg
+      if (!asset) {
+        asset = assets.find((a: any) => a.name.endsWith('.dmg'));
       }
+
+      return asset || null;
+    } else if (platform === 'linux') {
+      // Linux: 优先 AppImage，其次 deb
+      let asset = assets.find((a: any) => a.name.endsWith('.AppImage'));
+      if (!asset) {
+        asset = assets.find((a: any) => a.name.endsWith('.deb'));
+      }
+      return asset || null;
     }
 
     return null;
