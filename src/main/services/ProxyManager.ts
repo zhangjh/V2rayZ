@@ -577,7 +577,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         auto_route: config.tunConfig?.autoRoute ?? true,
         // macOS 上不使用 strict_route，避免网络完全不通
         strict_route: process.platform === 'darwin' ? false : (config.tunConfig?.strictRoute ?? true),
-        stack: config.tunConfig?.stack || 'mixed',
+        stack: config.tunConfig?.stack || 'system',
         sniff: true,
         sniff_override_destination: true,
       };
@@ -1314,6 +1314,20 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private isLowValueLog(line: string): boolean {
     const lowerLine = line.toLowerCase();
+
+    // 优先过滤的噪音日志（即使包含 error 也要过滤）
+    const noisePatterns = [
+      'connection upload closed',
+      'connection download closed',
+      'forcibly closed',
+      'connection closed',
+    ];
+
+    for (const pattern of noisePatterns) {
+      if (lowerLine.includes(pattern)) {
+        return true; // 过滤掉
+      }
+    }
 
     // 高价值日志模式 - 这些日志应该保留
     const keepPatterns = [
