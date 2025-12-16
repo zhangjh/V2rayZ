@@ -33,7 +33,7 @@ export function registerVersionHandlers(): void {
         buildDate: new Date().toISOString().split('T')[0],
         singBoxVersion: SINGBOX_VERSION,
         copyright: `© ${new Date().getFullYear()} FlowZ. All rights reserved.`,
-        repositoryUrl: 'https://github.com/nicezhangjh/FlowZ',
+        repositoryUrl: 'https://github.com/zhangjh/FlowZ',
       };
     }
   );
