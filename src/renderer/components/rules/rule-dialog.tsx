@@ -20,7 +20,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -37,22 +36,13 @@ import type { DomainRule, RuleAction } from '../../../shared/types';
 
 const domainRegex = /^(\*\.)?([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 
-// 添加模式：支持多行域名输入
-const addRuleFormSchema = z.object({
+const ruleFormSchema = z.object({
   domains: z.string().min(1, '域名不能为空'),
   action: z.enum(['proxy', 'direct', 'block']),
   enabled: z.boolean(),
 });
 
-// 编辑模式：单个域名
-const editRuleFormSchema = z.object({
-  domain: z.string().min(1, '域名不能为空').regex(domainRegex, '域名格式不正确'),
-  action: z.enum(['proxy', 'direct', 'block']),
-  enabled: z.boolean(),
-});
-
-type AddRuleFormValues = z.infer<typeof addRuleFormSchema>;
-type EditRuleFormValues = z.infer<typeof editRuleFormSchema>;
+type RuleFormValues = z.infer<typeof ruleFormSchema>;
 
 interface RuleDialogProps {
   open: boolean;
@@ -62,24 +52,13 @@ interface RuleDialogProps {
 }
 
 export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) {
-  const addCustomRulesBatch = useAppStore((state) => state.addCustomRulesBatch);
+  const addCustomRule = useAppStore((state) => state.addCustomRule);
   const updateCustomRule = useAppStore((state) => state.updateCustomRule);
 
-  // 添加模式使用多行表单
-  const addForm = useForm<AddRuleFormValues>({
-    resolver: zodResolver(addRuleFormSchema),
+  const form = useForm<RuleFormValues>({
+    resolver: zodResolver(ruleFormSchema),
     defaultValues: {
       domains: '',
-      action: 'proxy',
-      enabled: true,
-    },
-  });
-
-  // 编辑模式使用单行表单
-  const editForm = useForm<EditRuleFormValues>({
-    resolver: zodResolver(editRuleFormSchema),
-    defaultValues: {
-      domain: '',
       action: 'proxy',
       enabled: true,
     },
@@ -88,22 +67,21 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
   useEffect(() => {
     if (open) {
       if (mode === 'edit' && rule) {
-        editForm.reset({
-          domain: rule.domain,
+        form.reset({
+          domains: rule.domains.join('\n'),
           action: rule.action,
           enabled: rule.enabled,
         });
       } else {
-        addForm.reset({
+        form.reset({
           domains: '',
           action: 'proxy',
           enabled: true,
         });
       }
     }
-  }, [open, mode, rule, addForm, editForm]);
+  }, [open, mode, rule, form]);
 
-  // 解析多行域名输入
   const parseDomains = (input: string): string[] => {
     return input
       .split('\n')
@@ -111,12 +89,11 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
       .filter((line) => line.length > 0);
   };
 
-  // 验证域名格式
   const validateDomain = (domain: string): boolean => {
     return domainRegex.test(domain);
   };
 
-  const onAddSubmit = async (values: AddRuleFormValues) => {
+  const onSubmit = async (values: RuleFormValues) => {
     try {
       const domains = parseDomains(values.domains);
 
@@ -125,7 +102,6 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
         return;
       }
 
-      // 验证所有域名格式
       const invalidDomains = domains.filter((d) => !validateDomain(d));
       if (invalidDomains.length > 0) {
         toast.error('域名格式不正确', {
@@ -134,16 +110,26 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
         return;
       }
 
-      // 批量创建规则
-      const newRules: DomainRule[] = domains.map((domain) => ({
-        id: `rule_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-        domain,
-        action: values.action as RuleAction,
-        enabled: values.enabled,
-      }));
+      if (mode === 'add') {
+        const newRule: DomainRule = {
+          id: `rule_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+          domains,
+          action: values.action as RuleAction,
+          enabled: values.enabled,
+        };
+        await addCustomRule(newRule);
+        toast.success('规则已添加');
+      } else if (rule) {
+        const updatedRule: DomainRule = {
+          ...rule,
+          domains,
+          action: values.action as RuleAction,
+          enabled: values.enabled,
+        };
+        await updateCustomRule(updatedRule);
+        toast.success('规则已更新');
+      }
 
-      await addCustomRulesBatch(newRules);
-      toast.success(`已添加 ${newRules.length} 条规则`);
       onOpenChange(false);
     } catch (error) {
       toast.error('保存失败', {
@@ -152,149 +138,41 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
     }
   };
 
-  const onEditSubmit = async (values: EditRuleFormValues) => {
-    try {
-      if (!rule) return;
-
-      const updatedRule: DomainRule = {
-        ...rule,
-        domain: values.domain,
-        action: values.action as RuleAction,
-        enabled: values.enabled,
-      };
-      await updateCustomRule(updatedRule);
-      toast.success('规则已更新');
-      onOpenChange(false);
-    } catch (error) {
-      toast.error('保存失败', {
-        description: error instanceof Error ? error.message : '保存规则时发生错误',
-      });
-    }
-  };
-
-  // 添加模式的表单
-  if (mode === 'add') {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>添加规则</DialogTitle>
-            <DialogDescription>添加新的域名代理规则，支持批量添加（每行一个域名）</DialogDescription>
-          </DialogHeader>
-
-          <Form {...addForm}>
-            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-6">
-              <FormField
-                control={addForm.control}
-                name="domains"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>域名</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder={`example.com\n*.google.com\ngithub.com`}
-                        className="min-h-[120px] font-mono text-sm"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      每行输入一个域名，支持通配符（如 *.example.com）
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={addForm.control}
-                name="action"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>策略</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择策略" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="proxy">代理</SelectItem>
-                        <SelectItem value="direct">直连</SelectItem>
-                        <SelectItem value="block">阻止</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={addForm.control}
-                name="enabled"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>启用规则</FormLabel>
-                      <FormDescription>禁用的规则不会生效</FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={addForm.formState.isSubmitting}
-                >
-                  取消
-                </Button>
-                <Button type="submit" disabled={addForm.formState.isSubmitting}>
-                  {addForm.formState.isSubmitting && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  添加
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // 编辑模式的表单
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>编辑规则</DialogTitle>
-          <DialogDescription>修改现有的域名代理规则</DialogDescription>
+          <DialogTitle>{mode === 'add' ? '添加规则' : '编辑规则'}</DialogTitle>
+          <DialogDescription>
+            {mode === 'add' ? '添加新的域名代理规则，每行一个域名' : '修改域名代理规则'}
+          </DialogDescription>
         </DialogHeader>
 
-        <Form {...editForm}>
-          <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
-              control={editForm.control}
-              name="domain"
+              control={form.control}
+              name="domains"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>域名</FormLabel>
                   <FormControl>
-                    <Input placeholder="example.com 或 *.example.com" {...field} />
+                    <Textarea
+                      placeholder={`google.com\ngithub.com\nopenai.com`}
+                      className="min-h-[120px] font-mono text-sm"
+                      {...field}
+                    />
                   </FormControl>
-                  <FormDescription>支持完整域名或通配符域名</FormDescription>
+                  <FormDescription>
+                    每行输入一个域名，会自动匹配该域名及其所有子域名
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
             <FormField
-              control={editForm.control}
+              control={form.control}
               name="action"
               render={({ field }) => (
                 <FormItem>
@@ -317,7 +195,7 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
             />
 
             <FormField
-              control={editForm.control}
+              control={form.control}
               name="enabled"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
@@ -325,7 +203,7 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
                     <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                   </FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>启用此规则</FormLabel>
+                    <FormLabel>启用规则</FormLabel>
                     <FormDescription>禁用的规则不会生效</FormDescription>
                   </div>
                 </FormItem>
@@ -337,15 +215,15 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={editForm.formState.isSubmitting}
+                disabled={form.formState.isSubmitting}
               >
                 取消
               </Button>
-              <Button type="submit" disabled={editForm.formState.isSubmitting}>
-                {editForm.formState.isSubmitting && (
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                保存
+                {mode === 'add' ? '添加' : '保存'}
               </Button>
             </DialogFooter>
           </form>

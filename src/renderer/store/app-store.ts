@@ -63,7 +63,6 @@ interface AppState {
 
   // Custom Rules Actions
   addCustomRule: (rule: DomainRule) => Promise<void>;
-  addCustomRulesBatch: (rules: DomainRule[]) => Promise<void>;
   updateCustomRule: (rule: DomainRule) => Promise<void>;
   deleteCustomRule: (ruleId: string) => Promise<void>;
 }
@@ -380,23 +379,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().loadConfig();
     } catch (error) {
       set({ error: String(error) });
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  addCustomRulesBatch: async (rules) => {
-    set({ isLoading: true, error: null });
-    try {
-      // 批量添加规则
-      for (const rule of rules) {
-        await api.rules.add(rule);
-      }
-      // Reload config to get updated rules
-      await get().loadConfig();
-    } catch (error) {
-      set({ error: String(error) });
-      throw error;
     } finally {
       set({ isLoading: false });
     }

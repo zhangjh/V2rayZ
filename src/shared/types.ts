@@ -84,7 +84,7 @@ export interface ServerConfig {
 
 export interface DomainRule {
   id: string;
-  domain: string;
+  domains: string[];
   action: RuleAction;
   enabled: boolean;
 }

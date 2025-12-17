@@ -809,6 +809,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * 生成自定义路由规则
+   * 所有域名统一使用 domain_suffix 匹配，即匹配该域名及其所有子域名
    */
   private generateCustomRules(
     customRules: import('../../shared/types').DomainRule[]
@@ -816,20 +817,16 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     const rules: SingBoxRouteRule[] = [];
 
     for (const rule of customRules) {
-      if (!rule.enabled) continue;
+      if (!rule.enabled || rule.domains.length === 0) continue;
+
+      // 统一使用 domain_suffix，匹配域名及其所有子域名
+      // 如 google.com 会匹配 google.com、www.google.com、mail.google.com 等
+      const domains = rule.domains.map((d) => (d.startsWith('*.') ? d.slice(2) : d));
 
       const singboxRule: SingBoxRouteRule = {
         action: 'route',
+        domain_suffix: domains,
       };
-
-      // 处理域名
-      if (rule.domain.startsWith('*.')) {
-        singboxRule.domain_suffix = [rule.domain.slice(2)];
-      } else if (rule.domain.includes('*')) {
-        singboxRule.domain_keyword = [rule.domain.replace(/\*/g, '')];
-      } else {
-        singboxRule.domain = [rule.domain];
-      }
 
       // 设置出站
       if (rule.action === 'proxy') {

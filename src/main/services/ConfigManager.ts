@@ -244,8 +244,13 @@ export class ConfigManager implements IConfigManager {
       if (!rule.id || typeof rule.id !== 'string') {
         throw new Error('Rule id is required and must be a string');
       }
-      if (!rule.domain || typeof rule.domain !== 'string') {
-        throw new Error('Rule domain is required and must be a string');
+      if (!Array.isArray(rule.domains) || rule.domains.length === 0) {
+        throw new Error('Rule domains is required and must be a non-empty array');
+      }
+      for (const domain of rule.domains) {
+        if (typeof domain !== 'string' || !domain.trim()) {
+          throw new Error('Each domain must be a non-empty string');
+        }
       }
       if (!['proxy', 'direct', 'block'].includes(rule.action)) {
         throw new Error('Rule action must be proxy, direct, or block');

@@ -201,6 +201,7 @@ export class RoutingRuleManager implements IRoutingRuleManager {
   /**
    * 集成自定义域名规则
    * 将用户自定义的域名规则转换为 sing-box 规则格式
+   * 所有域名统一使用 domain_suffix 匹配，即匹配该域名及其所有子域名
    */
   integrateCustomRules(customRules: DomainRule[]): SingBoxRouteRule[] {
     // 按 action 分组规则
@@ -217,7 +218,11 @@ export class RoutingRuleManager implements IRoutingRuleManager {
         rulesByAction.set(action, []);
       }
 
-      rulesByAction.get(action)!.push(rule.domain);
+      // 支持 domains 数组，统一去掉 *. 前缀
+      for (const domain of rule.domains) {
+        const cleanDomain = domain.startsWith('*.') ? domain.slice(2) : domain;
+        rulesByAction.get(action)!.push(cleanDomain);
+      }
     }
 
     // 转换为 sing-box 规则
@@ -241,38 +246,11 @@ export class RoutingRuleManager implements IRoutingRuleManager {
         continue;
       }
 
-      // 分类域名规则
-      const exactDomains: string[] = [];
-      const suffixDomains: string[] = [];
-      const keywordDomains: string[] = [];
-
-      for (const domain of domains) {
-        if (domain.startsWith('*.')) {
-          // 通配符域名，转换为 domain_suffix
-          suffixDomains.push(domain.slice(2));
-        } else if (domain.includes('*')) {
-          // 包含通配符，转换为 domain_keyword
-          keywordDomains.push(domain.replace(/\*/g, ''));
-        } else {
-          // 精确域名
-          exactDomains.push(domain);
-        }
-      }
-
-      // 创建规则
+      // 统一使用 domain_suffix，匹配域名及其所有子域名
       const rule: SingBoxRouteRule = {
         outbound,
+        domain_suffix: domains,
       };
-
-      if (exactDomains.length > 0) {
-        rule.domain = exactDomains;
-      }
-      if (suffixDomains.length > 0) {
-        rule.domain_suffix = suffixDomains;
-      }
-      if (keywordDomains.length > 0) {
-        rule.domain_keyword = keywordDomains;
-      }
 
       singboxRules.push(rule);
     }

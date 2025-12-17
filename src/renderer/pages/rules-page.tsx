@@ -87,7 +87,18 @@ export function RulesPage() {
                         onCheckedChange={() => handleToggleRule(rule)}
                       />
                     </TableCell>
-                    <TableCell className="font-mono">{rule.domain}</TableCell>
+                    <TableCell className="font-mono">
+                      <div className="max-w-[400px]">
+                        {rule.domains.length <= 3 ? (
+                          rule.domains.join(', ')
+                        ) : (
+                          <span title={rule.domains.join('\n')}>
+                            {rule.domains.slice(0, 3).join(', ')}
+                            <span className="text-muted-foreground"> +{rule.domains.length - 3}</span>
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={rule.action === 'proxy' ? 'default' : 'secondary'}>
                         {rule.action === 'proxy'
@@ -120,9 +131,9 @@ export function RulesPage() {
           <CardTitle>规则说明</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>• 支持完整域名匹配（example.com）</p>
-          <p>• 支持通配符匹配（*.example.com）</p>
-          <p>• 添加规则时支持批量输入，每行一个域名</p>
+          <p>• 输入域名会自动匹配该域名及其所有子域名</p>
+          <p>• 如 google.com 会匹配 google.com、www.google.com 等</p>
+          <p>• 每条规则支持多个域名，每行一个</p>
           <p>• 规则按优先级从上到下匹配</p>
           <p>• 自定义规则优先级高于全局代理模式和智能分流</p>
         </CardContent>
