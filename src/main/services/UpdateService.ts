@@ -22,10 +22,19 @@ export class UpdateService {
     message: '',
   };
   private skippedVersion: string | null = null;
+  private cleanupCallback: (() => Promise<void>) | null = null;
 
   constructor(logManager: LogManager) {
     this.logManager = logManager;
     this.loadSkippedVersion();
+  }
+
+  /**
+   * 设置清理回调函数
+   * 在安装更新前会调用此函数来停止代理进程等资源
+   */
+  setCleanupCallback(callback: () => Promise<void>): void {
+    this.cleanupCallback = callback;
   }
 
   setMainWindow(window: BrowserWindow | null): void {
@@ -167,33 +176,48 @@ export class UpdateService {
         return false;
       }
 
-      if (process.platform === 'win32') {
-        // Windows: 创建批处理脚本，等待 3 秒后启动安装程序
-        const { spawn } = require('child_process');
-        const batPath = path.join(app.getPath('temp'), 'flowz_update.bat');
+      // 在安装更新前，先清理资源（停止代理进程等）
+      // 这是关键步骤，否则 Windows 上会因为文件被占用而安装失败
+      if (this.cleanupCallback) {
+        this.logManager.addLog('info', '正在停止代理进程...', 'UpdateService');
+        try {
+          await this.cleanupCallback();
+          this.logManager.addLog('info', '代理进程已停止', 'UpdateService');
+        } catch (error: any) {
+          this.logManager.addLog('warn', `停止代理进程时出错: ${error?.message}`, 'UpdateService');
+          // 继续安装，不要因为清理失败而中断
+        }
+      }
 
-        // 简单的批处理：等待 3 秒，然后启动安装程序，最后删除自己
-        // 使用 ping 命令实现延迟（比 timeout 更可靠）
-        const batContent = [
-          '@echo off',
-          'ping 127.0.0.1 -n 4 > nul',
-          `start "" "${installerPath}"`,
-          `del "%~f0"`,
+      if (process.platform === 'win32') {
+        // Windows: 使用 VBScript 完全隐藏窗口运行安装程序
+        const { spawn } = require('child_process');
+        const vbsPath = path.join(app.getPath('temp'), 'flowz_update.vbs');
+
+        // VBScript: 等待 2 秒确保应用完全退出，然后静默启动安装程序
+        // WScript.Shell.Run 的第二个参数 0 表示隐藏窗口，第三个参数 false 表示不等待
+        const vbsContent = [
+          'WScript.Sleep 2000',
+          `Set WshShell = CreateObject("WScript.Shell")`,
+          `WshShell.Run """${installerPath.replace(/\\/g, '\\\\')}""", 1, False`,
+          // 删除自身
+          `Set fso = CreateObject("Scripting.FileSystemObject")`,
+          `fso.DeleteFile WScript.ScriptFullName, True`,
         ].join('\r\n');
 
-        fs.writeFileSync(batPath, batContent, 'utf-8');
+        fs.writeFileSync(vbsPath, vbsContent, 'utf-8');
 
-        // 启动批处理（独立进程，隐藏窗口）
-        const bat = spawn('cmd.exe', ['/c', 'start', '/min', '', batPath], {
+        // 使用 wscript 运行 VBS（完全无窗口）
+        const vbs = spawn('wscript.exe', [vbsPath], {
           detached: true,
           stdio: 'ignore',
           shell: false,
         });
-        bat.unref();
+        vbs.unref();
 
         this.logManager.addLog('info', '更新脚本已启动，正在退出应用...', 'UpdateService');
 
-        // 立即退出应用
+        // 给一点时间让 VBS 启动，然后退出应用
         setTimeout(() => {
           app.exit(0);
         }, 500);

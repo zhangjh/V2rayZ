@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { ExternalLink, Loader2, Download } from 'lucide-react';
 import {
   getVersionInfo,
   checkForUpdates,
@@ -11,6 +11,8 @@ import {
   installUpdate,
   openExternal,
 } from '@/bridge/api-wrapper';
+import { api } from '@/ipc/api-client';
+import type { UpdateProgress } from '@/ipc/api-client';
 
 interface VersionInfo {
   appVersion: string;
@@ -25,9 +27,18 @@ export function AboutSettings() {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const progressUnsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     loadVersionInfo();
+    // 清理进度监听器
+    return () => {
+      if (progressUnsubscribeRef.current) {
+        progressUnsubscribeRef.current();
+      }
+    };
   }, []);
 
   const loadVersionInfo = async () => {
@@ -42,6 +53,65 @@ export function AboutSettings() {
       toast.error('无法加载版本信息');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadAndInstall = async (updateInfo: any) => {
+    // 开始监听下载进度
+    setDownloading(true);
+    setDownloadProgress(0);
+
+    // 订阅进度更新
+    progressUnsubscribeRef.current = api.update.onProgress((progress: UpdateProgress) => {
+      if (progress.status === 'downloading') {
+        setDownloadProgress(progress.percentage);
+      } else if (progress.status === 'downloaded') {
+        setDownloadProgress(100);
+      } else if (progress.status === 'error') {
+        setDownloading(false);
+        toast.error('下载失败', {
+          description: progress.error || progress.message,
+          action: {
+            label: '手动下载',
+            onClick: () => openExternal(updateInfo.downloadUrl),
+          },
+        });
+      }
+    });
+
+    try {
+      const downloadResult = await downloadUpdate(updateInfo);
+
+      // 取消订阅
+      if (progressUnsubscribeRef.current) {
+        progressUnsubscribeRef.current();
+        progressUnsubscribeRef.current = null;
+      }
+
+      if (downloadResult.success && downloadResult.data) {
+        toast.info('下载完成，正在安装...');
+        setDownloading(false);
+        await installUpdate(downloadResult.data);
+      } else {
+        setDownloading(false);
+        toast.error('下载失败', {
+          description: downloadResult.error,
+          action: {
+            label: '手动下载',
+            onClick: () => openExternal(updateInfo.downloadUrl),
+          },
+        });
+      }
+    } catch (error) {
+      // 取消订阅
+      if (progressUnsubscribeRef.current) {
+        progressUnsubscribeRef.current();
+        progressUnsubscribeRef.current = null;
+      }
+      setDownloading(false);
+      toast.error('下载失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
     }
   };
 
@@ -73,22 +143,7 @@ export function AboutSettings() {
           description: '点击下载并安装',
           action: {
             label: '立即更新',
-            onClick: async () => {
-              toast.info('正在下载更新...');
-              const downloadResult = await downloadUpdate(updateInfo);
-              if (downloadResult.success && downloadResult.data) {
-                toast.info('下载完成，正在安装...');
-                await installUpdate(downloadResult.data);
-              } else {
-                toast.error('下载失败', {
-                  description: downloadResult.error,
-                  action: {
-                    label: '手动下载',
-                    onClick: () => openExternal(updateInfo.downloadUrl),
-                  },
-                });
-              }
-            },
+            onClick: () => handleDownloadAndInstall(updateInfo),
           },
           duration: 15000,
         });
@@ -149,14 +204,29 @@ export function AboutSettings() {
           <Separator />
 
           <div className="space-y-2">
-            <Button
-              onClick={handleCheckUpdate}
-              disabled={checkingUpdate}
-              className="w-full sm:w-auto"
-            >
-              {checkingUpdate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {checkingUpdate ? '检查中...' : '检查更新'}
-            </Button>
+            {downloading ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Download className="h-4 w-4 animate-bounce text-primary" />
+                  <span className="text-sm font-medium">正在下载更新... {downloadProgress}%</span>
+                </div>
+                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300 ease-out"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <Button
+                onClick={handleCheckUpdate}
+                disabled={checkingUpdate}
+                className="w-full sm:w-auto"
+              >
+                {checkingUpdate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {checkingUpdate ? '检查中...' : '检查更新'}
+              </Button>
+            )}
           </div>
 
           <Separator />

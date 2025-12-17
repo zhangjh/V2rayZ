@@ -392,6 +392,8 @@ app.whenReady().then(async () => {
   // 注册更新处理器
   setUpdateService(updateService);
   updateService.setMainWindow(mainWindow);
+  // 设置更新前的清理回调，确保在安装更新前停止代理进程
+  updateService.setCleanupCallback(cleanupResources);
   registerUpdateHandlers();
 
   // 设置托盘状态更新回调
