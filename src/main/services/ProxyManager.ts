@@ -483,15 +483,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     const dnsConfig: SingBoxDnsConfig = {
       servers: [
         {
-          tag: 'dns-remote',
-          type: 'udp',
-          server: '8.8.8.8',
-          detour: 'proxy',
-        },
-        {
           tag: 'dns-local',
           type: 'udp',
           server: '223.5.5.5',
+        },
+        {
+          tag: 'dns-remote',
+          type: 'udp',
+          server: '8.8.8.8',
         },
       ],
       final: 'dns-remote',
@@ -512,7 +511,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     // 根据代理模式配置其他 DNS 规则
     if (proxyMode === 'smart') {
-      // 智能分流模式：中国域名走本地 DNS，国外域名走远程 DNS
+      // 智能分流模式：中国域名走本地 DNS，国外域名走直连远程 DNS
       dnsRules.push(
         {
           rule_set: 'geosite-cn',
@@ -524,7 +523,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         }
       );
     }
-    // 全局代理模式：所有域名走远程 DNS（final: dns-remote 已设置）
+    // 全局代理模式：所有域名走直连远程 DNS（final: dns-remote 已设置）
     // 直连模式：所有域名走本地 DNS
     if (proxyMode === 'direct') {
       dnsConfig.final = 'dns-local';
@@ -577,7 +576,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         auto_route: config.tunConfig?.autoRoute ?? true,
         // macOS 上不使用 strict_route，避免网络完全不通
         strict_route: process.platform === 'darwin' ? false : (config.tunConfig?.strictRoute ?? true),
-        stack: config.tunConfig?.stack || 'system',
+        // 关键修复：Windows 和 macOS 使用 gvisor stack
+        // 原因：Windows 的 system stack 在处理流量嗅探时存在竞态条件，导致 TLS 握手超时
+        // gvisor 是用户态网络栈，绕过内核 TUN 实现，消除竞态条件
+        // macOS 也使用 gvisor 以保持跨平台行为一致
+        stack:
+          process.platform === 'win32' || process.platform === 'darwin'
+            ? 'gvisor'
+            : config.tunConfig?.stack || 'system',
         sniff: true,
         sniff_override_destination: true,
         // 在系统路由层面排除本地地址，确保本地代理端口可访问
@@ -638,9 +644,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       tag: 'proxy',
       server: server.address,
       server_port: server.port,
-      // 关键：代理服务器域名必须使用本地 DNS 解析，否则会形成死循环
-      // 因为 dns-remote 通过 proxy 出站，如果代理服务器域名也用 dns-remote 解析，
-      // 就会导致：解析代理服务器 -> 需要连接代理 -> 需要解析代理服务器 -> 死循环
+      // 代理服务器域名使用本地 DNS 解析
       domain_resolver: 'dns-local',
     };
 
