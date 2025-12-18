@@ -9,7 +9,6 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EventEmitter } from 'events';
 import type { UserConfig, ServerConfig, ProxyStatus } from '../../shared/types';
-// RoutingRuleManager 不再使用，配置生成已内置
 import type { ILogManager } from './LogManager';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { resourceManager } from './ResourceManager';
@@ -730,6 +729,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       });
     }
 
+    // 自定义规则（优先级最高，必须放在智能分流规则之前）
+    // 这样用户可以覆盖任何默认的分流行为
+    const customRules = this.generateCustomRules(config.customRules || []);
+    rules.push(...customRules);
+
     // 私有 IP 段直连（内网地址不应该走代理）
     rules.push({
       ip_cidr: [
@@ -766,10 +770,6 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         outbound: 'direct',
       });
     }
-
-    // 添加自定义规则
-    const customRules = this.generateCustomRules(config.customRules || []);
-    rules.push(...customRules);
 
     // 始终添加 rule_set 配置（除非是直连模式）
     // 全局代理模式使用远程 DNS 避免 DNS 污染，智能分流模式使用本地 DNS 提高国内访问速度
