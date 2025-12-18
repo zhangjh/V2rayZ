@@ -66,6 +66,7 @@ interface SingBoxInbound {
   stack?: string;
   sniff?: boolean;
   sniff_override_destination?: boolean;
+  route_exclude_address?: string[];
   platform?: {
     http_proxy?: {
       enabled: boolean;
@@ -549,25 +550,25 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     console.log('[ProxyManager] generateInbounds - proxyModeType:', config.proxyModeType);
     console.log('[ProxyManager] generateInbounds - modeType (lowercase):', modeType);
 
-    if (modeType === 'systemproxy') {
-      // 系统代理模式：HTTP + SOCKS inbound
-      inbounds.push(
-        {
-          type: 'http',
-          tag: 'http-in',
-          listen: '127.0.0.1',
-          listen_port: config.httpPort || 2080,
-        },
-        {
-          type: 'socks',
-          tag: 'socks-in',
-          listen: '127.0.0.1',
-          listen_port: config.socksPort || 2081,
-        }
-      );
-    } else {
-      // TUN 模式（默认，参考示例配置）
-      // 不指定 interface_name，让 sing-box 自动选择可用的接口
+    // 无论哪种模式，都添加 HTTP + SOCKS inbound
+    // 这样用户在终端配置的代理环境变量在切换模式后仍然可用
+    inbounds.push(
+      {
+        type: 'http',
+        tag: 'http-in',
+        listen: '127.0.0.1',
+        listen_port: config.httpPort || 2080,
+      },
+      {
+        type: 'socks',
+        tag: 'socks-in',
+        listen: '127.0.0.1',
+        listen_port: config.socksPort || 2081,
+      }
+    );
+
+    // TUN 模式额外添加 TUN inbound
+    if (modeType !== 'systemproxy') {
       const tunInbound: SingBoxInbound = {
         type: 'tun',
         tag: 'tun-in',
@@ -579,6 +580,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         stack: config.tunConfig?.stack || 'system',
         sniff: true,
         sniff_override_destination: true,
+        // 在系统路由层面排除本地地址，确保本地代理端口可访问
+        route_exclude_address: ['127.0.0.0/8', '::1/128'],
       };
 
       // macOS 平台特定配置
