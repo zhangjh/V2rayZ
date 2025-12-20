@@ -369,15 +369,40 @@ app.whenReady().then(async () => {
   proxyManager = new ProxyManager(logManager, mainWindow || undefined);
 
   // 监听代理管理器事件，更新托盘状态
-  proxyManager.on('error', (error: Error) => {
+  proxyManager.on('error', async (error: Error) => {
     logManager.addLog('error', `Proxy error: ${error.message}`, 'Main');
     // 发生错误时，更新托盘显示为"连接异常"
     updateTrayMenuState(false, true);
+    
+    // 进程意外退出时，清理系统代理设置，避免网络不可用
+    try {
+      const proxyStatus = await systemProxyManager.getProxyStatus();
+      if (proxyStatus.enabled) {
+        logManager.addLog('info', 'Disabling system proxy due to proxy error...', 'Main');
+        await systemProxyManager.disableProxy();
+        logManager.addLog('info', 'System proxy disabled after error', 'Main');
+      }
+    } catch (cleanupError) {
+      const errorMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+      logManager.addLog('warn', `Failed to disable system proxy after error: ${errorMessage}`, 'Main');
+    }
   });
 
-  proxyManager.on('stopped', () => {
+  proxyManager.on('stopped', async () => {
     // 正常停止时，重置错误状态
     updateTrayMenuState(false, false);
+    
+    // 确保系统代理被清理
+    try {
+      const proxyStatus = await systemProxyManager.getProxyStatus();
+      if (proxyStatus.enabled) {
+        await systemProxyManager.disableProxy();
+        logManager.addLog('info', 'System proxy disabled on stop', 'Main');
+      }
+    } catch (cleanupError) {
+      const errorMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+      logManager.addLog('warn', `Failed to disable system proxy on stop: ${errorMessage}`, 'Main');
+    }
   });
 
   // 注册 IPC 处理器（需要在 ProxyManager 创建后）
