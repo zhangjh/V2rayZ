@@ -180,6 +180,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
   private static readonly HEALTH_CHECK_INTERVAL = 10000; // 10秒检查一次
 
+  // 自动重启相关
+  private autoRestartEnabled: boolean = true;
+  private restartCount: number = 0;
+  private lastRestartTime: number = 0;
+  private static readonly MAX_RESTART_COUNT = 3; // 最大重启次数
+  private static readonly RESTART_COOLDOWN = 60000; // 重启冷却时间（1分钟内最多重启3次）
+  private isRestarting: boolean = false;
+
   constructor(
     logManager?: ILogManager,
     mainWindow?: BrowserWindow,
@@ -213,6 +221,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // 如果已经在运行，先停止
     if (this.singboxProcess || this.singboxPid) {
       await this.stop();
+    }
+
+    // 用户手动启动时重置重启计数
+    if (!this.isRestarting) {
+      this.resetRestartCount();
     }
 
     // 先保存当前配置（needsRootPrivilege 等方法需要用到）
@@ -1454,34 +1467,146 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 执行健康检查
    */
   private performHealthCheck(): void {
+    // 如果正在重启中，跳过检查
+    if (this.isRestarting) {
+      return;
+    }
+
     const activePid = this.singboxPid || this.pid;
-    
+
     if (!activePid) {
       return;
     }
 
     if (!this.isProcessAlive(activePid)) {
       this.logToManager('error', `检测到 sing-box 进程 (PID: ${activePid}) 已意外退出`);
-      
-      // 触发错误事件
-      this.emit('error', {
-        message: 'sing-box 进程意外退出，网络连接可能已中断',
-        code: -1,
-      });
 
-      // 发送到前端
-      this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_ERROR, {
-        message: 'sing-box 进程意外退出，请重新启动代理',
-        code: -1,
-      });
+      // 清理资源（但不停止健康检查，因为可能要重启）
+      this.singboxProcess = null;
+      this.pid = null;
+      this.singboxPid = null;
+      this.stopLogFileWatcher();
 
-      // 触发停止事件
-      this.emit('stopped');
-      this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
+      // 尝试自动重启
+      if (this.shouldAutoRestart()) {
+        this.attemptAutoRestart();
+      } else {
+        // 无法自动重启，通知用户
+        this.emit('error', {
+          message: 'sing-box 进程意外退出，已达到最大重启次数，请手动重启',
+          code: -1,
+        });
 
-      // 清理资源
-      this.cleanup();
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_ERROR, {
+          message: 'sing-box 进程多次异常退出，请检查网络或服务器配置后手动重启',
+          code: -1,
+        });
+
+        this.emit('stopped');
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
+
+        // 完全清理
+        this.cleanup();
+      }
     }
+  }
+
+  /**
+   * 检查是否应该自动重启
+   */
+  private shouldAutoRestart(): boolean {
+    if (!this.autoRestartEnabled || !this.currentConfig) {
+      return false;
+    }
+
+    const now = Date.now();
+
+    // 如果距离上次重启超过冷却时间，重置计数
+    if (now - this.lastRestartTime > ProxyManager.RESTART_COOLDOWN) {
+      this.restartCount = 0;
+    }
+
+    // 检查是否超过最大重启次数
+    return this.restartCount < ProxyManager.MAX_RESTART_COUNT;
+  }
+
+  /**
+   * 尝试自动重启
+   */
+  private async attemptAutoRestart(): Promise<void> {
+    if (!this.currentConfig) {
+      return;
+    }
+
+    this.isRestarting = true;
+    this.restartCount++;
+    this.lastRestartTime = Date.now();
+
+    this.logToManager(
+      'warn',
+      `正在尝试自动重启 sing-box (第 ${this.restartCount}/${ProxyManager.MAX_RESTART_COUNT} 次)...`
+    );
+
+    // 通知前端正在重启
+    this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_ERROR, {
+      message: `sing-box 进程异常退出，正在自动重启 (${this.restartCount}/${ProxyManager.MAX_RESTART_COUNT})...`,
+      code: -2, // 特殊代码表示正在重启
+    });
+
+    try {
+      // 等待一小段时间让系统清理
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // 重新启动
+      await this.start(this.currentConfig);
+
+      this.logToManager('info', 'sing-box 自动重启成功');
+
+      // 通知前端重启成功
+      this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STARTED, {
+        pid: this.singboxPid || this.pid,
+        startTime: this.startTime,
+        autoRestarted: true,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logToManager('error', `自动重启失败: ${errorMessage}`);
+
+      // 如果还有重试机会，会在下次健康检查时再次尝试
+      if (this.restartCount >= ProxyManager.MAX_RESTART_COUNT) {
+        this.emit('error', {
+          message: `自动重启失败: ${errorMessage}`,
+          code: -1,
+        });
+
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_ERROR, {
+          message: `自动重启失败，请手动重启: ${errorMessage}`,
+          code: -1,
+        });
+
+        this.emit('stopped');
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
+        this.cleanup();
+      }
+    } finally {
+      this.isRestarting = false;
+    }
+  }
+
+  /**
+   * 设置是否启用自动重启
+   */
+  setAutoRestartEnabled(enabled: boolean): void {
+    this.autoRestartEnabled = enabled;
+    this.logToManager('info', `自动重启已${enabled ? '启用' : '禁用'}`);
+  }
+
+  /**
+   * 重置重启计数（用于用户手动启动后）
+   */
+  private resetRestartCount(): void {
+    this.restartCount = 0;
+    this.lastRestartTime = 0;
   }
 
   /**
