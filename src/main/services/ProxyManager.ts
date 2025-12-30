@@ -55,6 +55,12 @@ interface SingBoxDnsServer {
   type: string;
   server?: string;
   detour?: string;
+  // DoH 专用字段
+  address?: string;
+  address_resolver?: string;
+  // FakeIP 专用字段
+  inet4_range?: string;
+  inet6_range?: string;
 }
 
 interface SingBoxDnsRule {
@@ -549,34 +555,36 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * 生成 DNS 配置（sing-box 1.12.x 格式）
-   * 关键：代理服务器域名必须使用本地 DNS 解析，否则会形成死循环
+   * 统一使用 FakeIP 模式：DNS 查询直接返回虚假 IP，由 sniff 识别真实域名后路由
+   * 这避免了 DNS 污染和超时问题，TUN 和系统代理模式都使用相同的逻辑
    */
   private generateDnsConfig(config: UserConfig, selectedServer: ServerConfig): SingBoxDnsConfig {
-    // 使用小写比较代理模式和模式类型
     const proxyMode = (config.proxyMode || 'smart').toLowerCase();
 
     const dnsConfig: SingBoxDnsConfig = {
       servers: [
         {
+          // 本地 DNS：用于解析代理服务器地址
           tag: 'dns-local',
           type: 'udp',
           server: '223.5.5.5',
         },
         {
-          tag: 'dns-remote',
-          type: 'udp',
-          server: '8.8.8.8',
+          // FakeIP 服务器：返回虚假 IP，由 sniff 识别真实域名
+          tag: 'fakeip',
+          type: 'fakeip',
+          inet4_range: '198.18.0.0/15',
+          inet6_range: 'fc00::/18',
         },
       ],
-      final: 'dns-remote',
+      rules: [],
+      final: 'dns-local',
       strategy: 'ipv4_only',
     };
 
-    // DNS 规则：代理服务器域名必须使用本地 DNS 解析
-    // 这是最重要的规则，必须放在最前面，否则代理服务器的 DNS 查询会通过代理发送，形成死循环
     const dnsRules: SingBoxDnsRule[] = [];
 
-    // 添加代理服务器域名使用本地 DNS 的规则
+    // 代理服务器域名必须使用本地 DNS 解析（避免死循环）
     if (selectedServer?.address) {
       dnsRules.push({
         domain: [selectedServer.address],
@@ -584,30 +592,17 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       } as SingBoxDnsRule);
     }
 
-    // 根据代理模式配置其他 DNS 规则
-    if (proxyMode === 'smart') {
-      // 智能分流模式：中国域名走本地 DNS，国外域名走直连远程 DNS
-      dnsRules.push(
-        {
-          rule_set: 'geosite-cn',
-          server: 'dns-local',
-        },
-        {
-          rule_set: 'geosite-geolocation-!cn',
-          server: 'dns-remote',
-        }
-      );
+    // 根据代理模式配置 FakeIP 规则
+    if (proxyMode === 'smart' || proxyMode === 'global') {
+      // 智能分流/全局代理：A/AAAA 查询走 FakeIP
+      dnsRules.push({
+        query_type: ['A', 'AAAA'],
+        server: 'fakeip',
+      } as SingBoxDnsRule);
     }
-    // 全局代理模式：所有域名走直连远程 DNS（final: dns-remote 已设置）
-    // 直连模式：所有域名走本地 DNS
-    if (proxyMode === 'direct') {
-      dnsConfig.final = 'dns-local';
-    }
+    // 直连模式不使用 FakeIP，全部走本地 DNS
 
-    // 设置 DNS 规则
-    if (dnsRules.length > 0) {
-      dnsConfig.rules = dnsRules;
-    }
+    dnsConfig.rules = dnsRules;
 
     return dnsConfig;
   }
