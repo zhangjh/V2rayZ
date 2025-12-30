@@ -185,6 +185,16 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private lastErrorOutput: string = '';
   private logFileWatcher: ReturnType<typeof setInterval> | null = null;
   private lastLogFileSize: number = 0;
+  private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly HEALTH_CHECK_INTERVAL = 10000; // 10秒检查一次
+
+  // 自动重启相关
+  private autoRestartEnabled: boolean = true;
+  private restartCount: number = 0;
+  private lastRestartTime: number = 0;
+  private static readonly MAX_RESTART_COUNT = 3; // 最大重启次数
+  private static readonly RESTART_COOLDOWN = 60000; // 重启冷却时间（1分钟内最多重启3次）
+  private isRestarting: boolean = false;
 
   constructor(
     logManager?: ILogManager,
@@ -217,8 +227,23 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   async start(config: UserConfig): Promise<void> {
     // 如果已经在运行，先停止
-    if (this.singboxProcess) {
+    if (this.singboxProcess || this.singboxPid) {
       await this.stop();
+    }
+
+    // 用户手动启动时重置重启计数
+    if (!this.isRestarting) {
+      this.resetRestartCount();
+    }
+
+    // 先保存当前配置（needsRootPrivilege 等方法需要用到）
+    this.currentConfig = config;
+
+    // 仅在 TUN 模式下清理可能残留的 sing-box 进程
+    // 系统代理模式不需要管理员权限，也不会有残留的 TUN 进程问题
+    const isTunMode = (config.proxyModeType || 'tun').toLowerCase() !== 'systemproxy';
+    if (isTunMode) {
+      await this.killOrphanedSingBoxProcesses();
     }
 
     // 检查是否选择了服务器
@@ -231,9 +256,6 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     if (!selectedServer) {
       throw new Error('Selected server not found');
     }
-
-    // 先保存当前配置（needsRootPrivilege 等方法需要用到）
-    this.currentConfig = config;
 
     // 生成 sing-box 配置
     const singboxConfig = this.generateSingBoxConfig(config);
@@ -379,8 +401,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   getStatus(): ProxyStatus {
     // macOS TUN 模式：检查 singboxPid 而不是 singboxProcess
-    const isRunning = this.singboxProcess !== null || this.singboxPid !== null;
+    // 同时验证进程是否真正存活
     const activePid = this.singboxPid || this.pid;
+    const isRunning = (this.singboxProcess !== null || this.singboxPid !== null) && 
+                      (activePid ? this.isProcessAlive(activePid) : false);
 
     if (!isRunning || !activePid) {
       return {
@@ -452,11 +476,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 生成日志配置
    */
   private generateLogConfig(config: UserConfig): SingBoxLogConfig {
-    // 使用 info 级别，只显示启动/停止和关键信息
-    // debug 级别会输出大量连接日志，但 sing-box 不输出路由决策（域名->出站）
-    // warn 级别只显示警告和错误
+    // 默认使用 debug 级别以显示路由决策（哪些请求走代理/直连）
+    // 应用层会过滤掉不重要的日志，只保留有价值的信息
     const logConfig: SingBoxLogConfig = {
-      level: config.logLevel || 'info',
+      level: config.logLevel || 'debug',
       timestamp: true,
     };
 
@@ -1021,25 +1044,53 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         });
 
         // 等待一小段时间确保进程启动成功
-        setTimeout(() => {
-          if (this.singboxProcess && this.pid) {
-            // 如果使用 osascript 运行（macOS TUN 模式），启动日志文件监控
-            if (this.needsOsascript()) {
+        setTimeout(async () => {
+          // macOS TUN 模式：检查 singboxPid（从 PID 文件读取）
+          // 其他模式：检查 singboxProcess 和 pid
+          const isMacTunMode = this.needsOsascript();
+          
+          if (isMacTunMode) {
+            // macOS TUN 模式：等待 PID 文件被写入
+            await this.waitForPidFile();
+            
+            if (this.singboxPid) {
+              // 启动日志文件监控
               this.startLogFileWatcher();
-            }
+              // 启动健康检查定时器
+              this.startHealthCheck();
 
-            // 触发启动事件
-            this.emit('started');
-            this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STARTED, {
-              pid: this.pid,
-              startTime: this.startTime,
-            });
-            this.logToManager('info', 'sing-box 进程启动成功');
-            resolve();
+              // 触发启动事件
+              this.emit('started');
+              this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STARTED, {
+                pid: this.singboxPid,
+                startTime: this.startTime,
+              });
+              this.logToManager('info', 'sing-box 进程启动成功');
+              resolve();
+            } else {
+              const error = '启动 sing-box 进程失败：无法获取进程 PID';
+              this.logToManager('error', error);
+              reject(new Error(error));
+            }
           } else {
-            const error = '启动 sing-box 进程失败：进程未能正常启动';
-            this.logToManager('error', error);
-            reject(new Error(error));
+            // 非 macOS TUN 模式
+            if (this.singboxProcess && this.pid) {
+              // 启动健康检查定时器
+              this.startHealthCheck();
+
+              // 触发启动事件
+              this.emit('started');
+              this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STARTED, {
+                pid: this.pid,
+                startTime: this.startTime,
+              });
+              this.logToManager('info', 'sing-box 进程启动成功');
+              resolve();
+            } else {
+              const error = '启动 sing-box 进程失败：进程未能正常启动';
+              this.logToManager('error', error);
+              reject(new Error(error));
+            }
           }
         }, 1000);
       } catch (error) {
@@ -1167,19 +1218,32 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       return;
     }
 
-    this.logToManager('info', `正在停止 sing-box 进程 (PID: ${this.singboxPid})...`);
+    const pidToKill = this.singboxPid;
+    this.logToManager('info', `正在停止 sing-box 进程 (PID: ${pidToKill})...`);
 
     return new Promise((resolve) => {
+      // 先尝试 SIGTERM 优雅终止
       const killProcess = spawn('/usr/bin/osascript', [
         '-e',
-        `do shell script "kill -TERM ${this.singboxPid}" with administrator privileges`,
+        `do shell script "kill -TERM ${pidToKill}" with administrator privileges`,
       ]);
 
-      killProcess.on('exit', (code) => {
+      killProcess.on('exit', async (code) => {
         if (code === 0) {
-          this.logToManager('info', 'sing-box 进程已停止');
+          // 等待进程退出
+          await this.waitForProcessExit(pidToKill, 3000);
+          
+          // 检查进程是否真的退出了
+          if (this.isProcessAlive(pidToKill)) {
+            this.logToManager('warn', '进程未响应 SIGTERM，尝试强制终止...');
+            await this.forceKillProcess(pidToKill);
+          } else {
+            this.logToManager('info', 'sing-box 进程已停止');
+          }
         } else {
           this.logToManager('warn', `停止 sing-box 进程可能失败，退出码: ${code}`);
+          // 尝试强制终止
+          await this.forceKillProcess(pidToKill);
         }
 
         // 清理 PID 文件
@@ -1199,9 +1263,51 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         resolve();
       });
 
-      killProcess.on('error', (error) => {
+      killProcess.on('error', async (error) => {
         this.logToManager('error', `停止 sing-box 进程失败: ${error.message}`);
+        // 尝试强制终止
+        await this.forceKillProcess(pidToKill);
         this.cleanup();
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * 等待进程退出
+   */
+  private async waitForProcessExit(pid: number, timeout: number): Promise<boolean> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      if (!this.isProcessAlive(pid)) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return !this.isProcessAlive(pid);
+  }
+
+  /**
+   * 强制终止进程
+   */
+  private async forceKillProcess(pid: number): Promise<void> {
+    return new Promise((resolve) => {
+      const killProcess = spawn('/usr/bin/osascript', [
+        '-e',
+        `do shell script "kill -9 ${pid}" with administrator privileges`,
+      ]);
+
+      killProcess.on('close', () => {
+        resolve();
+      });
+
+      killProcess.on('error', () => {
+        // 最后尝试普通 kill
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+          // 忽略错误
+        }
         resolve();
       });
     });
@@ -1212,10 +1318,334 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private cleanup(): void {
     this.stopLogFileWatcher();
+    this.stopHealthCheck();
     this.singboxProcess = null;
     this.pid = null;
     this.singboxPid = null;
     this.startTime = null;
+  }
+
+  /**
+   * 清理可能残留的 sing-box 进程
+   * 这是解决"重启代理后网络不恢复"问题的关键
+   */
+  private async killOrphanedSingBoxProcesses(): Promise<void> {
+    if (process.platform === 'darwin') {
+      await this.killOrphanedProcessesMac();
+    } else if (process.platform === 'win32') {
+      await this.killOrphanedProcessesWindows();
+    }
+  }
+
+  /**
+   * macOS: 清理残留的 sing-box 进程
+   */
+  private async killOrphanedProcessesMac(): Promise<void> {
+    return new Promise((resolve) => {
+      // 使用 pgrep 查找所有 sing-box 进程
+      const pgrep = spawn('/usr/bin/pgrep', ['-f', 'sing-box']);
+      let pids = '';
+
+      pgrep.stdout.on('data', (data: Buffer) => {
+        pids += data.toString();
+      });
+
+      pgrep.on('close', async () => {
+        const pidList = pids
+          .trim()
+          .split('\n')
+          .filter((p) => p.trim())
+          .map((p) => parseInt(p.trim(), 10))
+          .filter((p) => !isNaN(p) && p > 0);
+
+        if (pidList.length === 0) {
+          resolve();
+          return;
+        }
+
+        this.logToManager('warn', `发现 ${pidList.length} 个残留的 sing-box 进程，正在清理...`);
+
+        // 尝试用 osascript 以 root 权限终止这些进程
+        const killCmd = pidList.map((p) => `kill -9 ${p}`).join('; ');
+        const killProcess = spawn('/usr/bin/osascript', [
+          '-e',
+          `do shell script "${killCmd}" with administrator privileges`,
+        ]);
+
+        killProcess.on('close', async (code) => {
+          if (code === 0) {
+            this.logToManager('info', '残留进程已清理');
+          } else {
+            // 如果 osascript 失败（用户取消），尝试普通 kill
+            for (const pid of pidList) {
+              try {
+                process.kill(pid, 'SIGKILL');
+              } catch {
+                // 忽略错误
+              }
+            }
+          }
+          // 等待更长时间让系统完全清理 TUN 接口和路由表
+          // 这是解决"重启后网络不恢复"问题的关键
+          await this.waitForNetworkCleanup();
+          resolve();
+        });
+
+        killProcess.on('error', async () => {
+          // 如果 osascript 出错，尝试普通 kill
+          for (const pid of pidList) {
+            try {
+              process.kill(pid, 'SIGKILL');
+            } catch {
+              // 忽略错误
+            }
+          }
+          await this.waitForNetworkCleanup();
+          resolve();
+        });
+      });
+
+      pgrep.on('error', () => {
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * 等待网络清理完成
+   * sing-box 进程终止后，系统需要时间清理 TUN 接口和路由表
+   */
+  private async waitForNetworkCleanup(): Promise<void> {
+    // 等待 2 秒让系统清理 TUN 接口
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // 可选：刷新 DNS 缓存（macOS）
+    if (process.platform === 'darwin') {
+      try {
+        const { exec } = require('child_process');
+        exec('dscacheutil -flushcache; killall -HUP mDNSResponder', (error: Error | null) => {
+          if (error) {
+            this.logToManager('debug', `刷新 DNS 缓存失败: ${error.message}`);
+          } else {
+            this.logToManager('debug', 'DNS 缓存已刷新');
+          }
+        });
+      } catch {
+        // 忽略错误
+      }
+    }
+  }
+
+  /**
+   * Windows: 清理残留的 sing-box 进程
+   */
+  private async killOrphanedProcessesWindows(): Promise<void> {
+    return new Promise((resolve) => {
+      // 使用 taskkill 强制终止所有 sing-box 进程
+      const taskkill = spawn('taskkill', ['/F', '/IM', 'sing-box.exe'], {
+        shell: true,
+      });
+
+      taskkill.on('close', () => {
+        // 等待一小段时间让系统清理
+        setTimeout(resolve, 500);
+      });
+
+      taskkill.on('error', () => {
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * 检查进程是否存活
+   * 注意：macOS 上检测 root 权限运行的进程需要特殊处理
+   */
+  private isProcessAlive(pid: number): boolean {
+    try {
+      // 发送信号 0 不会杀死进程，只检查进程是否存在
+      process.kill(pid, 0);
+      return true;
+    } catch (error: any) {
+      // EPERM 表示进程存在但没有权限发送信号（root 进程）
+      // 这种情况下进程实际上是存活的
+      if (error.code === 'EPERM') {
+        return true;
+      }
+      // ESRCH 表示进程不存在
+      return false;
+    }
+  }
+
+  /**
+   * 启动健康检查定时器
+   */
+  private startHealthCheck(): void {
+    if (this.healthCheckTimer) {
+      return;
+    }
+
+    this.healthCheckTimer = setInterval(() => {
+      this.performHealthCheck();
+    }, ProxyManager.HEALTH_CHECK_INTERVAL);
+
+    this.logToManager('debug', '已启动进程健康检查');
+  }
+
+  /**
+   * 停止健康检查定时器
+   */
+  private stopHealthCheck(): void {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
+    }
+  }
+
+  /**
+   * 执行健康检查
+   */
+  private performHealthCheck(): void {
+    // 如果正在重启中，跳过检查
+    if (this.isRestarting) {
+      return;
+    }
+
+    const activePid = this.singboxPid || this.pid;
+
+    if (!activePid) {
+      return;
+    }
+
+    if (!this.isProcessAlive(activePid)) {
+      this.logToManager('error', `检测到 sing-box 进程 (PID: ${activePid}) 已意外退出`);
+
+      // 清理资源（但不停止健康检查，因为可能要重启）
+      this.singboxProcess = null;
+      this.pid = null;
+      this.singboxPid = null;
+      this.stopLogFileWatcher();
+
+      // 尝试自动重启
+      if (this.shouldAutoRestart()) {
+        this.attemptAutoRestart();
+      } else {
+        // 无法自动重启，通知用户
+        this.emit('error', {
+          message: 'sing-box 进程意外退出，已达到最大重启次数，请手动重启',
+          code: -1,
+        });
+
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_ERROR, {
+          message: 'sing-box 进程多次异常退出，请检查网络或服务器配置后手动重启',
+          code: -1,
+        });
+
+        this.emit('stopped');
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
+
+        // 完全清理
+        this.cleanup();
+      }
+    }
+  }
+
+  /**
+   * 检查是否应该自动重启
+   */
+  private shouldAutoRestart(): boolean {
+    if (!this.autoRestartEnabled || !this.currentConfig) {
+      return false;
+    }
+
+    const now = Date.now();
+
+    // 如果距离上次重启超过冷却时间，重置计数
+    if (now - this.lastRestartTime > ProxyManager.RESTART_COOLDOWN) {
+      this.restartCount = 0;
+    }
+
+    // 检查是否超过最大重启次数
+    return this.restartCount < ProxyManager.MAX_RESTART_COUNT;
+  }
+
+  /**
+   * 尝试自动重启
+   */
+  private async attemptAutoRestart(): Promise<void> {
+    if (!this.currentConfig) {
+      return;
+    }
+
+    this.isRestarting = true;
+    this.restartCount++;
+    this.lastRestartTime = Date.now();
+
+    this.logToManager(
+      'warn',
+      `正在尝试自动重启 sing-box (第 ${this.restartCount}/${ProxyManager.MAX_RESTART_COUNT} 次)...`
+    );
+
+    // 通知前端正在重启
+    this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_ERROR, {
+      message: `sing-box 进程异常退出，正在自动重启 (${this.restartCount}/${ProxyManager.MAX_RESTART_COUNT})...`,
+      code: -2, // 特殊代码表示正在重启
+    });
+
+    try {
+      // 等待一小段时间让系统清理
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // 重新启动
+      await this.start(this.currentConfig);
+
+      this.logToManager('info', 'sing-box 自动重启成功');
+
+      // 通知前端重启成功
+      this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STARTED, {
+        pid: this.singboxPid || this.pid,
+        startTime: this.startTime,
+        autoRestarted: true,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logToManager('error', `自动重启失败: ${errorMessage}`);
+
+      // 如果还有重试机会，会在下次健康检查时再次尝试
+      if (this.restartCount >= ProxyManager.MAX_RESTART_COUNT) {
+        this.emit('error', {
+          message: `自动重启失败: ${errorMessage}`,
+          code: -1,
+        });
+
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_ERROR, {
+          message: `自动重启失败，请手动重启: ${errorMessage}`,
+          code: -1,
+        });
+
+        this.emit('stopped');
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
+        this.cleanup();
+      }
+    } finally {
+      this.isRestarting = false;
+    }
+  }
+
+  /**
+   * 设置是否启用自动重启
+   */
+  setAutoRestartEnabled(enabled: boolean): void {
+    this.autoRestartEnabled = enabled;
+    this.logToManager('info', `自动重启已${enabled ? '启用' : '禁用'}`);
+  }
+
+  /**
+   * 重置重启计数（用于用户手动启动后）
+   */
+  private resetRestartCount(): void {
+    this.restartCount = 0;
+    this.lastRestartTime = 0;
   }
 
   /**
@@ -1234,6 +1664,34 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     } catch (error) {
       this.logToManager('warn', `无法读取 sing-box PID 文件: ${error}`);
     }
+  }
+
+  /**
+   * 等待 PID 文件被写入（macOS TUN 模式）
+   */
+  private async waitForPidFile(): Promise<void> {
+    const pidFile = this.getPidFilePath();
+    const maxWaitTime = 5000; // 最多等待 5 秒
+    const checkInterval = 200; // 每 200ms 检查一次
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        const pidContent = await fs.readFile(pidFile, 'utf-8');
+        const pid = parseInt(pidContent.trim(), 10);
+        if (!isNaN(pid) && pid > 0) {
+          this.singboxPid = pid;
+          this.pid = pid;
+          this.logToManager('info', `sing-box 后台进程 PID: ${pid}`);
+          return;
+        }
+      } catch {
+        // 文件还不存在，继续等待
+      }
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
+    }
+
+    this.logToManager('warn', 'PID 文件等待超时');
   }
 
   /**
@@ -1354,18 +1812,21 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * 检查是否为低价值日志（应该被过滤）
-   * 保留：路由决策、错误、启动/停止、outbound 选择等重要日志
-   * 过滤：频繁的连接建立/关闭、握手等日志
+   * 保留：路由决策、错误、启动/停止等重要日志
+   * 过滤：频繁的连接关闭、握手细节等日志
    */
   private isLowValueLog(line: string): boolean {
     const lowerLine = line.toLowerCase();
 
-    // 优先过滤的噪音日志（即使包含 error 也要过滤）
+    // 优先过滤的噪音日志（即使包含其他关键词也要过滤）
     const noisePatterns = [
       'connection upload closed',
       'connection download closed',
       'forcibly closed',
       'connection closed',
+      'connection established',
+      'tls handshake',
+      'handshake completed',
     ];
 
     for (const pattern of noisePatterns) {
@@ -1384,6 +1845,19 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       'warn', // 警告
       'failed', // 失败
       'updated default interface', // 网络接口变化
+      // 路由决策相关 - 关键日志
+      '[proxy]', // 走代理
+      '[direct]', // 走直连
+      '[block]', // 被阻断
+      '-> proxy', // 路由到代理
+      '-> direct', // 路由到直连
+      '-> block', // 路由到阻断
+      'outbound/proxy', // 代理出站
+      'outbound/direct', // 直连出站
+      'outbound/block', // 阻断出站
+      'match rule', // 匹配规则
+      'final rule', // 最终规则
+      'rule-set', // 规则集匹配
     ];
 
     // 检查是否包含高价值模式
@@ -1393,30 +1867,17 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       }
     }
 
-    // 过滤的低价值日志模式（sing-box 的连接日志太频繁）
+    // 过滤的低价值日志模式
     const filterPatterns = [
-      'outbound connection', // 出站连接（太频繁）
-      'outbound packet', // 出站数据包（太频繁）
-      'inbound connection', // 入站连接建立（太频繁）
-      'inbound/tun', // TUN 入站日志（太频繁）
-      'inbound/http', // HTTP 入站日志
-      'inbound/socks', // SOCKS 入站日志
-      'connection to', // 连接到目标
-      'connection from', // 来自的连接
       'dns query', // DNS 查询
       'dns response', // DNS 响应
       'dns: exchanged', // DNS 交换
       'dns: cached', // DNS 缓存
       'resolved', // DNS 解析完成
-      'connection closed', // 连接关闭
-      'connection upload closed', // 上传连接关闭
-      'connection download closed', // 下载连接关闭
-      'forcibly closed', // 连接被强制关闭
-      'connection established', // 连接建立
-      'handshake', // 握手
-      'tls handshake', // TLS 握手
       'udp packet', // UDP 包
-      'tcp connection', // TCP 连接
+      'inbound/tun[tun-in]', // TUN 入站细节
+      'inbound/http[http-in]', // HTTP 入站细节
+      'inbound/socks[socks-in]', // SOCKS 入站细节
     ];
 
     for (const pattern of filterPatterns) {
