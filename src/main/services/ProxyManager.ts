@@ -504,6 +504,24 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   }
 
   /**
+   * 清空 sing-box 日志文件
+   * 在 Windows 和 macOS 上都能工作
+   */
+  async clearSingBoxLogFile(): Promise<void> {
+    const logFilePath = this.getLogFilePath();
+    try {
+      // 清空日志文件（截断为空）
+      await fs.writeFile(logFilePath, '', 'utf-8');
+      this.logToManager('info', 'sing-box 日志文件已清空');
+    } catch (error: any) {
+      // 文件不存在，忽略
+      if (error.code !== 'ENOENT') {
+        this.logToManager('error', `清空 sing-box 日志文件失败: ${error.message}`);
+      }
+    }
+  }
+
+  /**
    * 生成 DNS 配置（sing-box 1.12.x 格式）
    * 关键：代理服务器域名必须使用本地 DNS 解析，否则会形成死循环
    */

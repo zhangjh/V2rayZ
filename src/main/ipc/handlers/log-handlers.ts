@@ -8,12 +8,13 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels';
 import type { LogEntry, LogLevel } from '../../../shared/types';
 import { registerIpcHandler } from '../ipc-handler';
 import { LogManager } from '../../services/LogManager';
+import { ProxyManager } from '../../services/ProxyManager';
 import { broadcastEvent } from '../ipc-events';
 
 /**
  * 注册日志管理相关的 IPC 处理器
  */
-export function registerLogHandlers(logManager: LogManager): void {
+export function registerLogHandlers(logManager: LogManager, proxyManager?: ProxyManager): void {
   // 获取日志
   registerIpcHandler<{ limit?: number }, LogEntry[]>(
     IPC_CHANNELS.LOGS_GET,
@@ -24,7 +25,13 @@ export function registerLogHandlers(logManager: LogManager): void {
 
   // 清空日志
   registerIpcHandler<void, void>(IPC_CHANNELS.LOGS_CLEAR, async (_event: IpcMainInvokeEvent) => {
+    // 清空应用日志（内存和文件）
     logManager.clearLogs();
+    
+    // 同时清空 sing-box 日志文件
+    if (proxyManager) {
+      await proxyManager.clearSingBoxLogFile();
+    }
   });
 
   // 设置日志级别

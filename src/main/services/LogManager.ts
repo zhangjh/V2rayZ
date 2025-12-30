@@ -134,10 +134,51 @@ export class LogManager extends EventEmitter implements ILogManager {
   }
 
   /**
-   * 清空日志
+   * 清空日志（内存和文件）
    */
   clearLogs(): void {
     this.logs = [];
+    // 异步清空日志文件
+    this.clearLogFiles().catch((error) => {
+      console.error('Failed to clear log files:', error);
+    });
+  }
+
+  /**
+   * 清空所有日志文件
+   */
+  private async clearLogFiles(): Promise<void> {
+    try {
+      await this.initPromise;
+      const logDir = path.dirname(this.logFilePath);
+      const logBaseName = path.basename(this.logFilePath, '.log');
+
+      // 清空主日志文件（截断为空）
+      try {
+        await fs.writeFile(this.logFilePath, '', 'utf-8');
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') {
+          console.error('Failed to clear main log file:', error);
+        }
+      }
+
+      // 删除所有轮转的日志文件
+      for (let i = 1; i <= this.maxLogFiles; i++) {
+        const rotatedLogFile = path.join(logDir, `${logBaseName}.${i}.log`);
+        try {
+          await fs.unlink(rotatedLogFile);
+        } catch (error: any) {
+          // 文件不存在，忽略
+          if (error.code !== 'ENOENT') {
+            console.error(`Failed to delete rotated log file ${rotatedLogFile}:`, error);
+          }
+        }
+      }
+
+      console.log('All log files cleared');
+    } catch (error) {
+      console.error('Failed to clear log files:', error);
+    }
   }
 
   /**

@@ -408,7 +408,7 @@ app.whenReady().then(async () => {
   // 注册 IPC 处理器（需要在 ProxyManager 创建后）
   registerConfigHandlers(configManager);
   registerServerHandlers(protocolParser, configManager);
-  registerLogHandlers(logManager);
+  registerLogHandlers(logManager, proxyManager);
   registerProxyHandlers(proxyManager, systemProxyManager);
   registerVersionHandlers();
   registerAdminHandlers();
