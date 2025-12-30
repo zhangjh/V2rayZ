@@ -15,6 +15,32 @@ import { resourceManager } from './ResourceManager';
 import { retry } from '../utils/retry';
 
 /**
+ * 私有 IP 地址段（CIDR 格式）
+ * 用于路由规则中的直连配置
+ */
+const PRIVATE_IP_CIDRS = [
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '127.0.0.0/8',
+  '169.254.0.0/16',
+  '224.0.0.0/4',
+  '240.0.0.0/4',
+];
+
+/**
+ * 私有 IP 地址正则表达式
+ * 用于日志过滤中识别内网请求
+ */
+const PRIVATE_IP_PATTERNS = [
+  /\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
+  /\b172\.(1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}/,
+  /\b192\.168\.\d{1,3}\.\d{1,3}/,
+  /\b127\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
+  /\b169\.254\.\d{1,3}\.\d{1,3}/,
+];
+
+/**
  * sing-box 1.12.x 配置类型定义
  */
 
@@ -823,15 +849,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     // 私有 IP 段直连（内网地址不应该走代理）
     rules.push({
-      ip_cidr: [
-        '10.0.0.0/8',
-        '172.16.0.0/12',
-        '192.168.0.0/16',
-        '127.0.0.0/8',
-        '169.254.0.0/16',
-        '224.0.0.0/4',
-        '240.0.0.0/4',
-      ],
+      ip_cidr: PRIVATE_IP_CIDRS,
       action: 'route',
       outbound: 'direct',
     });
@@ -1864,18 +1882,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       'failed', // 失败
       'updated default interface', // 网络接口变化
       // 路由决策相关 - 关键日志
-      '[proxy]', // 走代理
-      '[direct]', // 走直连
-      '[block]', // 被阻断
-      '-> proxy', // 路由到代理
-      '-> direct', // 路由到直连
-      '-> block', // 路由到阻断
-      'outbound/proxy', // 代理出站
-      'outbound/direct', // 直连出站
-      'outbound/block', // 阻断出站
       'match rule', // 匹配规则
       'final rule', // 最终规则
       'rule-set', // 规则集匹配
+      'outbound/proxy', // 代理出站 - 用户关心的
     ];
 
     // 检查是否包含高价值模式
@@ -1883,6 +1893,18 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       if (lowerLine.includes(pattern)) {
         return false; // 不过滤，保留这条日志
       }
+    }
+
+    // 检查是否为内网IP的直连连接（这些太频繁，需要过滤）
+    if (lowerLine.includes('outbound/direct')) {
+      // 检查是否连接到私有IP地址
+      for (const pattern of PRIVATE_IP_PATTERNS) {
+        if (pattern.test(line)) {
+          return true; // 过滤内网直连
+        }
+      }
+      // 公网直连保留（如 CDN、国内网站等）
+      return false;
     }
 
     // 过滤的低价值日志模式
