@@ -14,7 +14,7 @@ export type {
 } from '../../shared/types';
 export type ProxyMode = 'global' | 'smart' | 'direct';
 export type ProxyModeType = 'systemProxy' | 'tun';
-export type ProtocolType = 'vless' | 'trojan';
+export type ProtocolType = 'vless' | 'trojan' | 'hysteria2';
 
 // 兼容旧代码的类型别名
 export type ServerConfigWithId = import('../../shared/types').ServerConfig;

@@ -13,6 +13,8 @@ import type {
   WebSocketSettings,
   GrpcSettings,
   HttpSettings,
+  Hysteria2Settings,
+  Hysteria2Network,
 } from '../../shared/types';
 
 export interface IProtocolParser {
@@ -37,7 +39,7 @@ export class ProtocolParser implements IProtocolParser {
    * 检查 URL 是否为支持的协议
    */
   isSupported(url: string): boolean {
-    return url.startsWith('vless://') || url.startsWith('trojan://');
+    return url.startsWith('vless://') || url.startsWith('trojan://') || url.startsWith('hysteria2://') || url.startsWith('hy2://');
   }
 
   /**
@@ -50,12 +52,21 @@ export class ProtocolParser implements IProtocolParser {
 
     try {
       const urlObj = new URL(url);
-      const protocol = urlObj.protocol.replace(':', '') as Protocol;
+      let protocolStr = urlObj.protocol.replace(':', '');
+      
+      // hy2 是 hysteria2 的别名
+      if (protocolStr === 'hy2') {
+        protocolStr = 'hysteria2';
+      }
+
+      const protocol = protocolStr as Protocol;
 
       if (protocol === 'vless') {
         return this.parseVless(urlObj);
       } else if (protocol === 'trojan') {
         return this.parseTrojan(urlObj);
+      } else if (protocol === 'hysteria2') {
+        return this.parseHysteria2(urlObj);
       }
 
       throw new Error(`不支持的协议: ${protocol}`);
@@ -150,6 +161,92 @@ export class ProtocolParser implements IProtocolParser {
       if (security === 'tls' || security === 'reality') {
         config.tlsSettings = this.parseTlsSettings(params);
       }
+    }
+
+    return config;
+  }
+
+  /**
+   * 解析 Hysteria2 URL
+   * 格式: hysteria2://password@address:port?obfs=salamander&obfs-password=xxx&sni=example.com&insecure=1#name
+   * 或者: hy2://password@address:port?...
+   */
+  private parseHysteria2(url: URL): ServerConfig {
+    const password = decodeURIComponent(url.username);
+    const address = url.hostname;
+    const port = parseInt(url.port) || 443;
+    const params = new URLSearchParams(url.search);
+    const name = decodeURIComponent(url.hash.slice(1)) || `${address}:${port}`;
+
+    if (!password) {
+      throw new Error('Hysteria2 URL 缺少密码');
+    }
+
+    const config: ServerConfig = {
+      id: randomUUID(),
+      name,
+      protocol: 'hysteria2',
+      address,
+      port,
+      password,
+      // Hysteria2 协议必须使用 TLS
+      security: 'tls',
+    };
+
+    // 解析 Hysteria2 特定配置
+    const hysteria2Settings: Hysteria2Settings = {};
+
+    // 解析带宽限制
+    const upMbps = params.get('up_mbps') || params.get('up');
+    const downMbps = params.get('down_mbps') || params.get('down');
+    if (upMbps) {
+      hysteria2Settings.upMbps = parseInt(upMbps);
+    }
+    if (downMbps) {
+      hysteria2Settings.downMbps = parseInt(downMbps);
+    }
+
+    // 解析混淆配置
+    const obfs = params.get('obfs');
+    const obfsPassword = params.get('obfs-password');
+    if (obfs === 'salamander' && obfsPassword) {
+      hysteria2Settings.obfs = {
+        type: 'salamander',
+        password: obfsPassword,
+      };
+    }
+
+    // 解析网络类型（tcp 或 udp）
+    const network = params.get('network') as Hysteria2Network | null;
+    if (network) {
+      hysteria2Settings.network = network;
+    }
+
+    // 只有在有设置时才添加
+    if (Object.keys(hysteria2Settings).length > 0) {
+      config.hysteria2Settings = hysteria2Settings;
+    }
+
+    // 解析 TLS 配置
+    const tlsSettings: TlsSettings = {};
+    
+    const sni = params.get('sni') || params.get('peer');
+    if (sni) {
+      tlsSettings.serverName = sni;
+    }
+
+    const insecure = params.get('insecure') || params.get('allowInsecure');
+    if (insecure === '1' || insecure === 'true') {
+      tlsSettings.allowInsecure = true;
+    }
+
+    const alpn = params.get('alpn');
+    if (alpn) {
+      tlsSettings.alpn = alpn.split(',');
+    }
+
+    if (Object.keys(tlsSettings).length > 0) {
+      config.tlsSettings = tlsSettings;
     }
 
     return config;
@@ -290,10 +387,15 @@ export class ProtocolParser implements IProtocolParser {
    * 将服务器配置生成为分享 URL
    */
   generateUrl(config: ServerConfig): string {
-    if (config.protocol === 'vless') {
+    // 统一转换为小写进行比较，因为存储的协议值可能是大写或小写
+    const protocol = config.protocol?.toLowerCase();
+    
+    if (protocol === 'vless') {
       return this.generateVlessUrl(config);
-    } else if (config.protocol === 'trojan') {
+    } else if (protocol === 'trojan') {
       return this.generateTrojanUrl(config);
+    } else if (protocol === 'hysteria2') {
+      return this.generateHysteria2Url(config);
     }
     throw new Error(`不支持的协议: ${config.protocol}`);
   }
@@ -321,7 +423,9 @@ export class ProtocolParser implements IProtocolParser {
     this.appendSecurityParams(params, config);
 
     const name = encodeURIComponent(config.name || `${config.address}:${config.port}`);
-    return `vless://${config.uuid}@${config.address}:${config.port}?${params.toString()}#${name}`;
+    const queryString = params.toString();
+    const queryPart = queryString ? `?${queryString}` : '';
+    return `vless://${config.uuid}@${config.address}:${config.port}${queryPart}#${name}`;
   }
 
   /**
@@ -338,7 +442,54 @@ export class ProtocolParser implements IProtocolParser {
 
     const name = encodeURIComponent(config.name || `${config.address}:${config.port}`);
     const password = encodeURIComponent(config.password || '');
-    return `trojan://${password}@${config.address}:${config.port}?${params.toString()}#${name}`;
+    const queryString = params.toString();
+    const queryPart = queryString ? `?${queryString}` : '';
+    return `trojan://${password}@${config.address}:${config.port}${queryPart}#${name}`;
+  }
+
+  /**
+   * 生成 Hysteria2 URL
+   */
+  private generateHysteria2Url(config: ServerConfig): string {
+    const params = new URLSearchParams();
+
+    // Hysteria2 特定配置
+    if (config.hysteria2Settings) {
+      if (config.hysteria2Settings.upMbps) {
+        params.set('up_mbps', config.hysteria2Settings.upMbps.toString());
+      }
+      if (config.hysteria2Settings.downMbps) {
+        params.set('down_mbps', config.hysteria2Settings.downMbps.toString());
+      }
+      if (config.hysteria2Settings.obfs) {
+        params.set('obfs', config.hysteria2Settings.obfs.type || 'salamander');
+        if (config.hysteria2Settings.obfs.password) {
+          params.set('obfs-password', config.hysteria2Settings.obfs.password);
+        }
+      }
+      if (config.hysteria2Settings.network) {
+        params.set('network', config.hysteria2Settings.network);
+      }
+    }
+
+    // TLS 配置
+    if (config.tlsSettings) {
+      if (config.tlsSettings.serverName) {
+        params.set('sni', config.tlsSettings.serverName);
+      }
+      if (config.tlsSettings.allowInsecure) {
+        params.set('insecure', '1');
+      }
+      if (config.tlsSettings.alpn && config.tlsSettings.alpn.length > 0) {
+        params.set('alpn', config.tlsSettings.alpn.join(','));
+      }
+    }
+
+    const name = encodeURIComponent(config.name || `${config.address}:${config.port}`);
+    const password = encodeURIComponent(config.password || '');
+    const queryString = params.toString();
+    const queryPart = queryString ? `?${queryString}` : '';
+    return `hysteria2://${password}@${config.address}:${config.port}${queryPart}#${name}`;
   }
 
   /**

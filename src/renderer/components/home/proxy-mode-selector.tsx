@@ -40,7 +40,7 @@ export function ProxyModeSelector() {
     const protocol = selectedServer.protocol?.toLowerCase();
     if (protocol === 'vless') {
       return !!(selectedServer.uuid && selectedServer.uuid.trim() !== '');
-    } else if (protocol === 'trojan') {
+    } else if (protocol === 'trojan' || protocol === 'hysteria2') {
       return !!(selectedServer.password && selectedServer.password.trim() !== '');
     }
 

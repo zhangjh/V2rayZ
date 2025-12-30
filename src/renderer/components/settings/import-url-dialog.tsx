@@ -95,7 +95,7 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
   };
 
   const isValidUrl = (url: string) => {
-    return url.startsWith('vless://') || url.startsWith('trojan://');
+    return url.startsWith('vless://') || url.startsWith('trojan://') || url.startsWith('hysteria2://') || url.startsWith('hy2://');
   };
 
   return (
@@ -106,7 +106,7 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
             <Link className="h-5 w-5" />
             从URL导入服务器
           </DialogTitle>
-          <DialogDescription>支持导入 vless:// 和 trojan:// 协议链接</DialogDescription>
+          <DialogDescription>支持导入 vless://、trojan://、hysteria2:// 和 hy2:// 协议链接</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -117,8 +117,8 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
               <Textarea
                 id="protocol-url"
                 placeholder="vless://uuid@server:port?encryption=none&security=tls&type=ws&host=example.com&path=/path#name
-或
-trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#name"
+或 trojan://password@server:port?security=tls&type=ws#name
+或 hysteria2://password@server:port?sni=example.com#name"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="min-h-[80px] resize-none"
@@ -133,7 +133,7 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
             </div>
             {url.trim() && !isValidUrl(url.trim()) && (
               <p className="text-sm text-destructive">
-                请输入有效的 vless:// 或 trojan:// 协议链接
+                请输入有效的 vless://、trojan://、hysteria2:// 或 hy2:// 协议链接
               </p>
             )}
           </div>
@@ -177,6 +177,12 @@ trojan://password@server:port?security=tls&type=ws&host=example.com&path=/path#n
                     </div>
                   )}
                   {parsedConfig.protocol === 'trojan' && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">密码:</span>
+                      <span className="ml-2">••••••••</span>
+                    </div>
+                  )}
+                  {parsedConfig.protocol === 'hysteria2' && (
                     <div className="col-span-2">
                       <span className="text-muted-foreground">密码:</span>
                       <span className="ml-2">••••••••</span>

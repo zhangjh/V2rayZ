@@ -9,8 +9,9 @@
 
 export type ProxyMode = 'global' | 'smart' | 'direct';
 export type ProxyModeType = 'systemProxy' | 'tun';
-export type Protocol = 'vless' | 'trojan';
+export type Protocol = 'vless' | 'trojan' | 'hysteria2';
 export type Network = 'tcp' | 'ws' | 'grpc' | 'http';
+export type Hysteria2Network = 'tcp' | 'udp';
 export type Security = 'none' | 'tls' | 'reality';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 export type RuleAction = 'proxy' | 'direct' | 'block';
@@ -46,6 +47,20 @@ export interface HttpSettings {
   headers?: Record<string, string[]>;
 }
 
+// Hysteria2 混淆设置
+export interface Hysteria2ObfsSettings {
+  type?: 'salamander';
+  password?: string;
+}
+
+// Hysteria2 协议设置
+export interface Hysteria2Settings {
+  upMbps?: number;
+  downMbps?: number;
+  obfs?: Hysteria2ObfsSettings;
+  network?: Hysteria2Network;
+}
+
 export interface ServerConfig {
   id: string;
   name: string;
@@ -58,8 +73,11 @@ export interface ServerConfig {
   encryption?: string;
   flow?: string;
 
-  // Trojan 特定
+  // Trojan 和 Hysteria2 通用
   password?: string;
+
+  // Hysteria2 特定
+  hysteria2Settings?: Hysteria2Settings;
 
   // 传输层配置
   network?: Network;

@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { VlessForm } from './vless-form';
 import { TrojanForm } from './trojan-form';
+import { Hysteria2Form } from './hysteria2-form';
 import type { ServerConfig, ProtocolType } from '@/bridge/types';
 
 type ServerConfigWithId = ServerConfig;
@@ -119,6 +120,7 @@ export function ServerConfigDialog({
               <SelectContent>
                 <SelectItem value="vless">VLESS</SelectItem>
                 <SelectItem value="trojan">Trojan</SelectItem>
+                <SelectItem value="hysteria2">Hysteria2</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">选择您的代理服务器协议类型</p>
@@ -142,6 +144,18 @@ export function ServerConfigDialog({
               <TrojanForm
                 serverConfig={
                   currentServerConfig?.protocol?.toLowerCase() === 'trojan'
+                    ? currentServerConfig
+                    : undefined
+                }
+                onSubmit={handleSave}
+                onTestConnection={onTestConnection}
+                isTestingConnection={isTestingConnection}
+              />
+            )}
+            {selectedProtocol === 'hysteria2' && (
+              <Hysteria2Form
+                serverConfig={
+                  currentServerConfig?.protocol?.toLowerCase() === 'hysteria2'
                     ? currentServerConfig
                     : undefined
                 }

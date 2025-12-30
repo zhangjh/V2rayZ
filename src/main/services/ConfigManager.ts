@@ -161,7 +161,7 @@ export class ConfigManager implements IConfigManager {
         throw new Error('Server name is required and must be a string');
       }
       const protocolLower = server.protocol?.toLowerCase();
-      if (!protocolLower || !['vless', 'trojan'].includes(protocolLower)) {
+      if (!protocolLower || !['vless', 'trojan', 'hysteria2'].includes(protocolLower)) {
         throw new Error('Server protocol must be vless or trojan');
       }
       if (!server.address || typeof server.address !== 'string') {

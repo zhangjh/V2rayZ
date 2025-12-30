@@ -85,8 +85,16 @@ interface SingBoxOutbound {
   uuid?: string;
   flow?: string;
   packet_encoding?: string;
-  // Trojan
+  // Trojan and Hysteria2
   password?: string;
+  // Hysteria2 specific
+  up_mbps?: number;
+  down_mbps?: number;
+  obfs?: {
+    type: string;
+    password: string;
+  };
+  network?: string;
   // TLS
   tls?: {
     enabled: boolean;
@@ -662,24 +670,55 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       outbound.password = server.password;
     }
 
+    // Hysteria2 特定配置
+    if (protocol === 'hysteria2') {
+      outbound.password = server.password;
+      
+      // 带宽限制
+      if (server.hysteria2Settings?.upMbps) {
+        outbound.up_mbps = server.hysteria2Settings.upMbps;
+      }
+      if (server.hysteria2Settings?.downMbps) {
+        outbound.down_mbps = server.hysteria2Settings.downMbps;
+      }
+      
+      // 混淆配置
+      if (server.hysteria2Settings?.obfs?.type && server.hysteria2Settings?.obfs?.password) {
+        outbound.obfs = {
+          type: server.hysteria2Settings.obfs.type,
+          password: server.hysteria2Settings.obfs.password,
+        };
+      }
+      
+      // 网络类型 (tcp/udp)
+      if (server.hysteria2Settings?.network) {
+        outbound.network = server.hysteria2Settings.network;
+      }
+    }
+
     // TLS 配置
     if (server.security === 'tls' || server.tlsSettings) {
       outbound.tls = {
         enabled: true,
         server_name: server.tlsSettings?.serverName || server.address,
         insecure: server.tlsSettings?.allowInsecure || false,
-        utls: {
+      };
+      
+      // uTLS 仅适用于基于 TCP 的协议，Hysteria2 使用 QUIC (UDP) 不支持 uTLS
+      if (protocol !== 'hysteria2') {
+        outbound.tls.utls = {
           enabled: true,
           fingerprint: 'chrome',
-        },
-      };
+        };
+      }
+      
       if (server.tlsSettings?.alpn) {
         outbound.tls.alpn = server.tlsSettings.alpn;
       }
     }
 
-    // 传输层配置
-    if (server.network && server.network !== 'tcp') {
+    // 传输层配置（不适用于 hysteria2）
+    if (protocol !== 'hysteria2' && server.network && server.network !== 'tcp') {
       outbound.transport = this.generateTransportConfig(server);
     }
 
@@ -1038,11 +1077,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       const lowerOutput = errorOutput.toLowerCase();
 
       if (lowerOutput.includes('permission denied') || lowerOutput.includes('access denied')) {
-        return 'TUN 模式需要管理员权限，请以管理员身份运行应用';
+        return `TUN 模式需要管理员权限，请以管理员身份运行应用 [${errorOutput}]`;
       }
 
       if (lowerOutput.includes('address already in use') || lowerOutput.includes('bind')) {
-        return '端口已被占用，请在设置中更换其他端口或关闭占用端口的程序';
+        return `端口已被占用，请在设置中更换其他端口或关闭占用端口的程序 [${errorOutput}]`;
       }
 
       if (
@@ -1050,15 +1089,15 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         lowerOutput.includes('parse') ||
         lowerOutput.includes('json')
       ) {
-        return 'sing-box 配置文件格式错误，请检查服务器配置';
+        return `sing-box 配置文件格式错误，请检查服务器配置 [${errorOutput}]`;
       }
 
       if (lowerOutput.includes('connection refused') || lowerOutput.includes('dial')) {
-        return '无法连接到代理服务器，请检查服务器地址和端口';
+        return `无法连接到代理服务器，请检查服务器地址和端口 [${errorOutput}]`;
       }
 
       if (lowerOutput.includes('certificate') || lowerOutput.includes('tls')) {
-        return 'TLS 证书验证失败，请检查服务器 TLS 配置';
+        return `TLS 证书验证失败，请检查服务器 TLS 配置 [${errorOutput}]`;
       }
 
       // 如果有具体的错误信息，翻译后返回
@@ -1448,8 +1487,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * 翻译错误消息为友好的中文提示
+   * 返回格式：友好提示 + 原始错误（如果有翻译）
    */
   private translateErrorMessage(message: string): string {
+    console.error(message);
     const lowerMessage = message.toLowerCase();
 
     // 常见错误模式匹配
@@ -1457,7 +1498,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       lowerMessage.includes('connection refused') ||
       lowerMessage.includes('connect: connection refused')
     ) {
-      return '连接被拒绝：无法连接到代理服务器，请检查服务器地址和端口是否正确';
+      return `连接被拒绝：无法连接到代理服务器，请检查服务器地址和端口是否正确 [${message}]`;
     }
 
     if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out')) {
@@ -1472,7 +1513,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     if (lowerMessage.includes('dns') && lowerMessage.includes('fail')) {
-      return 'DNS 解析失败：无法解析服务器域名，请检查 DNS 设置';
+      return `DNS 解析失败：无法解析服务器域名，请检查 DNS 设置 [${message}]`;
     }
 
     if (
@@ -1480,26 +1521,27 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       lowerMessage.includes('tls') ||
       lowerMessage.includes('ssl')
     ) {
-      return 'TLS 证书错误：服务器证书验证失败，请检查 TLS 设置';
+      // 保留原始错误信息，帮助用户诊断具体的证书问题
+      return `TLS 证书错误：服务器证书验证失败 [${message}]`;
     }
 
     if (lowerMessage.includes('authentication failed') || lowerMessage.includes('auth fail')) {
-      return '认证失败：用户名或密码错误，请检查服务器配置';
+      return `认证失败：用户名或密码错误，请检查服务器配置 [${message}]`;
     }
 
     if (lowerMessage.includes('permission denied') || lowerMessage.includes('access denied')) {
-      return '权限不足：需要管理员权限才能启动 TUN 模式';
+      return `权限不足：需要管理员权限才能启动 TUN 模式 [${message}]`;
     }
 
     if (
       lowerMessage.includes('address already in use') ||
       lowerMessage.includes('bind: address already in use')
     ) {
-      return '端口已被占用：请更换其他端口或关闭占用端口的程序';
+      return `端口已被占用：请更换其他端口或关闭占用端口的程序 [${message}]`;
     }
 
     if (lowerMessage.includes('invalid config') || lowerMessage.includes('config error')) {
-      return '配置错误：sing-box 配置文件格式不正确';
+      return `配置错误：sing-box 配置文件格式不正确 [${message}]`;
     }
 
     // 如果没有匹配到特定错误，返回原始消息
