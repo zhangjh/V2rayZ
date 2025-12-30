@@ -40,6 +40,10 @@ export function registerConfigHandlers(configManager: ConfigManager): void {
     IPC_CHANNELS.CONFIG_UPDATE_MODE,
     async (_event: IpcMainInvokeEvent, args: { mode: ProxyMode }) => {
       await configManager.set('proxyMode', args.mode);
+      const config = await configManager.loadConfig();
+      // 广播和触发事件
+      ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      mainEventEmitter.emit(MAIN_EVENTS.CONFIG_CHANGED, config);
     }
   );
 
@@ -56,6 +60,10 @@ export function registerConfigHandlers(configManager: ConfigManager): void {
     IPC_CHANNELS.CONFIG_SET_VALUE,
     async (_event: IpcMainInvokeEvent, args: { key: keyof UserConfig; value: any }) => {
       await configManager.set(args.key, args.value);
+      const config = await configManager.loadConfig();
+      // 广播和触发事件
+      ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      mainEventEmitter.emit(MAIN_EVENTS.CONFIG_CHANGED, config);
     }
   );
 

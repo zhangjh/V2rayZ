@@ -571,10 +571,31 @@ app.whenReady().then(async () => {
   // 初始化托盘菜单状态
   updateTrayMenuState(false);
 
-  // 监听配置变更事件，更新托盘菜单
-  mainEventEmitter.on(MAIN_EVENTS.CONFIG_CHANGED, () => {
+  // 监听配置变更事件，更新托盘菜单并自动重启代理
+  mainEventEmitter.on(MAIN_EVENTS.CONFIG_CHANGED, async () => {
+    // 1. 更新托盘菜单
     const isRunning = proxyManager?.getStatus().running ?? false;
     updateTrayMenuState(isRunning);
+
+    // 2. 如果代理正在运行，自动重启以应用新配置
+    if (isRunning && proxyManager) {
+      logManager.addLog('info', 'Configuration changed, restarting proxy...', 'Main');
+      try {
+        await proxyManager.stop();
+        // 重新加载配置以确保使用最新值
+        const latestConfig = await configManager.loadConfig();
+        await proxyManager.start(latestConfig);
+        logManager.addLog('info', 'Proxy restarted successfully with new configuration', 'Main');
+        
+        // 重启后再次更新托盘（以防状态有变）
+        updateTrayMenuState(true);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logManager.addLog('error', `Failed to restart proxy after config change: ${errorMessage}`, 'Main');
+        // 重启失败，更新托盘状态为停止
+        updateTrayMenuState(false, true);
+      }
+    }
   });
 
   app.on('activate', () => {

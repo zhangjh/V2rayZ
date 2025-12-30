@@ -872,10 +872,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     // 始终添加 rule_set 配置（除非是直连模式）
-    // 全局代理模式使用远程 DNS 避免 DNS 污染，智能分流模式使用本地 DNS 提高国内访问速度
+    // 统一使用 dns-local 作为默认解析器
     const routeConfig: SingBoxRouteConfig = {
       rules,
-      default_domain_resolver: proxyMode === 'global' ? 'dns-remote' : 'dns-local',
+      default_domain_resolver: 'dns-local',
       auto_detect_interface: true,
       final: proxyMode === 'direct' ? 'direct' : 'proxy',
     };
