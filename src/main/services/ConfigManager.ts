@@ -3,10 +3,10 @@
  * 负责用户配置的加载、保存、验证和管理
  */
 
-import { app } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { UserConfig } from '../../shared/types';
+import { getConfigPath } from '../utils/paths';
 
 export interface IConfigManager {
   loadConfig(): Promise<UserConfig>;
@@ -25,8 +25,8 @@ export class ConfigManager implements IConfigManager {
     if (customConfigPath) {
       this.configPath = customConfigPath;
     } else {
-      const userDataPath = app.getPath('userData');
-      this.configPath = path.join(userDataPath, 'config.json');
+      // 使用统一的路径工具，确保始终使用正确的用户数据路径
+      this.configPath = getConfigPath();
     }
   }
 

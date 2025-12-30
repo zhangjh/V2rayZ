@@ -22,10 +22,15 @@ import {
 import { UpdateService } from './services/UpdateService';
 import { ipcEventEmitter } from './ipc/ipc-events';
 import { mainEventEmitter, MAIN_EVENTS } from './ipc/main-events';
+import { initUserDataPath } from './utils/paths';
 
 let mainWindow: BrowserWindow | null = null;
 let trayManager: TrayManager | null = null;
 const isDevelopment = process.env.NODE_ENV === 'development';
+
+// 在导入任何使用路径的服务之前，初始化用户数据路径
+// 这确保无论以何种权限运行，都使用正确的路径
+initUserDataPath();
 
 // 初始化服务
 const configManager = new ConfigManager();
@@ -373,7 +378,7 @@ app.whenReady().then(async () => {
     logManager.addLog('error', `Proxy error: ${error.message}`, 'Main');
     // 发生错误时，更新托盘显示为"连接异常"
     updateTrayMenuState(false, true);
-    
+
     // 进程意外退出时，清理系统代理设置，避免网络不可用
     try {
       const proxyStatus = await systemProxyManager.getProxyStatus();
@@ -391,7 +396,7 @@ app.whenReady().then(async () => {
   proxyManager.on('stopped', async () => {
     // 正常停止时，重置错误状态
     updateTrayMenuState(false, false);
-    
+
     // 确保系统代理被清理
     try {
       const proxyStatus = await systemProxyManager.getProxyStatus();
@@ -586,7 +591,7 @@ app.whenReady().then(async () => {
         const latestConfig = await configManager.loadConfig();
         await proxyManager.start(latestConfig);
         logManager.addLog('info', 'Proxy restarted successfully with new configuration', 'Main');
-        
+
         // 重启后再次更新托盘（以防状态有变）
         updateTrayMenuState(true);
       } catch (error) {

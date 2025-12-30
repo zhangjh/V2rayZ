@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LogManager } from './LogManager';
 import type { UpdateInfo, UpdateCheckResult, UpdateProgress } from '../../shared/types/update';
+import { getUserDataPath } from '../utils/paths';
 
 const GITHUB_OWNER = 'zhangjh';
 const GITHUB_REPO = 'FlowZ';
@@ -484,7 +485,8 @@ open "${installerPath}"
 
   private loadSkippedVersion(): void {
     try {
-      const configPath = path.join(app.getPath('userData'), 'skipped_version.txt');
+      // 使用统一的路径工具，确保始终使用正确的用户数据路径
+      const configPath = path.join(getUserDataPath(), 'skipped_version.txt');
       if (fs.existsSync(configPath)) {
         this.skippedVersion = fs.readFileSync(configPath, 'utf-8').trim();
       }
@@ -495,7 +497,8 @@ open "${installerPath}"
 
   private saveSkippedVersion(): void {
     try {
-      const configPath = path.join(app.getPath('userData'), 'skipped_version.txt');
+      // 使用统一的路径工具，确保始终使用正确的用户数据路径
+      const configPath = path.join(getUserDataPath(), 'skipped_version.txt');
       if (this.skippedVersion) {
         fs.writeFileSync(configPath, this.skippedVersion);
       } else if (fs.existsSync(configPath)) {

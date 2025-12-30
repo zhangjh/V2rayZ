@@ -36,13 +36,5 @@ export function registerAdminHandlers(): void {
     }
   );
 
-  // 请求提升权限（重启应用）
-  registerIpcHandler<void, boolean>(
-    IPC_CHANNELS.ADMIN_REQUEST_ELEVATION,
-    async (_event: IpcMainInvokeEvent) => {
-      return adminPrivilegeService.requestElevation();
-    }
-  );
-
   console.log('[Admin Handlers] Registered all admin IPC handlers');
 }

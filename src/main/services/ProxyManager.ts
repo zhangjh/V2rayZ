@@ -3,7 +3,7 @@
  * 负责 sing-box 进程的生命周期管理和配置生成
  */
 
-import { app, BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -13,6 +13,7 @@ import type { ILogManager } from './LogManager';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { resourceManager } from './ResourceManager';
 import { retry } from '../utils/retry';
+import { getUserDataPath } from '../utils/paths';
 
 /**
  * 私有 IP 地址段（CIDR 格式）
@@ -242,7 +243,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     if (configPath) {
       this.configPath = configPath;
     } else {
-      const userDataPath = app.getPath('userData');
+      const userDataPath = getUserDataPath();
       this.configPath = path.join(userDataPath, 'singbox_config.json');
     }
 
@@ -273,10 +274,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
     // 仅在 TUN 模式下清理可能残留的 sing-box 进程
     // 系统代理模式不需要管理员权限，也不会有残留的 TUN 进程问题
-    const isTunMode = (config.proxyModeType || 'tun').toLowerCase() !== 'systemproxy';
+    const isTunMode = config.proxyModeType === 'tun';
     if (isTunMode) {
       await this.killOrphanedSingBoxProcesses();
     }
+
+    // 修复可能被 root 创建的文件权限（从 TUN 模式切换到系统代理模式时）
+    await this.fixFilePermissions();
 
     // 检查是否选择了服务器
     if (!config.selectedServerId) {
@@ -435,8 +439,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // macOS TUN 模式：检查 singboxPid 而不是 singboxProcess
     // 同时验证进程是否真正存活
     const activePid = this.singboxPid || this.pid;
-    const isRunning = (this.singboxProcess !== null || this.singboxPid !== null) && 
-                      (activePid ? this.isProcessAlive(activePid) : false);
+    const isRunning = (this.singboxProcess !== null || this.singboxPid !== null) &&
+      (activePid ? this.isProcessAlive(activePid) : false);
 
     if (!isRunning || !activePid) {
       return {
@@ -479,7 +483,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     });
 
     // 获取用户数据目录用于缓存文件
-    const userDataPath = app.getPath('userData');
+    const userDataPath = getUserDataPath();
     const cachePath = path.join(userDataPath, 'cache.db');
 
     const singboxConfig: SingBoxConfig = {
@@ -531,7 +535,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 获取 sing-box 日志文件路径
    */
   private getLogFilePath(): string {
-    const userDataPath = app.getPath('userData');
+    const userDataPath = getUserDataPath();
     return path.join(userDataPath, 'singbox.log');
   }
 
@@ -735,7 +739,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // Hysteria2 特定配置
     if (protocol === 'hysteria2') {
       outbound.password = server.password;
-      
+
       // 带宽限制
       if (server.hysteria2Settings?.upMbps) {
         outbound.up_mbps = server.hysteria2Settings.upMbps;
@@ -743,7 +747,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       if (server.hysteria2Settings?.downMbps) {
         outbound.down_mbps = server.hysteria2Settings.downMbps;
       }
-      
+
       // 混淆配置
       if (server.hysteria2Settings?.obfs?.type && server.hysteria2Settings?.obfs?.password) {
         outbound.obfs = {
@@ -751,7 +755,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           password: server.hysteria2Settings.obfs.password,
         };
       }
-      
+
       // 网络类型 (tcp/udp)
       if (server.hysteria2Settings?.network) {
         outbound.network = server.hysteria2Settings.network;
@@ -765,7 +769,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         server_name: server.tlsSettings?.serverName || server.address,
         insecure: server.tlsSettings?.allowInsecure || false,
       };
-      
+
       // uTLS 仅适用于基于 TCP 的协议，Hysteria2 使用 QUIC (UDP) 不支持 uTLS
       if (protocol !== 'hysteria2') {
         outbound.tls.utls = {
@@ -773,7 +777,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           fingerprint: 'chrome',
         };
       }
-      
+
       if (server.tlsSettings?.alpn) {
         outbound.tls.alpn = server.tlsSettings.alpn;
       }
@@ -956,7 +960,9 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * Windows 和 macOS 的 TUN 模式都需要管理员权限
    */
   private needsRootPrivilege(): boolean {
-    const isTunMode = this.currentConfig?.proxyModeType?.toLowerCase() !== 'systemproxy';
+    // 只有 TUN 模式才需要管理员权限
+    // proxyModeType 的值为 'systemProxy' 或 'tun'
+    const isTunMode = this.currentConfig?.proxyModeType === 'tun';
     // Windows 和 macOS 的 TUN 模式都需要管理员权限
     return isTunMode && (process.platform === 'darwin' || process.platform === 'win32');
   }
@@ -966,6 +972,70 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    */
   private needsOsascript(): boolean {
     return process.platform === 'darwin' && this.needsRootPrivilege();
+  }
+
+  /**
+   * 检查是否需要使用 UAC 提升权限运行（仅 Windows TUN 模式）
+   */
+  private needsWindowsUAC(): boolean {
+    return process.platform === 'win32' && this.needsRootPrivilege();
+  }
+
+  /**
+   * 修复可能被 root 创建的文件权限（macOS）
+   * 当从 TUN 模式切换到系统代理模式时，某些文件可能仍然属于 root
+   * 需要在普通用户模式下修复这些文件的权限
+   */
+  private async fixFilePermissions(): Promise<void> {
+    // 只在 macOS 上需要处理
+    if (process.platform !== 'darwin') {
+      return;
+    }
+
+    // 如果是 TUN 模式，不需要修复（会以 root 权限运行）
+    if (this.needsRootPrivilege()) {
+      return;
+    }
+
+    const userDataPath = getUserDataPath();
+    const filesToFix = [
+      path.join(userDataPath, 'cache.db'),
+      path.join(userDataPath, 'singbox.log'),
+      path.join(userDataPath, 'singbox.pid'),
+    ];
+
+    const fsSync = require('fs');
+    const { execSync } = require('child_process');
+
+    for (const filePath of filesToFix) {
+      try {
+        if (fsSync.existsSync(filePath)) {
+          const stats = fsSync.statSync(filePath);
+          // 检查文件是否属于 root (uid 0)
+          if (stats.uid === 0) {
+            this.logToManager('info', `修复文件权限: ${filePath}`);
+            // 使用 chown 修改文件所有权为当前用户
+            const currentUser = process.env.USER || process.env.LOGNAME;
+            if (currentUser) {
+              try {
+                // 尝试使用 chown（可能需要密码）
+                execSync(`chown ${currentUser} "${filePath}"`, { stdio: 'ignore' });
+              } catch {
+                // 如果 chown 失败，尝试删除文件让 sing-box 重新创建
+                try {
+                  fsSync.unlinkSync(filePath);
+                  this.logToManager('info', `已删除需要重新创建的文件: ${filePath}`);
+                } catch {
+                  this.logToManager('warn', `无法修复文件权限: ${filePath}，请手动删除或运行: sudo chown ${currentUser} "${filePath}"`);
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        // 忽略检查错误
+      }
+    }
   }
 
   /**
@@ -983,8 +1053,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           return;
         }
 
-        // 在 macOS 上，TUN 模式需要使用 osascript 请求 root 权限
-        // 在 Windows 上，应用应该已经以管理员权限运行（通过 UAC 提升）
+        // 根据平台和模式选择启动方式：
+        // - macOS TUN 模式: 使用 osascript 请求管理员权限
+        // - Windows TUN 模式: 使用 PowerShell Start-Process -Verb RunAs 请求 UAC 权限
+        // - 其他情况: 直接运行
         let command: string;
         let args: string[];
 
@@ -993,7 +1065,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           // 注意：路径中可能包含空格，需要使用转义引号
           // sing-box 配置中已经设置了 log.output，日志会写入文件
           // 使用 & 让进程在后台运行，并将 PID 写入文件
-          const pidFile = path.join(app.getPath('userData'), 'singbox.pid');
+          const pidFile = path.join(getUserDataPath(), 'singbox.pid');
           command = '/usr/bin/osascript';
           // 使用 bash -c 来执行后台命令，确保 & 正常工作
           args = [
@@ -1001,8 +1073,29 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
             `do shell script "/bin/bash -c '\\"${this.singboxPath}\\" run -c \\"${this.configPath}\\" & echo $! > \\"${pidFile}\\"'" with administrator privileges`,
           ];
           this.logToManager('info', 'TUN 模式需要管理员权限，正在请求...');
+        } else if (this.needsWindowsUAC()) {
+          // Windows TUN 模式: 使用 PowerShell 请求 UAC 权限运行
+          // 使用 Start-Process -Verb RunAs 来请求管理员权限
+          const pidFile = path.join(getUserDataPath(), 'singbox.pid');
+          command = 'powershell.exe';
+
+          // PowerShell 脚本：以管理员权限启动 sing-box 并记录 PID
+          // -WindowStyle Hidden 确保 sing-box 窗口隐藏
+          // -PassThru 返回进程对象以获取 PID
+          const psScript = `
+            $process = Start-Process -FilePath '${this.singboxPath.replace(/'/g, "''")}' -ArgumentList 'run','-c','${this.configPath.replace(/'/g, "''")}' -Verb RunAs -PassThru -WindowStyle Hidden
+            if ($process) {
+              $process.Id | Out-File -FilePath '${pidFile.replace(/'/g, "''")}' -Encoding ASCII -NoNewline
+              exit 0
+            } else {
+              exit 1
+            }
+          `.trim();
+
+          args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript];
+          this.logToManager('info', 'TUN 模式需要管理员权限，正在请求 UAC 授权...');
         } else {
-          // Windows 或系统代理模式：直接运行
+          // 系统代理模式或 Linux：直接运行
           command = this.singboxPath;
           args = ['run', '-c', this.configPath];
         }
@@ -1063,6 +1156,24 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
             }
           }
 
+          // 对于 Windows TUN 模式，PowerShell 退出码为 0 表示成功启动了 sing-box
+          if (this.needsWindowsUAC()) {
+            if (code === 0) {
+              // PowerShell 成功执行，sing-box 以管理员权限在后台运行
+              // 读取 PID 文件获取实际的 sing-box PID
+              this.readSingBoxPidFromFile();
+              return; // 不调用 handleProcessExit，因为 sing-box 还在运行
+            } else {
+              // PowerShell 执行失败（用户取消 UAC 或其他错误）
+              const errorMessage =
+                code === 1 ? '用户取消了管理员权限请求' : `UAC 授权失败，退出码: ${code}`;
+              this.logToManager('error', errorMessage);
+              reject(new Error(errorMessage));
+              this.handleProcessExit(code, signal);
+              return;
+            }
+          }
+
           // 如果在启动阶段就退出了，说明启动失败
           const startupTime = Date.now() - (this.startTime?.getTime() || Date.now());
           if (startupTime < 2000 && code !== null && code !== 0) {
@@ -1076,17 +1187,20 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
         // 等待一小段时间确保进程启动成功
         setTimeout(async () => {
-          // macOS TUN 模式：检查 singboxPid（从 PID 文件读取）
+          // macOS TUN 模式或 Windows TUN 模式：检查 singboxPid（从 PID 文件读取）
           // 其他模式：检查 singboxProcess 和 pid
           const isMacTunMode = this.needsOsascript();
-          
-          if (isMacTunMode) {
-            // macOS TUN 模式：等待 PID 文件被写入
+          const isWindowsTunMode = this.needsWindowsUAC();
+
+          if (isMacTunMode || isWindowsTunMode) {
+            // TUN 模式：等待 PID 文件被写入
             await this.waitForPidFile();
-            
+
             if (this.singboxPid) {
-              // 启动日志文件监控
-              this.startLogFileWatcher();
+              // 启动日志文件监控（仅 macOS，Windows 不需要因为进程在后台运行）
+              if (isMacTunMode) {
+                this.startLogFileWatcher();
+              }
               // 启动健康检查定时器
               this.startHealthCheck();
 
@@ -1104,7 +1218,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
               reject(new Error(error));
             }
           } else {
-            // 非 macOS TUN 模式
+            // 系统代理模式或 Linux
             if (this.singboxProcess && this.pid) {
               // 启动健康检查定时器
               this.startHealthCheck();
@@ -1213,6 +1327,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       return this.stopSingBoxWithSudo();
     }
 
+    // Windows TUN 模式：sing-box 以管理员权限在后台运行，使用 taskkill 终止
+    if (this.singboxPid && process.platform === 'win32') {
+      return this.stopSingBoxOnWindows();
+    }
+
     if (!this.singboxProcess) {
       return;
     }
@@ -1263,7 +1382,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         if (code === 0) {
           // 等待进程退出
           await this.waitForProcessExit(pidToKill, 3000);
-          
+
           // 检查进程是否真的退出了
           if (this.isProcessAlive(pidToKill)) {
             this.logToManager('warn', '进程未响应 SIGTERM，尝试强制终止...');
@@ -1298,6 +1417,64 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         this.logToManager('error', `停止 sing-box 进程失败: ${error.message}`);
         // 尝试强制终止
         await this.forceKillProcess(pidToKill);
+        this.cleanup();
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * 停止 sing-box 进程（Windows TUN 模式）
+   * Windows 上使用 taskkill 命令终止以管理员权限运行的进程
+   */
+  private async stopSingBoxOnWindows(): Promise<void> {
+    if (!this.singboxPid) {
+      this.cleanup();
+      return;
+    }
+
+    const pidToKill = this.singboxPid;
+    this.logToManager('info', `正在停止 sing-box 进程 (PID: ${pidToKill})...`);
+
+    return new Promise((resolve) => {
+      // 使用 taskkill 终止进程
+      // /F 强制终止，/PID 指定进程 ID
+      const killProcess = spawn('taskkill', ['/F', '/PID', pidToKill.toString()], {
+        windowsHide: true,
+      });
+
+      killProcess.on('exit', (code) => {
+        if (code === 0) {
+          this.logToManager('info', 'sing-box 进程已停止');
+        } else {
+          this.logToManager('warn', `taskkill 退出码: ${code}，进程可能已经退出`);
+        }
+
+        // 清理 PID 文件
+        const fsSync = require('fs');
+        try {
+          fsSync.unlinkSync(this.getPidFilePath());
+        } catch {
+          // 忽略错误
+        }
+
+        this.cleanup();
+
+        // 触发停止事件
+        this.emit('stopped');
+        this.sendEventToRenderer(IPC_CHANNELS.EVENT_PROXY_STOPPED, {});
+
+        resolve();
+      });
+
+      killProcess.on('error', (error) => {
+        this.logToManager('error', `停止 sing-box 进程失败: ${error.message}`);
+        // 尝试使用 process.kill
+        try {
+          process.kill(pidToKill, 'SIGKILL');
+        } catch {
+          // 忽略错误
+        }
         this.cleanup();
         resolve();
       });
@@ -1683,7 +1860,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 从 PID 文件读取 sing-box 的实际 PID（macOS TUN 模式）
    */
   private async readSingBoxPidFromFile(): Promise<void> {
-    const pidFile = path.join(app.getPath('userData'), 'singbox.pid');
+    const pidFile = path.join(getUserDataPath(), 'singbox.pid');
     try {
       const pidContent = await fs.readFile(pidFile, 'utf-8');
       const pid = parseInt(pidContent.trim(), 10);
@@ -1729,7 +1906,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 获取 PID 文件路径
    */
   private getPidFilePath(): string {
-    return path.join(app.getPath('userData'), 'singbox.pid');
+    return path.join(getUserDataPath(), 'singbox.pid');
   }
 
   /**

@@ -374,14 +374,6 @@ export const adminApi = {
   async check(): Promise<AdminCheckResult> {
     return ipcClient.invoke(IPC_CHANNELS.ADMIN_CHECK);
   },
-
-  /**
-   * 请求提升权限（会重启应用）
-   * @returns 如果用户同意重启返回 true，否则返回 false
-   */
-  async requestElevation(): Promise<boolean> {
-    return ipcClient.invoke(IPC_CHANNELS.ADMIN_REQUEST_ELEVATION);
-  },
 };
 
 /**
@@ -412,13 +404,13 @@ export interface UpdateInfo {
  */
 export interface UpdateProgress {
   status:
-    | 'idle'
-    | 'checking'
-    | 'no-update'
-    | 'update-available'
-    | 'downloading'
-    | 'downloaded'
-    | 'error';
+  | 'idle'
+  | 'checking'
+  | 'no-update'
+  | 'update-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
   percentage: number;
   message: string;
   error?: string;

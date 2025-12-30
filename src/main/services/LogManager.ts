@@ -6,8 +6,8 @@
 import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { app } from 'electron';
 import type { LogEntry, LogLevel } from '../../shared/types';
+import { getLogsPath } from '../utils/paths';
 
 export interface ILogManager {
   addLog(level: LogLevel, message: string, source: string, stack?: string): void;
@@ -39,7 +39,8 @@ export class LogManager extends EventEmitter implements ILogManager {
 
   constructor(logDir?: string) {
     super();
-    const baseLogDir = logDir || path.join(app.getPath('userData'), 'logs');
+    // 使用统一的路径工具，确保始终使用正确的用户数据路径
+    const baseLogDir = logDir || getLogsPath();
     this.logFilePath = path.join(baseLogDir, 'app.log');
     this.initPromise = this.ensureLogDirectory();
   }

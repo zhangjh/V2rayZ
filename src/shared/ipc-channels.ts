@@ -69,7 +69,6 @@ export const IPC_CHANNELS = {
 
   // 管理员权限
   ADMIN_CHECK: 'admin:check',
-  ADMIN_REQUEST_ELEVATION: 'admin:requestElevation',
 
   // 事件 (主进程 -> 渲染进程)
   EVENT_PROXY_STARTED: 'event:proxyStarted',

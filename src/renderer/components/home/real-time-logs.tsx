@@ -66,12 +66,12 @@ export function RealTimeLogs() {
     const handleScroll = () => {
       // 标记用户正在滚动
       setIsUserScrolling(true);
-      
+
       // 清除之前的超时
       if (userScrollTimeoutRef.current) {
         clearTimeout(userScrollTimeoutRef.current);
       }
-      
+
       // 设置超时，滚动停止后更新状态
       userScrollTimeoutRef.current = setTimeout(() => {
         setIsUserScrolling(false);
@@ -82,7 +82,7 @@ export function RealTimeLogs() {
     };
 
     scrollElement.addEventListener('scroll', handleScroll, { passive: true });
-    
+
     return () => {
       scrollElement.removeEventListener('scroll', handleScroll);
       if (userScrollTimeoutRef.current) {
@@ -155,12 +155,12 @@ export function RealTimeLogs() {
               {connectionStatus?.proxyCore?.running ? '等待日志输出...' : '请先启动代理服务'}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1 select-text cursor-text">
               {logs.map((log, index) => {
                 const timestamp = new Date(log.timestamp).toLocaleTimeString('zh-CN');
 
                 return (
-                  <div key={index} className="text-xs font-mono">
+                  <div key={index} className="text-xs font-mono select-text">
                     <span className="text-muted-foreground">[{timestamp}]</span>
                     <span className={`ml-2 font-semibold ${getLevelColor(log.level)}`}>
                       {log.level.toUpperCase()}:
