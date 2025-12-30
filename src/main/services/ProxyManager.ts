@@ -564,10 +564,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     const dnsConfig: SingBoxDnsConfig = {
       servers: [
         {
-          // 本地 DNS：用于解析代理服务器地址
+          // 本地/系统 DNS：使用操作系统当前的 DNS 配置
+          // 用于解析代理服务器地址、Fail-safe 解析以及直连域名的真实 IP 解析
           tag: 'dns-local',
-          type: 'udp',
-          server: '223.5.5.5',
+          type: 'local',
         },
         {
           // FakeIP 服务器：返回虚假 IP，由 sniff 识别真实域名

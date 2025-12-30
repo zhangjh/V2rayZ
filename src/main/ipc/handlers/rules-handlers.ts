@@ -7,6 +7,8 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels';
 import type { DomainRule } from '../../../shared/types';
 import { registerIpcHandler } from '../ipc-handler';
 import { ConfigManager } from '../../services/ConfigManager';
+import { ipcEventEmitter } from '../ipc-events';
+import { mainEventEmitter, MAIN_EVENTS } from '../main-events';
 
 /**
  * 注册路由规则相关的 IPC 处理器
@@ -36,6 +38,10 @@ export function registerRulesHandlers(configManager: ConfigManager): void {
       }
       config.customRules.push(newRule);
       await configManager.saveConfig(config);
+      
+      // 广播和触发事件
+      ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      mainEventEmitter.emit(MAIN_EVENTS.CONFIG_CHANGED, config);
 
       console.log('[Rules Handlers] Rule added:', newRule.id);
       return newRule;
@@ -60,6 +66,10 @@ export function registerRulesHandlers(configManager: ConfigManager): void {
       config.customRules[index] = rule;
       await configManager.saveConfig(config);
 
+      // 广播和触发事件
+      ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      mainEventEmitter.emit(MAIN_EVENTS.CONFIG_CHANGED, config);
+
       console.log('[Rules Handlers] Rule updated:', rule.id);
     }
   );
@@ -81,6 +91,10 @@ export function registerRulesHandlers(configManager: ConfigManager): void {
 
       config.customRules.splice(index, 1);
       await configManager.saveConfig(config);
+
+      // 广播和触发事件
+      ipcEventEmitter.sendToAll('event:configChanged', { newValue: config });
+      mainEventEmitter.emit(MAIN_EVENTS.CONFIG_CHANGED, config);
 
       console.log('[Rules Handlers] Rule deleted:', args.ruleId);
     }
