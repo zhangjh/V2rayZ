@@ -47,18 +47,25 @@ function prompt(question) {
 
 async function main() {
   const skipConfirm = process.argv.includes('-y') || process.argv.includes('--yes');
-  const forceUpdate = process.argv.includes('-f') || process.argv.includes('--force');
+  // 使用 -u/--update 替代 -f/--force，因为 npm 会拦截 -f
+  const forceUpdate = process.argv.includes('-u') || process.argv.includes('--update');
 
   if (process.argv.includes('-h') || process.argv.includes('--help')) {
     console.log(`
 推送 Release Tag 脚本
 
 用法: node push-release.js [选项]
+      npm run release:tag -- [选项]
 
 选项:
-  -y, --yes    跳过确认
-  -f, --force  强制更新已存在的 tag
-  -h, --help   显示帮助
+  -y, --yes      跳过确认
+  -u, --update   强制更新已存在的 tag
+  -h, --help     显示帮助
+
+示例:
+  npm run release:tag           # 创建并推送 tag
+  npm run release:tag -- -u     # 强制更新已存在的 tag
+  npm run release:tag -- -y -u  # 跳过确认并强制更新
 `);
     process.exit(0);
   }
@@ -94,7 +101,7 @@ async function main() {
 
   if (remoteTagExists && !forceUpdate) {
     log(`❌ Tag ${tag} 已存在于远程`, colors.red);
-    log('使用 -f 强制更新，或修改 package.json 版本号', colors.yellow);
+    log('使用 -u 强制更新，或修改 package.json 版本号', colors.yellow);
     process.exit(1);
   }
 
