@@ -519,12 +519,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       timestamp: true,
     };
 
-    // 在 macOS TUN 模式下，使用 osascript 运行时无法捕获 stdout
+    // 在 TUN 模式下（macOS 和 Windows），使用权限提升运行时无法捕获 stdout
     // 需要将日志输出到文件，然后通过文件监控读取
     // 注意：这里直接根据 config 参数判断，而不是 this.currentConfig
-    const isMacTunMode =
-      process.platform === 'darwin' && config.proxyModeType?.toLowerCase() !== 'systemproxy';
-    if (isMacTunMode) {
+    const isTunMode = config.proxyModeType?.toLowerCase() !== 'systemproxy';
+    const isMacTunMode = process.platform === 'darwin' && isTunMode;
+    const isWindowsTunMode = process.platform === 'win32' && isTunMode;
+    
+    if (isMacTunMode || isWindowsTunMode) {
       logConfig.output = this.getLogFilePath();
     }
 
@@ -1219,10 +1221,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
             await this.waitForPidFile();
 
             if (this.singboxPid) {
-              // 启动日志文件监控（仅 macOS，Windows 不需要因为进程在后台运行）
-              if (isMacTunMode) {
-                this.startLogFileWatcher();
-              }
+              // 启动日志文件监控（macOS 和 Windows TUN 模式都需要，因为后台进程的 stdout 无法被捕获）
+              this.startLogFileWatcher();
               // 启动健康检查定时器
               this.startHealthCheck();
 
