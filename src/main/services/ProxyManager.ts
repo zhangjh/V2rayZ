@@ -1080,17 +1080,41 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           command = 'powershell.exe';
 
           // PowerShell 脚本：以管理员权限启动 sing-box 并记录 PID
-          // -WindowStyle Hidden 确保 sing-box 窗口隐藏
-          // -PassThru 返回进程对象以获取 PID
-          const psScript = `
-            $process = Start-Process -FilePath '${this.singboxPath.replace(/'/g, "''")}' -ArgumentList 'run','-c','${this.configPath.replace(/'/g, "''")}' -Verb RunAs -PassThru -WindowStyle Hidden
-            if ($process) {
-              $process.Id | Out-File -FilePath '${pidFile.replace(/'/g, "''")}' -Encoding ASCII -NoNewline
-              exit 0
-            } else {
-              exit 1
-            }
-          `.trim();
+          // 使用数组构建脚本避免模板字符串中 $ 被 JS 解析
+          // 详细日志输出到 singbox_startup.log 帮助诊断启动问题
+          const startupLogFile = path.join(getUserDataPath(), 'singbox_startup.log');
+          const singboxPathEsc = this.singboxPath.replace(/'/g, "''");
+          const configPathEsc = this.configPath.replace(/'/g, "''");
+          const pidFileEsc = pidFile.replace(/'/g, "''");
+          const logFileEsc = startupLogFile.replace(/'/g, "''");
+
+          const psScript = [
+            "$ErrorActionPreference = 'Stop'",
+            "$logFile = '" + logFileEsc + "'",
+            "$pidFile = '" + pidFileEsc + "'",
+            "$singboxPath = '" + singboxPathEsc + "'",
+            "$configPath = '" + configPathEsc + "'",
+            "try {",
+            "  'Starting sing-box...' | Out-File -FilePath $logFile -Encoding UTF8",
+            "  'SingboxPath: ' + $singboxPath | Out-File -FilePath $logFile -Append -Encoding UTF8",
+            "  'ConfigPath: ' + $configPath | Out-File -FilePath $logFile -Append -Encoding UTF8",
+            "  if (-not (Test-Path $singboxPath)) { 'ERROR: sing-box not found' | Out-File -FilePath $logFile -Append -Encoding UTF8; exit 1 }",
+            "  if (-not (Test-Path $configPath)) { 'ERROR: config not found' | Out-File -FilePath $logFile -Append -Encoding UTF8; exit 1 }",
+            "  'Starting with UAC...' | Out-File -FilePath $logFile -Append -Encoding UTF8",
+            "  $process = Start-Process -FilePath $singboxPath -ArgumentList 'run','-c',$configPath -Verb RunAs -PassThru -WindowStyle Hidden",
+            "  if ($process -and $process.Id) {",
+            "    'Process started PID: ' + $process.Id | Out-File -FilePath $logFile -Append -Encoding UTF8",
+            "    $process.Id | Out-File -FilePath $pidFile -Encoding ASCII -NoNewline",
+            "    exit 0",
+            "  } else {",
+            "    'ERROR: Start-Process returned null' | Out-File -FilePath $logFile -Append -Encoding UTF8",
+            "    exit 1",
+            "  }",
+            "} catch {",
+            "  'ERROR: ' + $_.Exception.Message | Out-File -FilePath $logFile -Append -Encoding UTF8",
+            "  exit 1",
+            "}"
+          ].join("; ");
 
           args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript];
           this.logToManager('info', 'TUN 模式需要管理员权限，正在请求 UAC 授权...');
@@ -1142,8 +1166,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           if (this.needsOsascript()) {
             if (code === 0) {
               // osascript 成功执行，sing-box 在后台运行
-              // 读取 PID 文件获取实际的 sing-box PID
-              this.readSingBoxPidFromFile();
+              // PID 文件读取由 setTimeout 中的 waitForPidFile 统一处理
               return; // 不调用 handleProcessExit，因为 sing-box 还在运行
             } else {
               // osascript 执行失败（用户取消或其他错误）
@@ -1160,8 +1183,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           if (this.needsWindowsUAC()) {
             if (code === 0) {
               // PowerShell 成功执行，sing-box 以管理员权限在后台运行
-              // 读取 PID 文件获取实际的 sing-box PID
-              this.readSingBoxPidFromFile();
+              // PID 文件读取由 setTimeout 中的 waitForPidFile 统一处理
               return; // 不调用 handleProcessExit，因为 sing-box 还在运行
             } else {
               // PowerShell 执行失败（用户取消 UAC 或其他错误）
@@ -1425,7 +1447,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * 停止 sing-box 进程（Windows TUN 模式）
-   * Windows 上使用 taskkill 命令终止以管理员权限运行的进程
+   * sing-box 以管理员权限（UAC）启动，停止时也需要管理员权限
+   * 使用 PowerShell Start-Process -Verb RunAs 来请求 UAC 权限执行 taskkill
    */
   private async stopSingBoxOnWindows(): Promise<void> {
     if (!this.singboxPid) {
@@ -1434,20 +1457,31 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     const pidToKill = this.singboxPid;
-    this.logToManager('info', `正在停止 sing-box 进程 (PID: ${pidToKill})...`);
+    this.logToManager('info', `正在停止 sing-box 进程 (PID: ${pidToKill})，需要管理员权限...`);
 
     return new Promise((resolve) => {
-      // 使用 taskkill 终止进程
-      // /F 强制终止，/PID 指定进程 ID
-      const killProcess = spawn('taskkill', ['/F', '/PID', pidToKill.toString()], {
+      // 直接使用 PowerShell 以管理员权限执行 taskkill
+      // sing-box 以 UAC 启动，必须用 UAC 权限才能终止
+      const psScript = "Start-Process -FilePath 'taskkill' -ArgumentList '/F','/PID','" + pidToKill.toString() + "' -Verb RunAs -Wait -WindowStyle Hidden";
+
+      const killProcess = spawn('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-Command', psScript
+      ], {
         windowsHide: true,
+      });
+
+      killProcess.stderr?.on('data', (data) => {
+        this.logToManager('warn', `taskkill stderr: ${data.toString()}`);
       });
 
       killProcess.on('exit', (code) => {
         if (code === 0) {
           this.logToManager('info', 'sing-box 进程已停止');
         } else {
-          this.logToManager('warn', `taskkill 退出码: ${code}，进程可能已经退出`);
+          // 非零退出码可能是进程已退出或用户取消 UAC
+          this.logToManager('warn', `停止进程结果: code=${code}`);
         }
 
         // 清理 PID 文件
@@ -1469,12 +1503,6 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
       killProcess.on('error', (error) => {
         this.logToManager('error', `停止 sing-box 进程失败: ${error.message}`);
-        // 尝试使用 process.kill
-        try {
-          process.kill(pidToKill, 'SIGKILL');
-        } catch {
-          // 忽略错误
-        }
         this.cleanup();
         resolve();
       });
@@ -1854,24 +1882,6 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private resetRestartCount(): void {
     this.restartCount = 0;
     this.lastRestartTime = 0;
-  }
-
-  /**
-   * 从 PID 文件读取 sing-box 的实际 PID（macOS TUN 模式）
-   */
-  private async readSingBoxPidFromFile(): Promise<void> {
-    const pidFile = path.join(getUserDataPath(), 'singbox.pid');
-    try {
-      const pidContent = await fs.readFile(pidFile, 'utf-8');
-      const pid = parseInt(pidContent.trim(), 10);
-      if (!isNaN(pid) && pid > 0) {
-        this.singboxPid = pid;
-        this.pid = pid; // 更新显示的 PID
-        this.logToManager('info', `sing-box 后台进程 PID: ${pid}`);
-      }
-    } catch (error) {
-      this.logToManager('warn', `无法读取 sing-box PID 文件: ${error}`);
-    }
   }
 
   /**
