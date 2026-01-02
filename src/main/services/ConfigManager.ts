@@ -293,7 +293,7 @@ export class ConfigManager implements IConfigManager {
       servers: [],
       selectedServerId: null,
       proxyMode: 'global',
-      proxyModeType: 'tun',
+      proxyModeType: 'systemProxy', // 默认使用系统代理模式，不需要管理员权限
       tunConfig: {
         mtu: 9000,
         stack: 'system',

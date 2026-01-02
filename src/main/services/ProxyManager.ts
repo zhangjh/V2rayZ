@@ -299,6 +299,11 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     // 写入配置文件
     await this.writeSingBoxConfig(singboxConfig);
 
+    // TUN 模式下，删除旧的 PID 文件，确保不会读到旧的 PID
+    if (this.needsOsascript() || this.needsWindowsUAC()) {
+      await this.deletePidFile();
+    }
+
     // 使用重试机制启动 sing-box 进程
     await retry(() => this.startSingBoxProcess(), {
       maxRetries: 2,
@@ -620,7 +625,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     const inbounds: SingBoxInbound[] = [];
 
     // 使用小写比较，兼容 SystemProxy/systemProxy 和 Tun/tun
-    const modeType = (config.proxyModeType || 'tun').toLowerCase();
+    const modeType = (config.proxyModeType || 'systemProxy').toLowerCase();
 
     console.log('[ProxyManager] generateInbounds - proxyModeType:', config.proxyModeType);
     console.log('[ProxyManager] generateInbounds - modeType (lowercase):', modeType);
@@ -1135,7 +1140,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         this.pid = this.singboxProcess.pid || null;
         this.startTime = new Date();
 
-        this.logToManager('info', `正在启动 sing-box 进程 (PID: ${this.pid})...`);
+        // macOS/Windows TUN 模式下，这个 PID 是 osascript/PowerShell 的 PID，不是 sing-box 的
+        // 实际的 sing-box PID 会在 waitForPidFile 中从 PID 文件读取
+        if (this.needsOsascript() || this.needsWindowsUAC()) {
+          this.logToManager('info', `正在启动 sing-box（权限提升进程 PID: ${this.pid}）...`);
+        } else {
+          this.logToManager('info', `正在启动 sing-box 进程 (PID: ${this.pid})...`);
+        }
 
         // 监听进程输出
         if (this.singboxProcess.stdout) {
@@ -1575,6 +1586,9 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * macOS: 清理残留的 sing-box 进程
+   * 优化：排除当前正在管理的进程，避免误杀
+   * 
+   * 注意：TUN 模式下 sing-box 以 root 权限运行，必须用 osascript 请求管理员权限才能终止
    */
   private async killOrphanedProcessesMac(): Promise<void> {
     return new Promise((resolve) => {
@@ -1587,21 +1601,27 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       });
 
       pgrep.on('close', async () => {
-        const pidList = pids
+        let pidList = pids
           .trim()
           .split('\n')
           .filter((p) => p.trim())
           .map((p) => parseInt(p.trim(), 10))
           .filter((p) => !isNaN(p) && p > 0);
 
+        // 排除当前正在管理的进程（避免误杀）
+        const currentPid = this.singboxPid || this.pid;
+        if (currentPid) {
+          pidList = pidList.filter((p) => p !== currentPid);
+        }
+
         if (pidList.length === 0) {
           resolve();
           return;
         }
 
-        this.logToManager('warn', `发现 ${pidList.length} 个残留的 sing-box 进程，正在清理...`);
+        this.logToManager('warn', `发现 ${pidList.length} 个残留的 sing-box 进程，正在清理: ${pidList.join(', ')}`);
 
-        // 尝试用 osascript 以 root 权限终止这些进程
+        // TUN 模式下 sing-box 以 root 权限运行，必须用 osascript 请求管理员权限终止
         const killCmd = pidList.map((p) => `kill -9 ${p}`).join('; ');
         const killProcess = spawn('/usr/bin/osascript', [
           '-e',
@@ -1612,30 +1632,15 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           if (code === 0) {
             this.logToManager('info', '残留进程已清理');
           } else {
-            // 如果 osascript 失败（用户取消），尝试普通 kill
-            for (const pid of pidList) {
-              try {
-                process.kill(pid, 'SIGKILL');
-              } catch {
-                // 忽略错误
-              }
-            }
+            this.logToManager('warn', `清理残留进程可能失败，退出码: ${code}`);
           }
-          // 等待更长时间让系统完全清理 TUN 接口和路由表
-          // 这是解决"重启后网络不恢复"问题的关键
+          // 等待系统完全清理 TUN 接口和路由表
           await this.waitForNetworkCleanup();
           resolve();
         });
 
-        killProcess.on('error', async () => {
-          // 如果 osascript 出错，尝试普通 kill
-          for (const pid of pidList) {
-            try {
-              process.kill(pid, 'SIGKILL');
-            } catch {
-              // 忽略错误
-            }
-          }
+        killProcess.on('error', async (error) => {
+          this.logToManager('warn', `清理残留进程失败: ${error.message}`);
           await this.waitForNetworkCleanup();
           resolve();
         });
@@ -1674,41 +1679,97 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
 
   /**
    * Windows: 清理残留的 sing-box 进程
+   * 优化：排除当前正在管理的进程，避免误杀
    */
   private async killOrphanedProcessesWindows(): Promise<void> {
     return new Promise((resolve) => {
-      // 使用 taskkill 强制终止所有 sing-box 进程
-      const taskkill = spawn('taskkill', ['/F', '/IM', 'sing-box.exe'], {
-        shell: true,
-      });
-
-      taskkill.on('close', () => {
+      const { execSync } = require('child_process');
+      
+      try {
+        // 使用 wmic 获取所有 sing-box.exe 进程的 PID
+        const result = execSync('wmic process where "name=\'sing-box.exe\'" get ProcessId /format:list', {
+          encoding: 'utf-8',
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'ignore']
+        });
+        
+        // 解析 PID 列表
+        const pidMatches = result.match(/ProcessId=(\d+)/g);
+        if (!pidMatches || pidMatches.length === 0) {
+          resolve();
+          return;
+        }
+        
+        let pidList = pidMatches
+          .map((m: string) => parseInt(m.replace('ProcessId=', ''), 10))
+          .filter((p: number) => !isNaN(p) && p > 0);
+        
+        // 排除当前正在管理的进程
+        const currentPid = this.singboxPid || this.pid;
+        if (currentPid) {
+          pidList = pidList.filter((p: number) => p !== currentPid);
+        }
+        
+        if (pidList.length === 0) {
+          resolve();
+          return;
+        }
+        
+        this.logToManager('warn', `发现 ${pidList.length} 个残留的 sing-box 进程，正在清理: ${pidList.join(', ')}`);
+        
+        // 逐个终止进程
+        for (const pid of pidList) {
+          try {
+            execSync(`taskkill /F /PID ${pid}`, {
+              windowsHide: true,
+              stdio: 'ignore'
+            });
+          } catch {
+            // 忽略单个进程终止失败
+          }
+        }
+        
+        this.logToManager('info', '残留进程已清理');
+        
         // 等待一小段时间让系统清理
         setTimeout(resolve, 500);
-      });
-
-      taskkill.on('error', () => {
+      } catch {
+        // wmic 命令失败，可能没有残留进程
         resolve();
-      });
+      }
     });
   }
 
   /**
    * 检查进程是否存活
-   * 注意：macOS 上检测 root 权限运行的进程需要特殊处理
+   * 
+   * 统一使用系统命令检测进程，避免 Node.js process.kill(pid, 0) 在检测
+   * 特权进程时的不可靠性（macOS/Windows TUN 模式下 sing-box 以管理员权限运行）
    */
   private isProcessAlive(pid: number): boolean {
     try {
-      // 发送信号 0 不会杀死进程，只检查进程是否存在
-      process.kill(pid, 0);
-      return true;
-    } catch (error: any) {
-      // EPERM 表示进程存在但没有权限发送信号（root 进程）
-      // 这种情况下进程实际上是存活的
-      if (error.code === 'EPERM') {
-        return true;
+      const { execSync } = require('child_process');
+      
+      if (process.platform === 'win32') {
+        // Windows: 使用 tasklist 检测进程
+        // /FI "PID eq xxx" 过滤指定 PID，/NH 不显示表头
+        const result = execSync(`tasklist /FI "PID eq ${pid}" /NH`, { 
+          encoding: 'utf-8',
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'ignore']
+        });
+        // 如果进程存在，输出会包含进程信息；不存在则输出 "INFO: No tasks..."
+        return !result.includes('No tasks') && result.includes(String(pid));
+      } else {
+        // macOS/Linux: 使用 ps 检测进程
+        const result = execSync(`ps -p ${pid} -o pid=`, { 
+          encoding: 'utf-8',
+          stdio: ['ignore', 'pipe', 'ignore']
+        });
+        return result.trim() === String(pid);
       }
-      // ESRCH 表示进程不存在
+    } catch {
+      // 命令执行失败，进程不存在
       return false;
     }
   }
@@ -1885,11 +1946,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   }
 
   /**
-   * 等待 PID 文件被写入（macOS TUN 模式）
+   * 等待 PID 文件被写入（macOS/Windows TUN 模式）
+   * 
+   * 重要：在调用此方法前，必须先删除旧的 PID 文件，否则可能读到旧的 PID
    */
   private async waitForPidFile(): Promise<void> {
     const pidFile = this.getPidFilePath();
-    const maxWaitTime = 5000; // 最多等待 5 秒
+    const maxWaitTime = 10000; // 最多等待 10 秒
     const checkInterval = 200; // 每 200ms 检查一次
     const startTime = Date.now();
 
@@ -1898,10 +1961,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         const pidContent = await fs.readFile(pidFile, 'utf-8');
         const pid = parseInt(pidContent.trim(), 10);
         if (!isNaN(pid) && pid > 0) {
-          this.singboxPid = pid;
-          this.pid = pid;
-          this.logToManager('info', `sing-box 后台进程 PID: ${pid}`);
-          return;
+          // 验证这个 PID 对应的进程确实存在且是 sing-box
+          if (this.isProcessAlive(pid)) {
+            this.singboxPid = pid;
+            this.pid = pid;
+            this.logToManager('info', `sing-box 后台进程 PID: ${pid}`);
+            return;
+          }
         }
       } catch {
         // 文件还不存在，继续等待
@@ -1910,6 +1976,18 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     }
 
     this.logToManager('warn', 'PID 文件等待超时');
+  }
+
+  /**
+   * 删除 PID 文件
+   * 在启动新进程前调用，确保不会读到旧的 PID
+   */
+  private async deletePidFile(): Promise<void> {
+    try {
+      await fs.unlink(this.getPidFilePath());
+    } catch {
+      // 文件不存在，忽略
+    }
   }
 
   /**

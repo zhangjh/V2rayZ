@@ -49,7 +49,7 @@ export function registerProxyHandlers(
       await proxyManager.start(config);
 
       // 系统代理模式：设置系统代理
-      const modeType = (config.proxyModeType || 'tun').toLowerCase();
+      const modeType = (config.proxyModeType || 'systemProxy').toLowerCase();
       if (modeType === 'systemproxy' && systemProxyManager) {
         console.log('[Proxy Handlers] Setting system proxy...');
         await systemProxyManager.enableProxy(

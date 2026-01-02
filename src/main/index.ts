@@ -440,7 +440,7 @@ app.whenReady().then(async () => {
           await proxyManager.start(config);
 
           // 系统代理模式：设置系统代理
-          const modeType = (config.proxyModeType || 'tun').toLowerCase();
+          const modeType = (config.proxyModeType || 'systemProxy').toLowerCase();
           if (modeType === 'systemproxy') {
             await systemProxyManager.enableProxy(
               '127.0.0.1',
