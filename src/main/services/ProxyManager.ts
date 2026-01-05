@@ -441,11 +441,14 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
    * 获取代理状态
    */
   getStatus(): ProxyStatus {
-    // macOS TUN 模式：检查 singboxPid 而不是 singboxProcess
-    // 同时验证进程是否真正存活
-    const activePid = this.singboxPid || this.pid;
-    const isRunning = (this.singboxProcess !== null || this.singboxPid !== null) &&
-      (activePid ? this.isProcessAlive(activePid) : false);
+    // TUN 模式下只检查 singboxPid（sing-box 的实际 PID）
+    // 系统代理模式下检查 pid（直接启动的进程 PID）
+    // 注意：TUN 模式下 this.pid 是 osascript/PowerShell 的 PID，不是 sing-box 的
+    const isTunMode = this.currentConfig?.proxyModeType === 'tun';
+    const activePid = isTunMode ? this.singboxPid : (this.singboxPid || this.pid);
+    
+    // 验证进程是否真正存活
+    const isRunning = activePid !== null && this.isProcessAlive(activePid);
 
     if (!isRunning || !activePid) {
       return {
@@ -1248,6 +1251,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
             } else {
               const error = '启动 sing-box 进程失败：无法获取进程 PID';
               this.logToManager('error', error);
+              // 启动失败，清理状态，避免健康检查使用错误的 PID
+              this.cleanup();
               reject(new Error(error));
             }
           } else {
@@ -1267,6 +1272,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
             } else {
               const error = '启动 sing-box 进程失败：进程未能正常启动';
               this.logToManager('error', error);
+              // 启动失败，清理状态
+              this.cleanup();
               reject(new Error(error));
             }
           }
@@ -1274,6 +1281,8 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         this.logToManager('error', `启动 sing-box 进程时发生异常: ${errorMessage}`);
+        // 异常时也要清理状态
+        this.cleanup();
         reject(error);
       }
     });
@@ -1808,14 +1817,20 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       return;
     }
 
-    const activePid = this.singboxPid || this.pid;
+    // TUN 模式下只检查 singboxPid（sing-box 的实际 PID）
+    // 系统代理模式下检查 pid（直接启动的进程 PID）
+    // 注意：TUN 模式下 this.pid 是 osascript/PowerShell 的 PID，不是 sing-box 的
+    const isTunMode = this.currentConfig?.proxyModeType === 'tun';
+    const activePid = isTunMode ? this.singboxPid : (this.singboxPid || this.pid);
 
     if (!activePid) {
       return;
     }
 
     if (!this.isProcessAlive(activePid)) {
-      this.logToManager('error', `检测到 sing-box 进程 (PID: ${activePid}) 已意外退出`);
+      // 尝试获取更多退出信息
+      const exitInfo = this.getProcessExitInfo();
+      this.logToManager('error', `检测到 sing-box 进程 (PID: ${activePid}) 已意外退出${exitInfo ? `，${exitInfo}` : ''}`);
 
       // 清理资源（但不停止健康检查，因为可能要重启）
       this.singboxProcess = null;
@@ -1943,6 +1958,56 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
   private resetRestartCount(): void {
     this.restartCount = 0;
     this.lastRestartTime = 0;
+  }
+
+  /**
+   * 获取进程退出信息（用于诊断）
+   * 尝试从系统日志或 sing-box 日志文件中获取退出原因
+   */
+  private getProcessExitInfo(): string {
+    const info: string[] = [];
+    
+    try {
+      const fsSync = require('fs');
+      const logFilePath = this.getLogFilePath();
+      
+      // 读取 sing-box 日志文件的最后几行
+      if (fsSync.existsSync(logFilePath)) {
+        const logContent = fsSync.readFileSync(logFilePath, 'utf-8');
+        const lines = logContent.trim().split('\n');
+        const lastLines = lines.slice(-10); // 最后 10 行
+        
+        // 查找错误或警告信息
+        for (const line of lastLines) {
+          const lowerLine = line.toLowerCase();
+          if (lowerLine.includes('error') || lowerLine.includes('fatal') || 
+              lowerLine.includes('panic') || lowerLine.includes('failed')) {
+            info.push(`日志: ${line.substring(0, 200)}`);
+          }
+        }
+      }
+      
+      // macOS: 尝试从系统日志获取信息
+      if (process.platform === 'darwin') {
+        const { execSync } = require('child_process');
+        try {
+          // 查询最近的 sing-box 相关系统日志
+          const sysLog = execSync(
+            `log show --predicate 'process == "sing-box"' --last 1m --style compact 2>/dev/null | tail -5`,
+            { encoding: 'utf-8', timeout: 3000 }
+          ).trim();
+          if (sysLog) {
+            info.push(`系统日志: ${sysLog.substring(0, 300)}`);
+          }
+        } catch {
+          // 忽略系统日志查询失败
+        }
+      }
+    } catch (error) {
+      // 忽略诊断错误
+    }
+    
+    return info.length > 0 ? info.join('; ') : '';
   }
 
   /**
