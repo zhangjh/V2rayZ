@@ -6,7 +6,7 @@
 
 ## ✨ 功能特性
 
-- ✅ 支持 VLESS 和 Trojan 协议
+- ✅ 支持 VLESS 、Trojan 和hysteria2协议
 - ✅ 多种代理模式（全局、智能、直连）
 - ✅ TUN 透明代理模式
 - ✅ 自定义域名路由规则
