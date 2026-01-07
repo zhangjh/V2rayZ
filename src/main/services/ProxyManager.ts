@@ -20,6 +20,7 @@ import { getUserDataPath } from '../utils/paths';
  * 用于路由规则中的直连配置
  */
 const PRIVATE_IP_CIDRS = [
+  // IPv4 私有地址
   '10.0.0.0/8',
   '172.16.0.0/12',
   '192.168.0.0/16',
@@ -27,6 +28,11 @@ const PRIVATE_IP_CIDRS = [
   '169.254.0.0/16',
   '224.0.0.0/4',
   '240.0.0.0/4',
+  // IPv6 私有地址
+  '::1/128',           // loopback
+  'fc00::/7',          // unique local address (ULA)
+  'fe80::/10',         // link-local
+  'ff00::/8',          // multicast
 ];
 
 /**
@@ -593,7 +599,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       ],
       rules: [],
       final: 'dns-local',
-      strategy: 'ipv4_only',
+      // 不设置 strategy，允许 IPv4 和 IPv6 DNS 查询都返回 FakeIP
     };
 
     const dnsRules: SingBoxDnsRule[] = [];
@@ -687,7 +693,10 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       const tunInbound: SingBoxInbound = {
         type: 'tun',
         tag: 'tun-in',
-        address: [config.tunConfig?.inet4Address || '172.19.0.1/30'],
+        address: [
+          config.tunConfig?.inet4Address || '172.19.0.1/30',
+          config.tunConfig?.inet6Address || 'fdfe:dcba:9876::1/126',
+        ],
         mtu: config.tunConfig?.mtu || 1400,
         auto_route: config.tunConfig?.autoRoute ?? true,
         // macOS 上不使用 strict_route，避免网络完全不通
