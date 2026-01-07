@@ -74,7 +74,7 @@ export function RulesPage() {
                 <TableRow>
                   <TableHead className="w-[50px]">启用</TableHead>
                   <TableHead>域名</TableHead>
-                  <TableHead className="w-[120px]">策略</TableHead>
+                  <TableHead className="w-[160px]">策略</TableHead>
                   <TableHead className="w-[120px] text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -100,13 +100,20 @@ export function RulesPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={rule.action === 'proxy' ? 'default' : 'secondary'}>
-                        {rule.action === 'proxy'
-                          ? '代理'
-                          : rule.action === 'direct'
-                            ? '直连'
-                            : '阻止'}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={rule.action === 'proxy' ? 'default' : 'secondary'}>
+                          {rule.action === 'proxy'
+                            ? '代理'
+                            : rule.action === 'direct'
+                              ? '直连'
+                              : '阻止'}
+                        </Badge>
+                        {rule.bypassFakeIP && (
+                          <Badge variant="outline" className="text-xs text-muted-foreground whitespace-nowrap">
+                            真实DNS
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -136,6 +143,7 @@ export function RulesPage() {
           <p>• 每条规则支持多个域名，每行一个</p>
           <p>• 规则按优先级从上到下匹配</p>
           <p>• 自定义规则优先级高于全局代理模式和智能分流</p>
+          <p>• <strong>绕过 FakeIP</strong>：使用真实 DNS 解析，适用于 QUIC/UDP 协议（如 Cloudflare Tunnel）</p>
         </CardContent>
       </Card>
 

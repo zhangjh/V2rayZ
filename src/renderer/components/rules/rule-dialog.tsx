@@ -40,6 +40,7 @@ const ruleFormSchema = z.object({
   domains: z.string().min(1, '域名不能为空'),
   action: z.enum(['proxy', 'direct', 'block']),
   enabled: z.boolean(),
+  bypassFakeIP: z.boolean(),
 });
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>;
@@ -61,6 +62,7 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
       domains: '',
       action: 'proxy',
       enabled: true,
+      bypassFakeIP: false,
     },
   });
 
@@ -71,12 +73,14 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
           domains: rule.domains.join('\n'),
           action: rule.action,
           enabled: rule.enabled,
+          bypassFakeIP: rule.bypassFakeIP ?? false,
         });
       } else {
         form.reset({
           domains: '',
           action: 'proxy',
           enabled: true,
+          bypassFakeIP: false,
         });
       }
     }
@@ -116,6 +120,7 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
           domains,
           action: values.action as RuleAction,
           enabled: values.enabled,
+          bypassFakeIP: values.bypassFakeIP,
         };
         await addCustomRule(newRule);
         toast.success('规则已添加');
@@ -125,6 +130,7 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
           domains,
           action: values.action as RuleAction,
           enabled: values.enabled,
+          bypassFakeIP: values.bypassFakeIP,
         };
         await updateCustomRule(updatedRule);
         toast.success('规则已更新');
@@ -205,6 +211,24 @@ export function RuleDialog({ open, onOpenChange, mode, rule }: RuleDialogProps) 
                   <div className="space-y-1 leading-none">
                     <FormLabel>启用规则</FormLabel>
                     <FormDescription>禁用的规则不会生效</FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bypassFakeIP"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>绕过 FakeIP</FormLabel>
+                    <FormDescription>
+                      默认无需开启，不理解请保持关闭。仅用于解决 Cloudflare Tunnel 等应用的 QUIC 协议兼容性问题。
+                    </FormDescription>
                   </div>
                 </FormItem>
               )}

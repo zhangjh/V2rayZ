@@ -105,6 +105,8 @@ export interface DomainRule {
   domains: string[];
   action: RuleAction;
   enabled: boolean;
+  /** 绕过 FakeIP，使用真实 DNS 解析（解决 QUIC 等协议兼容性问题） */
+  bypassFakeIP?: boolean;
 }
 
 // ============================================================================

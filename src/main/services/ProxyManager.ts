@@ -606,6 +606,16 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       } as SingBoxDnsRule);
     }
 
+    // 绕过 FakeIP 的域名：使用本地 DNS 解析真实 IP
+    // 用于解决 QUIC 等协议与 FakeIP 的兼容性问题（如 Cloudflare Tunnel）
+    const bypassFakeIPDomains = this.collectBypassFakeIPDomains(config.customRules || []);
+    if (bypassFakeIPDomains.length > 0) {
+      dnsRules.push({
+        domain_suffix: bypassFakeIPDomains,
+        server: 'dns-local',
+      } as SingBoxDnsRule);
+    }
+
     // 根据代理模式配置 FakeIP 规则
     if (proxyMode === 'smart' || proxyMode === 'global') {
       // 智能分流/全局代理：A/AAAA 查询走 FakeIP
@@ -619,6 +629,28 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
     dnsConfig.rules = dnsRules;
 
     return dnsConfig;
+  }
+
+  /**
+   * 收集需要绕过 FakeIP 的域名列表
+   * 这些域名将使用本地 DNS 解析真实 IP，而不是返回 FakeIP
+   */
+  private collectBypassFakeIPDomains(
+    customRules: import('../../shared/types').DomainRule[]
+  ): string[] {
+    const domains: string[] = [];
+
+    for (const rule of customRules) {
+      if (!rule.enabled || !rule.bypassFakeIP || rule.domains.length === 0) continue;
+
+      // 统一处理域名格式，移除可能的 *. 前缀
+      for (const domain of rule.domains) {
+        const normalizedDomain = domain.startsWith('*.') ? domain.slice(2) : domain;
+        domains.push(normalizedDomain);
+      }
+    }
+
+    return domains;
   }
 
   /**
