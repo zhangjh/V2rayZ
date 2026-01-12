@@ -270,6 +270,14 @@ export class ConfigManager implements IConfigManager {
     if (typeof config.minimizeToTray !== 'boolean') {
       throw new Error('minimizeToTray must be a boolean');
     }
+    // autoCheckUpdate 是可选字段，兼容旧配置
+    if (config.autoCheckUpdate !== undefined && typeof config.autoCheckUpdate !== 'boolean') {
+      throw new Error('autoCheckUpdate must be a boolean');
+    }
+    // 如果未定义，设置默认值
+    if (config.autoCheckUpdate === undefined) {
+      config.autoCheckUpdate = true;
+    }
 
     // 验证端口
     if (typeof config.socksPort !== 'number' || config.socksPort < 1 || config.socksPort > 65535) {
@@ -304,6 +312,7 @@ export class ConfigManager implements IConfigManager {
       autoStart: false,
       autoConnect: false,
       minimizeToTray: true,
+      autoCheckUpdate: true, // 默认启用启动时自动检查更新
       socksPort: 65534,
       httpPort: 65533,
       logLevel: 'info',

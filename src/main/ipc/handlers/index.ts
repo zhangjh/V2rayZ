@@ -11,3 +11,4 @@ export * from './version-handlers';
 export * from './admin-handlers';
 export * from './update-handlers';
 export * from './rules-handlers';
+export * from './autostart-handlers';

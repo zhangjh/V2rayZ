@@ -146,6 +146,7 @@ export interface UserConfig {
   autoStart: boolean;
   autoConnect: boolean;
   minimizeToTray: boolean;
+  autoCheckUpdate: boolean;
 
   // 端口配置
   socksPort: number;

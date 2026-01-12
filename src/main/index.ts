@@ -16,6 +16,7 @@ import {
   registerAdminHandlers,
   registerUpdateHandlers,
   registerRulesHandlers,
+  registerAutoStartHandlers,
   setUpdateService,
   setTrayStateCallback,
 } from './ipc/handlers';
@@ -419,6 +420,9 @@ app.whenReady().then(async () => {
   registerAdminHandlers();
   registerRulesHandlers(configManager);
 
+  // 注册自启动处理器
+  registerAutoStartHandlers();
+
   // 注册更新处理器
   setUpdateService(updateService);
   updateService.setMainWindow(mainWindow);
@@ -575,6 +579,38 @@ app.whenReady().then(async () => {
 
   // 初始化托盘菜单状态
   updateTrayMenuState(false);
+
+  // 启动后自动检查更新（延迟 5 秒，避免影响启动体验）
+  setTimeout(async () => {
+    try {
+      const config = await configManager.loadConfig();
+      // 检查是否启用了自动检查更新
+      if (config.autoCheckUpdate !== false) {
+        logManager.addLog('info', '正在自动检查更新...', 'Main');
+        const result = await updateService.checkForUpdate();
+        if (result.hasUpdate && result.updateInfo) {
+          logManager.addLog('info', `发现新版本: ${result.updateInfo.version}`, 'Main');
+          // 显示更新对话框
+          const action = await updateService.showUpdateDialog(result.updateInfo);
+          if (action === 'update') {
+            const filePath = await updateService.downloadUpdate(result.updateInfo);
+            if (filePath) {
+              await updateService.installUpdate(filePath);
+            }
+          } else if (action === 'skip') {
+            updateService.skipVersion(result.updateInfo.version);
+          }
+        } else if (result.error) {
+          logManager.addLog('warn', `自动检查更新失败: ${result.error}`, 'Main');
+        } else {
+          logManager.addLog('info', '当前已是最新版本', 'Main');
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logManager.addLog('warn', `自动检查更新时出错: ${errorMessage}`, 'Main');
+    }
+  }, 5000);
 
   // 监听配置变更事件，更新托盘菜单并自动重启代理
   mainEventEmitter.on(MAIN_EVENTS.CONFIG_CHANGED, async () => {
