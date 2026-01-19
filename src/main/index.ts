@@ -580,6 +580,42 @@ app.whenReady().then(async () => {
   // 初始化托盘菜单状态
   updateTrayMenuState(false);
 
+  // 启动时自动连接（延迟 2 秒，等待窗口和服务初始化完成）
+  setTimeout(async () => {
+    try {
+      const config = await configManager.loadConfig();
+      // 检查是否启用了启动时自动连接
+      if (config.autoConnect && config.selectedServerId) {
+        logManager.addLog('info', '启动时自动连接已启用，正在连接...', 'Main');
+        
+        if (proxyManager) {
+          await proxyManager.start(config);
+          
+          // 系统代理模式：设置系统代理
+          const modeType = (config.proxyModeType || 'systemProxy').toLowerCase();
+          if (modeType === 'systemproxy') {
+            await systemProxyManager.enableProxy(
+              '127.0.0.1',
+              config.httpPort || 65533,
+              config.socksPort || 65534
+            );
+          }
+          
+          logManager.addLog('info', '启动时自动连接成功', 'Main');
+          // 更新托盘菜单状态
+          updateTrayMenuState(true);
+        }
+      } else if (config.autoConnect && !config.selectedServerId) {
+        logManager.addLog('warn', '启动时自动连接已启用，但未选择服务器', 'Main');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logManager.addLog('error', `启动时自动连接失败: ${errorMessage}`, 'Main');
+      // 连接失败时更新托盘状态
+      updateTrayMenuState(false, true);
+    }
+  }, 2000);
+
   // 启动后自动检查更新（延迟 5 秒，避免影响启动体验）
   setTimeout(async () => {
     try {

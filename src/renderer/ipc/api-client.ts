@@ -281,7 +281,7 @@ export const autoStartApi = {
   /**
    * 设置自启动
    */
-  async set(enabled: boolean): Promise<void> {
+  async set(enabled: boolean): Promise<boolean> {
     return ipcClient.invoke(IPC_CHANNELS.AUTO_START_SET, { enabled });
   },
 
