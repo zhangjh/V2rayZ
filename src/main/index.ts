@@ -20,6 +20,7 @@ import {
   setUpdateService,
   setTrayStateCallback,
 } from './ipc/handlers';
+import { createAutoStartManager } from './services/AutoStartManager';
 import { UpdateService } from './services/UpdateService';
 import { ipcEventEmitter } from './ipc/ipc-events';
 import { mainEventEmitter, MAIN_EVENTS } from './ipc/main-events';
@@ -422,6 +423,11 @@ app.whenReady().then(async () => {
 
   // 注册自启动处理器
   registerAutoStartHandlers();
+
+  // 同步自启动状态
+  const autoStartManager = createAutoStartManager();
+  const config = await configManager.loadConfig();
+  await autoStartManager.setAutoStart(config.autoStart ?? false);
 
   // 注册更新处理器
   setUpdateService(updateService);
