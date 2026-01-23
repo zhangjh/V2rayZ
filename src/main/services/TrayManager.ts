@@ -80,6 +80,11 @@ export class TrayManager implements ITrayManager {
   private onOpenSettings?: () => void;
   private onCheckUpdate?: () => void;
   private onManageServers?: () => void;
+  private onSpeedTest?: () => void;
+
+  // 测速结果
+  private speedTestResults: Map<string, number | null> = new Map();
+  private isSpeedTesting: boolean = false;
 
   constructor(
     mainWindow: BrowserWindow | null,
@@ -94,6 +99,7 @@ export class TrayManager implements ITrayManager {
       onOpenSettings?: () => void;
       onCheckUpdate?: () => void;
       onManageServers?: () => void;
+      onSpeedTest?: () => void;
     }
   ) {
     this.mainWindow = mainWindow;
@@ -107,6 +113,7 @@ export class TrayManager implements ITrayManager {
     this.onOpenSettings = callbacks?.onOpenSettings;
     this.onCheckUpdate = callbacks?.onCheckUpdate;
     this.onManageServers = callbacks?.onManageServers;
+    this.onSpeedTest = callbacks?.onSpeedTest;
   }
 
   /**
@@ -175,13 +182,11 @@ export class TrayManager implements ITrayManager {
 
       this.tray.setImage(icon);
 
-      // 更新工具提示
-      const tooltips: Record<TrayIconState, string> = {
-        idle: 'FlowZ - 未连接',
-        connecting: 'FlowZ - 连接中...',
-        connected: 'FlowZ - 已连接',
-      };
-      this.tray.setToolTip(tooltips[state]);
+      if (state !== 'connected') {
+        this.speedTestResults.clear();
+      }
+
+      this.updateTrayTooltip();
 
       this.logManager.addLog('info', `Tray icon updated to state: ${state}`, 'TrayManager');
     } catch (error) {
@@ -232,16 +237,18 @@ export class TrayManager implements ITrayManager {
 
     // 构建服务器子菜单
     const serverSubmenu: MenuItemConstructorOptions[] = [];
-    const maxLabelLength = 25; // 最大显示长度
+    const maxLabelLength = 30;
 
     if (data.servers.length > 0) {
-      // 添加服务器列表
       data.servers.forEach((server) => {
         const name = server.name || server.address;
         const protocol = (server.protocol || '').toUpperCase();
-        let label = `${name}（${protocol}）`;
+        const latency = this.speedTestResults.get(server.id);
+        const latencyStr = latency !== undefined
+          ? (latency !== null ? ` [${latency}ms]` : ' [超时]')
+          : '';
+        let label = `${name}（${protocol}）${latencyStr}`;
 
-        // 超长截断
         if (label.length > maxLabelLength) {
           label = label.substring(0, maxLabelLength - 3) + '...';
         }
@@ -253,7 +260,6 @@ export class TrayManager implements ITrayManager {
           click: () => this.handleSelectServer(server.id),
         });
       });
-      // 添加分隔线
       serverSubmenu.push({ type: 'separator' });
     } else {
       serverSubmenu.push({ label: '未配置服务器', enabled: false });
@@ -320,6 +326,12 @@ export class TrayManager implements ITrayManager {
       {
         label: '检查更新',
         click: () => this.handleCheckUpdate(),
+      },
+      { type: 'separator' },
+      {
+        label: this.getSpeedTestLabel(),
+        enabled: !this.isSpeedTesting,
+        click: () => this.handleSpeedTest(),
       },
       { type: 'separator' },
       {
@@ -503,6 +515,71 @@ export class TrayManager implements ITrayManager {
         this.mainWindow.webContents.send('navigate', '/server');
       }
     }
+  }
+
+  /**
+   * 处理测速
+   */
+  private handleSpeedTest(): void {
+    this.logManager.addLog('info', 'Speed test clicked from tray', 'TrayManager');
+    if (this.onSpeedTest) {
+      this.isSpeedTesting = true;
+      this.updateTrayMenu(this.isProxyRunning);
+      this.onSpeedTest();
+    }
+  }
+
+  /**
+   * 获取测速菜单项标签
+   */
+  private getSpeedTestLabel(): string {
+    if (this.isSpeedTesting) {
+      return '测速中...';
+    }
+    return '服务器测速';
+  }
+
+  /**
+   * 更新测速结果
+   */
+  updateSpeedTestResults(results: Map<string, number | null>, servers: ServerConfig[]): void {
+    this.speedTestResults = results;
+    this.isSpeedTesting = false;
+    this.updateTrayMenu(this.isProxyRunning);
+
+    const resultList = servers
+      .map(s => ({
+        name: s.name || s.address,
+        protocol: (s.protocol || '').toUpperCase(),
+        latency: results.get(s.id) ?? null,
+      }))
+      .sort((a, b) => {
+        if (a.latency === null) return 1;
+        if (b.latency === null) return -1;
+        return a.latency - b.latency;
+      });
+
+    // 发送到渲染进程显示 toast
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send('speedTestResult', resultList);
+    }
+  }
+
+  /**
+   * 更新托盘 tooltip
+   */
+  private updateTrayTooltip(): void {
+    if (!this.tray) return;
+
+    const tooltips: Record<TrayIconState, string> = {
+      idle: 'FlowZ - 未连接',
+      connecting: 'FlowZ - 连接中...',
+      connected: 'FlowZ - 已连接',
+    };
+
+    let tooltip = tooltips[this.currentState];
+
+    this.tray.setToolTip(tooltip);
   }
 
   /**

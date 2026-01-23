@@ -580,6 +580,64 @@ app.whenReady().then(async () => {
         mainWindow.webContents.send('navigate', '/server');
       }
     },
+    onSpeedTest: async () => {
+      try {
+        const config = await configManager.loadConfig();
+        if (config.servers.length === 0) {
+          logManager.addLog('warn', 'No servers configured for speed test', 'Main');
+          return;
+        }
+
+        logManager.addLog('info', `Starting speed test for ${config.servers.length} servers`, 'Main');
+
+        const net = require('net');
+        const results = new Map<string, number | null>();
+
+        const testServer = (server: typeof config.servers[0]): Promise<void> => {
+          return new Promise((resolve) => {
+            const startTime = Date.now();
+            const socket = new net.Socket();
+            socket.setTimeout(5000);
+
+            socket.on('connect', () => {
+              const latency = Date.now() - startTime;
+              socket.destroy();
+              results.set(server.id, latency);
+              resolve();
+            });
+
+            socket.on('timeout', () => {
+              socket.destroy();
+              results.set(server.id, null);
+              resolve();
+            });
+
+            socket.on('error', () => {
+              socket.destroy();
+              results.set(server.id, null);
+              resolve();
+            });
+
+            socket.connect(server.port, server.address);
+          });
+        };
+
+        await Promise.all(config.servers.map(testServer));
+
+        logManager.addLog('info', 'Speed test completed for all servers', 'Main');
+
+        if (trayManager) {
+          trayManager.updateSpeedTestResults(results, config.servers);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logManager.addLog('error', `Speed test failed: ${errorMessage}`, 'Main');
+
+        if (trayManager) {
+          trayManager.updateSpeedTestResults(new Map(), []);
+        }
+      }
+    },
   });
   trayManager.createTray();
 
