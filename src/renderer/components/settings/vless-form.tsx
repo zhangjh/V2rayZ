@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -32,10 +31,15 @@ const vlessFormSchema = z.object({
     .min(1, 'UUID 不能为空')
     .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'UUID 格式不正确'),
   encryption: z.string().optional(),
+  flow: z.string().optional(),
   network: z.enum(['Tcp', 'Ws', 'H2']),
-  security: z.enum(['None', 'Tls']),
+  security: z.enum(['None', 'Tls', 'Reality']),
   tlsServerName: z.string().optional(),
   tlsAllowInsecure: z.boolean(),
+  tlsFingerprint: z.string().optional(),
+  // Reality specific settings
+  realityPublicKey: z.string().optional(),
+  realityShortId: z.string().optional(),
   // WebSocket specific settings
   wsPath: z.string().optional(),
   wsHost: z.string().optional(),
@@ -56,72 +60,92 @@ export function VlessForm({
   onTestConnection,
   isTestingConnection,
 }: VlessFormProps) {
-  const form = useForm<VlessFormValues>({
-    resolver: zodResolver(vlessFormSchema),
-    defaultValues: {
-      address: '',
-      port: 443,
-      uuid: '',
-      encryption: 'none',
-      network: 'Tcp',
-      security: 'Tls',
-      tlsServerName: '',
-      tlsAllowInsecure: false,
-      wsPath: '',
-      wsHost: '',
-    },
-  });
+  const normalizeNetwork = (n: string | undefined): 'Tcp' | 'Ws' | 'H2' => {
+    const lower = (n || 'tcp').toLowerCase();
+    if (lower === 'ws' || lower === 'websocket') return 'Ws';
+    if (lower === 'h2' || lower === 'http2') return 'H2';
+    return 'Tcp';
+  };
 
-  useEffect(() => {
-    console.log('[VlessForm] Server config changed:', serverConfig);
+  const normalizeSecurity = (s: string | undefined): 'None' | 'Tls' | 'Reality' => {
+    const lower = (s || 'tls').toLowerCase();
+    if (lower === 'none') return 'None';
+    if (lower === 'reality') return 'Reality';
+    return 'Tls';
+  };
+
+  const getDefaultValues = (): VlessFormValues => {
     if (serverConfig && serverConfig.protocol?.toLowerCase() === 'vless') {
-      // 标准化 network 和 security 值（首字母大写）
-      const normalizeNetwork = (n: string | undefined): 'Tcp' | 'Ws' | 'H2' => {
-        const lower = (n || 'tcp').toLowerCase();
-        if (lower === 'ws' || lower === 'websocket') return 'Ws';
-        if (lower === 'h2' || lower === 'http2') return 'H2';
-        return 'Tcp';
-      };
-      const normalizeSecurity = (s: string | undefined): 'None' | 'Tls' => {
-        const lower = (s || 'tls').toLowerCase();
-        return lower === 'none' ? 'None' : 'Tls';
-      };
-
-      const formData = {
+      return {
         address: serverConfig.address || '',
         port: serverConfig.port || 443,
         uuid: serverConfig.uuid || '',
         encryption: serverConfig.encryption || 'none',
+        flow: serverConfig.flow || '',
         network: normalizeNetwork(serverConfig.network),
         security: normalizeSecurity(serverConfig.security),
         tlsServerName: serverConfig.tlsSettings?.serverName || '',
         tlsAllowInsecure: serverConfig.tlsSettings?.allowInsecure || false,
+        tlsFingerprint: serverConfig.tlsSettings?.fingerprint || 'chrome',
+        realityPublicKey: serverConfig.realitySettings?.publicKey || '',
+        realityShortId: serverConfig.realitySettings?.shortId || '',
         wsPath: serverConfig.wsSettings?.path || '',
         wsHost: serverConfig.wsSettings?.headers?.['Host'] || '',
       };
-      console.log('[VlessForm] Resetting form with:', formData);
-      form.reset(formData);
     }
-  }, [serverConfig, form]);
+    return {
+      address: '',
+      port: 443,
+      uuid: '',
+      encryption: 'none',
+      flow: '',
+      network: 'Tcp',
+      security: 'Tls',
+      tlsServerName: '',
+      tlsAllowInsecure: false,
+      tlsFingerprint: 'chrome',
+      realityPublicKey: '',
+      realityShortId: '',
+      wsPath: '',
+      wsHost: '',
+    };
+  };
+
+  const form = useForm<VlessFormValues>({
+    resolver: zodResolver(vlessFormSchema),
+    defaultValues: getDefaultValues(),
+  });
 
   const handleSubmit = async (values: VlessFormValues) => {
+    const network = values.network.toLowerCase() as 'tcp' | 'ws' | 'h2';
+    const security = values.security.toLowerCase() as 'none' | 'tls' | 'reality';
+
     const serverConfig = {
-      protocol: 'Vless' as const,
+      protocol: 'vless' as const,
       address: values.address,
       port: values.port,
       uuid: values.uuid,
       encryption: values.encryption || 'none',
-      network: values.network,
-      security: values.security,
+      flow: values.flow || undefined,
+      network,
+      security,
       tlsSettings:
-        values.security === 'Tls'
+        security === 'tls' || security === 'reality'
           ? {
-              serverName: values.tlsServerName || null,
-              allowInsecure: values.tlsAllowInsecure,
+              serverName: values.tlsServerName?.trim() || null,
+              allowInsecure: security === 'tls' ? values.tlsAllowInsecure : false,
+              fingerprint: values.tlsFingerprint || 'chrome',
+            }
+          : null,
+      realitySettings:
+        security === 'reality'
+          ? {
+              publicKey: values.realityPublicKey?.trim() || '',
+              shortId: values.realityShortId?.trim() || undefined,
             }
           : null,
       wsSettings:
-        values.network === 'Ws'
+        network === 'ws'
           ? {
               path: values.wsPath || '/',
               host: values.wsHost || null,
@@ -133,6 +157,7 @@ export function VlessForm({
   };
 
   const isTlsEnabled = form.watch('security') === 'Tls';
+  const isRealityEnabled = form.watch('security') === 'Reality';
   const isWebSocketEnabled = form.watch('network') === 'Ws';
 
   return (
@@ -249,6 +274,7 @@ export function VlessForm({
                 <SelectContent>
                   <SelectItem value="None">无</SelectItem>
                   <SelectItem value="Tls">TLS</SelectItem>
+                  <SelectItem value="Reality">Reality</SelectItem>
                 </SelectContent>
               </Select>
               <FormDescription>传输层安全协议</FormDescription>
@@ -276,6 +302,34 @@ export function VlessForm({
 
             <FormField
               control={form.control}
+              name="tlsFingerprint"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>TLS 指纹</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择 TLS 指纹" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="chrome">Chrome</SelectItem>
+                      <SelectItem value="firefox">Firefox</SelectItem>
+                      <SelectItem value="safari">Safari</SelectItem>
+                      <SelectItem value="edge">Edge</SelectItem>
+                      <SelectItem value="ios">iOS</SelectItem>
+                      <SelectItem value="android">Android</SelectItem>
+                      <SelectItem value="random">随机</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>uTLS 客户端指纹伪装</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="tlsAllowInsecure"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
@@ -286,6 +340,109 @@ export function VlessForm({
                     <FormLabel>允许不安全的连接</FormLabel>
                     <FormDescription>跳过 TLS 证书验证（不推荐，仅用于测试）</FormDescription>
                   </div>
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+
+        {isRealityEnabled && (
+          <>
+            <FormField
+              control={form.control}
+              name="tlsServerName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>目标网站（SNI）</FormLabel>
+                  <FormControl>
+                    <Input placeholder="www.microsoft.com" {...field} />
+                  </FormControl>
+                  <FormDescription>Reality 伪装的目标网站域名</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="realityPublicKey"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Public Key</FormLabel>
+                  <FormControl>
+                    <Input placeholder="服务端生成的公钥" {...field} />
+                  </FormControl>
+                  <FormDescription>Reality 公钥，由服务端生成</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="realityShortId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Short ID（可选）</FormLabel>
+                  <FormControl>
+                    <Input placeholder="留空或填写服务端配置的值" {...field} />
+                  </FormControl>
+                  <FormDescription>Reality Short ID，需与服务端配置一致</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="tlsFingerprint"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>TLS 指纹</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择 TLS 指纹" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="chrome">Chrome</SelectItem>
+                      <SelectItem value="firefox">Firefox</SelectItem>
+                      <SelectItem value="safari">Safari</SelectItem>
+                      <SelectItem value="edge">Edge</SelectItem>
+                      <SelectItem value="ios">iOS</SelectItem>
+                      <SelectItem value="android">Android</SelectItem>
+                      <SelectItem value="random">随机</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>uTLS 客户端指纹伪装</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="flow"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Flow（可选）</FormLabel>
+                  <Select
+                    onValueChange={(v) => field.onChange(v === '_none' ? '' : v)}
+                    value={field.value || '_none'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择 Flow 控制" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="_none">无</SelectItem>
+                      <SelectItem value="xtls-rprx-vision">xtls-rprx-vision</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>XTLS 流控，Reality 推荐使用 xtls-rprx-vision</FormDescription>
+                  <FormMessage />
                 </FormItem>
               )}
             />

@@ -130,6 +130,7 @@ export function ServerConfigDialog({
           <div className="border-t pt-6">
             {selectedProtocol === 'vless' && (
               <VlessForm
+                key={currentServerConfig?.id || 'new'}
                 serverConfig={
                   currentServerConfig?.protocol?.toLowerCase() === 'vless'
                     ? currentServerConfig
@@ -142,6 +143,7 @@ export function ServerConfigDialog({
             )}
             {selectedProtocol === 'trojan' && (
               <TrojanForm
+                key={currentServerConfig?.id || 'new'}
                 serverConfig={
                   currentServerConfig?.protocol?.toLowerCase() === 'trojan'
                     ? currentServerConfig
@@ -154,6 +156,7 @@ export function ServerConfigDialog({
             )}
             {selectedProtocol === 'hysteria2' && (
               <Hysteria2Form
+                key={currentServerConfig?.id || 'new'}
                 serverConfig={
                   currentServerConfig?.protocol?.toLowerCase() === 'hysteria2'
                     ? currentServerConfig

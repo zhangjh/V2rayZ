@@ -144,6 +144,11 @@ interface SingBoxOutbound {
       enabled: boolean;
       fingerprint: string;
     };
+    reality?: {
+      enabled: boolean;
+      public_key: string;
+      short_id: string;
+    };
   };
   // Transport
   transport?: {
@@ -678,7 +683,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         type: 'http',
         tag: 'http-in',
         listen: '127.0.0.1',
-        listen_port: config.httpPort || 2080,
+        listen_port: config.httpPort || 65533,
         sniff: true,
         sniff_override_destination: true,
       },
@@ -686,7 +691,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         type: 'socks',
         tag: 'socks-in',
         listen: '127.0.0.1',
-        listen_port: config.socksPort || 2081,
+        listen_port: config.socksPort || 65534,
         sniff: true,
         sniff_override_destination: true,
       }
@@ -725,7 +730,7 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
           http_proxy: {
             enabled: true,
             server: '127.0.0.1',
-            server_port: config.httpPort || 2080,
+            server_port: config.httpPort || 65533,
           },
         };
       }
@@ -829,13 +834,30 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       if (protocol !== 'hysteria2') {
         outbound.tls.utls = {
           enabled: true,
-          fingerprint: 'chrome',
+          fingerprint: server.tlsSettings?.fingerprint || 'chrome',
         };
       }
 
       if (server.tlsSettings?.alpn) {
         outbound.tls.alpn = server.tlsSettings.alpn;
       }
+    }
+
+    // Reality 配置
+    if (server.security === 'reality' && server.realitySettings) {
+      outbound.tls = {
+        enabled: true,
+        server_name: server.tlsSettings?.serverName || server.address,
+        utls: {
+          enabled: true,
+          fingerprint: server.tlsSettings?.fingerprint || 'chrome',
+        },
+        reality: {
+          enabled: true,
+          public_key: server.realitySettings.publicKey,
+          short_id: server.realitySettings.shortId || '',
+        },
+      };
     }
 
     // 传输层配置（不适用于 hysteria2）

@@ -10,6 +10,7 @@ import type {
   Network,
   Security,
   TlsSettings,
+  RealitySettings,
   WebSocketSettings,
   GrpcSettings,
   HttpSettings,
@@ -118,6 +119,9 @@ export class ProtocolParser implements IProtocolParser {
       if (security === 'tls' || security === 'reality') {
         config.tlsSettings = this.parseTlsSettings(params);
       }
+      if (security === 'reality') {
+        config.realitySettings = this.parseRealitySettings(params);
+      }
     }
 
     return config;
@@ -160,6 +164,9 @@ export class ProtocolParser implements IProtocolParser {
       config.security = security;
       if (security === 'tls' || security === 'reality') {
         config.tlsSettings = this.parseTlsSettings(params);
+      }
+      if (security === 'reality') {
+        config.realitySettings = this.parseRealitySettings(params);
       }
     }
 
@@ -384,6 +391,27 @@ export class ProtocolParser implements IProtocolParser {
   }
 
   /**
+   * 解析 Reality 配置
+   */
+  private parseRealitySettings(params: URLSearchParams): RealitySettings | undefined {
+    const publicKey = params.get('pbk');
+    if (!publicKey) {
+      return undefined;
+    }
+
+    const settings: RealitySettings = {
+      publicKey,
+    };
+
+    const shortId = params.get('sid');
+    if (shortId) {
+      settings.shortId = shortId;
+    }
+
+    return settings;
+  }
+
+  /**
    * 将服务器配置生成为分享 URL
    */
   generateUrl(config: ServerConfig): string {
@@ -560,6 +588,13 @@ export class ProtocolParser implements IProtocolParser {
       }
       if (config.tlsSettings.fingerprint) {
         params.set('fp', config.tlsSettings.fingerprint);
+      }
+    }
+
+    if (config.security === 'reality' && config.realitySettings) {
+      params.set('pbk', config.realitySettings.publicKey);
+      if (config.realitySettings.shortId) {
+        params.set('sid', config.realitySettings.shortId);
       }
     }
   }

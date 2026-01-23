@@ -28,6 +28,11 @@ export interface TlsSettings {
   fingerprint?: string;
 }
 
+export interface RealitySettings {
+  publicKey: string;
+  shortId?: string;
+}
+
 export interface WebSocketSettings {
   path?: string;
   headers?: Record<string, string>;
@@ -85,6 +90,9 @@ export interface ServerConfig {
 
   // TLS 配置
   tlsSettings?: TlsSettings;
+
+  // Reality 配置
+  realitySettings?: RealitySettings;
 
   // 传输层特定配置
   wsSettings?: WebSocketSettings;
