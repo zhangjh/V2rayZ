@@ -591,34 +591,71 @@ app.whenReady().then(async () => {
         logManager.addLog('info', `Starting speed test for ${config.servers.length} servers`, 'Main');
 
         const net = require('net');
+        const dgram = require('dgram');
         const results = new Map<string, number | null>();
 
         const testServer = (server: typeof config.servers[0]): Promise<void> => {
           return new Promise((resolve) => {
             const startTime = Date.now();
-            const socket = new net.Socket();
-            socket.setTimeout(5000);
+            const protocol = server.protocol?.toLowerCase();
 
-            socket.on('connect', () => {
-              const latency = Date.now() - startTime;
-              socket.destroy();
-              results.set(server.id, latency);
-              resolve();
-            });
+            if (protocol === 'hysteria2') {
+              // Hysteria2 使用 UDP
+              const client = dgram.createSocket('udp4');
+              const timeout = setTimeout(() => {
+                client.close();
+                results.set(server.id, null);
+                resolve();
+              }, 5000);
 
-            socket.on('timeout', () => {
-              socket.destroy();
-              results.set(server.id, null);
-              resolve();
-            });
+              client.on('error', () => {
+                clearTimeout(timeout);
+                client.close();
+                results.set(server.id, null);
+                resolve();
+              });
 
-            socket.on('error', () => {
-              socket.destroy();
-              results.set(server.id, null);
-              resolve();
-            });
+              // 发送一个空包探测
+              const message = Buffer.alloc(1);
+              client.send(message, server.port, server.address, (err: Error | null) => {
+                clearTimeout(timeout);
+                client.close();
+                if (err) {
+                  results.set(server.id, null);
+                } else {
+                  // UDP 是无连接的，send 成功只表示包已发出
+                  // 这里测量的是 DNS 解析 + 发送时间
+                  const latency = Date.now() - startTime;
+                  results.set(server.id, latency);
+                }
+                resolve();
+              });
+            } else {
+              // VLESS/Trojan 使用 TCP
+              const socket = new net.Socket();
+              socket.setTimeout(5000);
 
-            socket.connect(server.port, server.address);
+              socket.on('connect', () => {
+                const latency = Date.now() - startTime;
+                socket.destroy();
+                results.set(server.id, latency);
+                resolve();
+              });
+
+              socket.on('timeout', () => {
+                socket.destroy();
+                results.set(server.id, null);
+                resolve();
+              });
+
+              socket.on('error', () => {
+                socket.destroy();
+                results.set(server.id, null);
+                resolve();
+              });
+
+              socket.connect(server.port, server.address);
+            }
           });
         };
 

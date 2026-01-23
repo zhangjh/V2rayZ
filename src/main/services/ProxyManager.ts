@@ -679,12 +679,16 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
         tag: 'http-in',
         listen: '127.0.0.1',
         listen_port: config.httpPort || 2080,
+        sniff: true,
+        sniff_override_destination: true,
       },
       {
         type: 'socks',
         tag: 'socks-in',
         listen: '127.0.0.1',
         listen_port: config.socksPort || 2081,
+        sniff: true,
+        sniff_override_destination: true,
       }
     );
 
