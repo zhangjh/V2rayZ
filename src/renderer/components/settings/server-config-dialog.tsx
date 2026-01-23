@@ -29,8 +29,6 @@ interface ServerConfigDialogProps {
   onSave: (
     serverConfig: Omit<ServerConfigWithId, 'id' | 'createdAt' | 'updatedAt'>
   ) => Promise<void>;
-  onTestConnection: () => Promise<void>;
-  isTestingConnection: boolean;
 }
 
 export function ServerConfigDialog({
@@ -38,8 +36,6 @@ export function ServerConfigDialog({
   onOpenChange,
   server,
   onSave,
-  onTestConnection,
-  isTestingConnection,
 }: ServerConfigDialogProps) {
   const [serverName, setServerName] = useState('');
   const [selectedProtocol, setSelectedProtocol] = useState<ProtocolType>('vless');
@@ -51,7 +47,6 @@ export function ServerConfigDialog({
     if (open) {
       if (server) {
         setServerName(server.name);
-        // 统一转换为小写以匹配 Select 的值
         const normalizedProtocol = server.protocol.toLowerCase() as ProtocolType;
         setSelectedProtocol(normalizedProtocol);
         setCurrentServerConfig(server);
@@ -79,7 +74,6 @@ export function ServerConfigDialog({
 
   const handleProtocolChange = (protocol: ProtocolType) => {
     setSelectedProtocol(protocol);
-    // Clear current config when switching protocols
     if (protocol !== currentServerConfig?.protocol) {
       setCurrentServerConfig(null);
     }
@@ -98,7 +92,6 @@ export function ServerConfigDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Server Name */}
           <div className="space-y-2">
             <Label htmlFor="serverName">服务器名称</Label>
             <Input
@@ -110,7 +103,6 @@ export function ServerConfigDialog({
             <p className="text-sm text-muted-foreground">为此服务器配置设置一个便于识别的名称</p>
           </div>
 
-          {/* Protocol Selection */}
           <div className="space-y-2">
             <Label>协议类型</Label>
             <Select value={selectedProtocol} onValueChange={handleProtocolChange}>
@@ -126,7 +118,6 @@ export function ServerConfigDialog({
             <p className="text-sm text-muted-foreground">选择您的代理服务器协议类型</p>
           </div>
 
-          {/* Protocol Form */}
           <div className="border-t pt-6">
             {selectedProtocol === 'vless' && (
               <VlessForm
@@ -137,8 +128,6 @@ export function ServerConfigDialog({
                     : undefined
                 }
                 onSubmit={handleSave}
-                onTestConnection={onTestConnection}
-                isTestingConnection={isTestingConnection}
               />
             )}
             {selectedProtocol === 'trojan' && (
@@ -150,8 +139,6 @@ export function ServerConfigDialog({
                     : undefined
                 }
                 onSubmit={handleSave}
-                onTestConnection={onTestConnection}
-                isTestingConnection={isTestingConnection}
               />
             )}
             {selectedProtocol === 'hysteria2' && (
@@ -163,8 +150,6 @@ export function ServerConfigDialog({
                     : undefined
                 }
                 onSubmit={handleSave}
-                onTestConnection={onTestConnection}
-                isTestingConnection={isTestingConnection}
               />
             )}
           </div>

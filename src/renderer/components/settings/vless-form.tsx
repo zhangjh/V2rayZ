@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { ServerConfig } from '@/bridge/types';
 
 const vlessFormSchema = z.object({
@@ -37,10 +37,8 @@ const vlessFormSchema = z.object({
   tlsServerName: z.string().optional(),
   tlsAllowInsecure: z.boolean(),
   tlsFingerprint: z.string().optional(),
-  // Reality specific settings
   realityPublicKey: z.string().optional(),
   realityShortId: z.string().optional(),
-  // WebSocket specific settings
   wsPath: z.string().optional(),
   wsHost: z.string().optional(),
 });
@@ -50,16 +48,9 @@ type VlessFormValues = z.infer<typeof vlessFormSchema>;
 interface VlessFormProps {
   serverConfig?: ServerConfig;
   onSubmit: (config: any) => Promise<void>;
-  onTestConnection: () => Promise<void>;
-  isTestingConnection: boolean;
 }
 
-export function VlessForm({
-  serverConfig,
-  onSubmit,
-  onTestConnection,
-  isTestingConnection,
-}: VlessFormProps) {
+export function VlessForm({ serverConfig, onSubmit }: VlessFormProps) {
   const normalizeNetwork = (n: string | undefined): 'Tcp' | 'Ws' | 'H2' => {
     const lower = (n || 'tcp').toLowerCase();
     if (lower === 'ws' || lower === 'websocket') return 'Ws';
@@ -487,19 +478,6 @@ export function VlessForm({
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             保存配置
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onTestConnection}
-            disabled={isTestingConnection || form.formState.isSubmitting}
-          >
-            {isTestingConnection ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-            )}
-            测试连接
           </Button>
           <Button
             type="button"

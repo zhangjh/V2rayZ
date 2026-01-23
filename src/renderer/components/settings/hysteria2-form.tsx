@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { ServerConfig } from '@/bridge/types';
 
 const hysteria2FormSchema = z.object({
@@ -37,16 +37,9 @@ type Hysteria2FormValues = z.infer<typeof hysteria2FormSchema>;
 interface Hysteria2FormProps {
   serverConfig?: ServerConfig;
   onSubmit: (config: any) => Promise<void>;
-  onTestConnection: () => Promise<void>;
-  isTestingConnection: boolean;
 }
 
-export function Hysteria2Form({
-  serverConfig,
-  onSubmit,
-  onTestConnection,
-  isTestingConnection,
-}: Hysteria2FormProps) {
+export function Hysteria2Form({ serverConfig, onSubmit }: Hysteria2FormProps) {
   const form = useForm<Hysteria2FormValues>({
     resolver: zodResolver(hysteria2FormSchema),
     defaultValues: {
@@ -281,19 +274,6 @@ export function Hysteria2Form({
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             保存配置
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onTestConnection}
-            disabled={isTestingConnection || form.formState.isSubmitting}
-          >
-            {isTestingConnection ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-            )}
-            测试连接
           </Button>
           <Button
             type="button"

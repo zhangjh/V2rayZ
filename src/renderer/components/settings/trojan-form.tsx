@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { ServerConfig } from '@/bridge/types';
 
 const trojanFormSchema = z.object({
@@ -39,16 +39,9 @@ type TrojanFormValues = z.infer<typeof trojanFormSchema>;
 interface TrojanFormProps {
   serverConfig?: ServerConfig;
   onSubmit: (config: any) => Promise<void>;
-  onTestConnection: () => Promise<void>;
-  isTestingConnection: boolean;
 }
 
-export function TrojanForm({
-  serverConfig,
-  onSubmit,
-  onTestConnection,
-  isTestingConnection,
-}: TrojanFormProps) {
+export function TrojanForm({ serverConfig, onSubmit }: TrojanFormProps) {
   const form = useForm<TrojanFormValues>({
     resolver: zodResolver(trojanFormSchema),
     defaultValues: {
@@ -252,19 +245,6 @@ export function TrojanForm({
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             保存配置
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onTestConnection}
-            disabled={isTestingConnection || form.formState.isSubmitting}
-          >
-            {isTestingConnection ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-            )}
-            测试连接
           </Button>
           <Button
             type="button"

@@ -13,7 +13,6 @@ export function ServerPage() {
   const deleteServer = useAppStore((state) => state.deleteServer);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<ServerConfigWithId | undefined>();
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const servers = config?.servers || [];
   const selectedServerId = config?.selectedServerId;
@@ -110,22 +109,6 @@ export function ServerPage() {
     }
   };
 
-  const handleTestConnection = async () => {
-    setIsTestingConnection(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      toast.success('连接测试成功', {
-        description: '服务器配置有效，可以正常连接。',
-      });
-    } catch (error) {
-      toast.error('连接测试失败', {
-        description: error instanceof Error ? error.message : '测试连接时发生错误',
-      });
-    } finally {
-      setIsTestingConnection(false);
-    }
-  };
-
   const loadConfig = useAppStore((state) => state.loadConfig);
 
   const handleImportSuccess = async () => {
@@ -158,8 +141,6 @@ export function ServerPage() {
         onOpenChange={setIsDialogOpen}
         server={editingServer}
         onSave={handleSaveServer}
-        onTestConnection={handleTestConnection}
-        isTestingConnection={isTestingConnection}
       />
     </div>
   );
