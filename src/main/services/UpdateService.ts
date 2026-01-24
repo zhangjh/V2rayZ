@@ -17,6 +17,7 @@ const GITHUB_REPO = 'FlowZ';
 export class UpdateService {
   private logManager: LogManager;
   private mainWindow: BrowserWindow | null = null;
+  private progressWindow: BrowserWindow | null = null;
   private downloadProgress: UpdateProgress = {
     status: 'idle',
     percentage: 0,
@@ -316,6 +317,277 @@ open "${installerPath}"
    */
   getProgress(): UpdateProgress {
     return { ...this.downloadProgress };
+  }
+
+  /**
+   * 创建下载进度窗口
+   */
+  private createProgressWindow(): BrowserWindow {
+    // 如果已存在进度窗口，先关闭
+    if (this.progressWindow && !this.progressWindow.isDestroyed()) {
+      this.progressWindow.close();
+    }
+
+    const progressWindow = new BrowserWindow({
+      width: 360,
+      height: 100,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      closable: true,
+      frame: false,
+      transparent: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      show: false,
+      backgroundColor: '#ffffff',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    // 加载进度页面 HTML
+    const html = this.getProgressWindowHtml();
+    progressWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
+    progressWindow.once('ready-to-show', () => {
+      progressWindow.show();
+    });
+
+    progressWindow.on('closed', () => {
+      this.progressWindow = null;
+    });
+
+    this.progressWindow = progressWindow;
+    return progressWindow;
+  }
+
+  /**
+   * 更新进度窗口
+   */
+  private updateProgressWindow(percentage: number, message: string): void {
+    if (this.progressWindow && !this.progressWindow.isDestroyed()) {
+      this.progressWindow.webContents.executeJavaScript(`
+        document.getElementById('progress-bar').style.width = '${percentage}%';
+        document.getElementById('progress-text').textContent = '${message}';
+        document.getElementById('progress-percent').textContent = '${percentage}%';
+      `).catch(() => {
+        // 忽略执行错误
+      });
+    }
+  }
+
+  /**
+   * 关闭进度窗口
+   */
+  private closeProgressWindow(): void {
+    if (this.progressWindow && !this.progressWindow.isDestroyed()) {
+      this.progressWindow.close();
+      this.progressWindow = null;
+    }
+  }
+
+  /**
+   * 获取进度窗口 HTML
+   */
+  private getProgressWindowHtml(): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: white;
+      height: 100vh;
+      padding: 24px;
+      -webkit-app-region: drag;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .title svg {
+      width: 20px;
+      height: 20px;
+      animation: bounce 1s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .progress-container {
+      background: #e5e7eb;
+      border-radius: 8px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 8px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .progress-text {
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .progress-percent {
+      font-size: 14px;
+      font-weight: 600;
+      color: #3b82f6;
+    }
+  </style>
+</head>
+<body>
+  <div class="title">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    正在下载更新
+  </div>
+  <div class="progress-container">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+  <div class="progress-info">
+    <span class="progress-text" id="progress-text">准备下载...</span>
+    <span class="progress-percent" id="progress-percent">0%</span>
+  </div>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * 带进度窗口的下载更新（用于托盘触发的更新）
+   */
+  async downloadUpdateWithProgress(updateInfo: UpdateInfo): Promise<string | null> {
+    // 创建进度窗口
+    this.createProgressWindow();
+    this.updateProgressWindow(0, '准备下载...');
+
+    try {
+      this.logManager.addLog('info', `开始下载更新: ${updateInfo.version}`, 'UpdateService');
+
+      const downloadDir = app.getPath('temp');
+      const filePath = path.join(downloadDir, updateInfo.fileName);
+
+      // 如果文件已存在，先删除
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      await this.downloadFileWithProgressWindow(updateInfo.downloadUrl, filePath, updateInfo.fileSize);
+
+      this.logManager.addLog('info', `更新下载完成: ${filePath}`, 'UpdateService');
+      this.updateProgressWindow(100, '下载完成');
+
+      // 延迟关闭进度窗口
+      setTimeout(() => {
+        this.closeProgressWindow();
+      }, 500);
+
+      return filePath;
+    } catch (error: any) {
+      const errorMessage = error?.message || '下载更新失败';
+      this.logManager.addLog('error', `下载更新失败: ${errorMessage}`, 'UpdateService');
+      this.closeProgressWindow();
+
+      // 显示错误对话框
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        dialog.showMessageBox(this.mainWindow, {
+          type: 'error',
+          title: '下载失败',
+          message: '更新下载失败',
+          detail: errorMessage,
+          buttons: ['确定'],
+        });
+      }
+
+      return null;
+    }
+  }
+
+  /**
+   * 带进度窗口的文件下载
+   */
+  private async downloadFileWithProgressWindow(url: string, destPath: string, totalSize: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(destPath);
+      let downloadedBytes = 0;
+
+      const request = (downloadUrl: string) => {
+        https
+          .get(downloadUrl, { headers: { 'User-Agent': 'FlowZ-Electron' } }, (response) => {
+            // 处理重定向
+            if (response.statusCode === 302 || response.statusCode === 301) {
+              const redirectUrl = response.headers.location;
+              if (redirectUrl) {
+                request(redirectUrl);
+                return;
+              }
+            }
+
+            if (response.statusCode !== 200) {
+              reject(new Error(`下载失败: HTTP ${response.statusCode}`));
+              return;
+            }
+
+            response.on('data', (chunk) => {
+              downloadedBytes += chunk.length;
+              file.write(chunk);
+
+              if (totalSize > 0) {
+                const percentage = Math.round((downloadedBytes / totalSize) * 100);
+                const downloadedMB = (downloadedBytes / 1024 / 1024).toFixed(1);
+                const totalMB = (totalSize / 1024 / 1024).toFixed(1);
+                this.updateProgressWindow(percentage, `${downloadedMB} MB / ${totalMB} MB`);
+              }
+            });
+
+            response.on('end', () => {
+              file.end();
+              resolve();
+            });
+
+            response.on('error', (err) => {
+              file.close();
+              fs.unlinkSync(destPath);
+              reject(err);
+            });
+          })
+          .on('error', (err) => {
+            file.close();
+            if (fs.existsSync(destPath)) {
+              fs.unlinkSync(destPath);
+            }
+            reject(err);
+          });
+      };
+
+      request(url);
+    });
   }
 
   // ========== 私有方法 ==========

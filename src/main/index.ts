@@ -553,7 +553,8 @@ app.whenReady().then(async () => {
       if (result.hasUpdate && result.updateInfo) {
         const action = await updateService.showUpdateDialog(result.updateInfo);
         if (action === 'update') {
-          const filePath = await updateService.downloadUpdate(result.updateInfo);
+          // 使用带进度窗口的下载方法
+          const filePath = await updateService.downloadUpdateWithProgress(result.updateInfo);
           if (filePath) {
             await updateService.installUpdate(filePath);
           }
@@ -730,7 +731,8 @@ app.whenReady().then(async () => {
           // 显示更新对话框
           const action = await updateService.showUpdateDialog(result.updateInfo);
           if (action === 'update') {
-            const filePath = await updateService.downloadUpdate(result.updateInfo);
+            // 使用带进度窗口的下载方法
+            const filePath = await updateService.downloadUpdateWithProgress(result.updateInfo);
             if (filePath) {
               await updateService.installUpdate(filePath);
             }
